@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -13,9 +13,13 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Handle Next.js 15 async params
+    const resolvedParams = await Promise.resolve(params)
+    const proposalId = resolvedParams.id
+
     // Verify proposal exists and user has access
     const proposal = await prisma.proposal.findUnique({
-      where: { id: params.id },
+      where: { id: proposalId },
     })
 
     if (!proposal) {
@@ -35,7 +39,7 @@ export async function GET(
     // Fetch finance applications for this proposal
     const applications = await prisma.financeApplication.findMany({
       where: {
-        proposalId: params.id,
+        proposalId: proposalId,
       },
       orderBy: {
         createdAt: 'desc',
