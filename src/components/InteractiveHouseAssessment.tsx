@@ -274,9 +274,11 @@ const defaultAddOns: AddOn[] = [
 
 interface Props {
   onAdminAccess: () => void
+  onSaveRef?: (saveFn: () => Promise<void>) => void
+  onProposalIdChange?: (id: string | null) => void
 }
 
-export function InteractiveHouseAssessment({ onAdminAccess }: Props) {
+export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposalIdChange }: Props) {
   // View state
   const [showPricing, setShowPricing] = useState(false)
   const [pricingStep, setPricingStep] = useState<
@@ -375,6 +377,20 @@ export function InteractiveHouseAssessment({ onAdminAccess }: Props) {
   const [selectedFinancingOption, setSelectedFinancingOption] = useState<FinancingOption | null>(null)
   const [showProposalActions, setShowProposalActions] = useState(false) // State to control proposal actions visibility
   const [proposalId, setProposalId] = useState<string | null>(null) // Store proposal ID for edits
+
+  // Expose save function and proposalId to parent
+  useEffect(() => {
+    if (onSaveRef) {
+      onSaveRef(handleSendToKin)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onSaveRef])
+
+  useEffect(() => {
+    if (onProposalIdChange) {
+      onProposalIdChange(proposalId)
+    }
+  }, [proposalId, onProposalIdChange])
 
   // AI Analysis State
   const [analyzingNameplate, setAnalyzingNameplate] = useState(false)
