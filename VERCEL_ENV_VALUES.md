@@ -12,7 +12,7 @@ Add each variable below. Make sure to select **Production**, **Preview**, and **
 
 ### 1. DATABASE_URL
 ```
-postgresql://neondb_owner:npg_W3HUwEXPZ0eC@ep-late-rice-aervqfab-pooler.c-2.us-east-2.aws.neon.tech/neondb?channel_binding=require&sslmode=require
+postgresql://neondb_owner:npg_W3HUwEXPZ0eC@ep-late-rice-aervqfab-pooler.c-2.us-east-2.aws.neon.tech/neondb?channel_binding=require&sslmode=verify-full
 ```
 
 ### 2. NEXTAUTH_SECRET

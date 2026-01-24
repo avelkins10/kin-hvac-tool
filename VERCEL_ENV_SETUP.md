@@ -14,7 +14,7 @@
 DATABASE_URL=your-neon-postgresql-connection-string
 ```
 - Get this from your Neon dashboard: https://console.neon.tech
-- Format: `postgresql://user:password@host.neon.tech/dbname?sslmode=require`
+- Format: `postgresql://user:password@host.neon.tech/dbname?sslmode=verify-full`
 
 ### NextAuth (Authentication)
 ```

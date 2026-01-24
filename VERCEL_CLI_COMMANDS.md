@@ -23,7 +23,7 @@ Run these commands one by one. When prompted, paste the value and press Enter.
 
 ### Set DATABASE_URL
 ```bash
-echo "postgresql://neondb_owner:npg_W3HUwEXPZ0eC@ep-late-rice-aervqfab-pooler.c-2.us-east-2.aws.neon.tech/neondb?channel_binding=require&sslmode=require" | vercel env add DATABASE_URL production preview development
+echo "postgresql://neondb_owner:npg_W3HUwEXPZ0eC@ep-late-rice-aervqfab-pooler.c-2.us-east-2.aws.neon.tech/neondb?channel_binding=require&sslmode=verify-full" | vercel env add DATABASE_URL production preview development
 ```
 
 ### Set NEXTAUTH_SECRET

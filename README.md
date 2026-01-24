@@ -47,7 +47,7 @@ npm install
 1. Create a Neon account at https://console.neon.tech
 2. Create a new project
 3. Copy the connection string from the dashboard
-4. The connection string format: `postgresql://user:password@host.neon.tech/dbname?sslmode=require`
+4. The connection string format: `postgresql://user:password@host.neon.tech/dbname?sslmode=verify-full`
 
 ### 3. Configure Environment Variables
 

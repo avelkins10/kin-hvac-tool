@@ -17,7 +17,7 @@ echo ""
 
 # Required variables
 echo -e "${GREEN}Setting DATABASE_URL...${NC}"
-vercel env add DATABASE_URL production preview development <<< "postgresql://neondb_owner:npg_W3HUwEXPZ0eC@ep-late-rice-aervqfab-pooler.c-2.us-east-2.aws.neon.tech/neondb?channel_binding=require&sslmode=require"
+vercel env add DATABASE_URL production preview development <<< "postgresql://neondb_owner:npg_W3HUwEXPZ0eC@ep-late-rice-aervqfab-pooler.c-2.us-east-2.aws.neon.tech/neondb?channel_binding=require&sslmode=verify-full"
 
 echo -e "\n${GREEN}Setting NEXTAUTH_SECRET...${NC}"
 vercel env add NEXTAUTH_SECRET production preview development <<< "YTlRW8PLwFVqMD/XZw5NAZDs6vdkQlZHA0EHa+IGDas="
