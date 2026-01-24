@@ -93,6 +93,7 @@ export default async function ProposalViewPage({ params }: PageProps) {
             This proposal is valid for 30 days from the date of issue.
           </p>
         </div>
+        </div>
       </div>
     </AuthenticatedLayout>
   )
