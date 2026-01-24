@@ -1,4 +1,5 @@
 import { LoginForm } from '@/components/auth/LoginForm'
+import { Toaster } from 'sonner'
 
 export default function SignInPage() {
   return (
@@ -7,6 +8,7 @@ export default function SignInPage() {
         <h1 className="text-2xl font-bold text-center mb-6">Sign In</h1>
         <LoginForm />
       </div>
+      <Toaster />
     </div>
   )
 }

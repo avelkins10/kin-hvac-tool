@@ -25,14 +25,21 @@ export function LoginForm() {
         redirect: false,
       })
 
+      console.log('Sign in result:', result)
+
       if (result?.error) {
-        toast.error('Invalid email or password')
-      } else {
+        console.error('Sign in error:', result.error)
+        toast.error(result.error === 'CredentialsSignin' ? 'Invalid email or password' : result.error)
+      } else if (result?.ok) {
         toast.success('Logged in successfully')
-        router.push('/dashboard')
-        router.refresh()
+        // Use window.location for a full page refresh to ensure session is loaded
+        window.location.href = '/dashboard'
+      } else {
+        console.error('Unexpected result:', result)
+        toast.error('Login failed. Please try again.')
       }
     } catch (error) {
+      console.error('Login error:', error)
       toast.error('An error occurred during login')
     } finally {
       setIsLoading(false)
