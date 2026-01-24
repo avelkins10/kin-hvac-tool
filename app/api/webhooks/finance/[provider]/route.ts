@@ -196,8 +196,8 @@ export async function POST(
                 },
               },
             },
-          },
-        })
+          })
+        }
       }
     } else {
       // Legacy format for other providers

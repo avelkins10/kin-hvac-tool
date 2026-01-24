@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../../../auth/[...nextauth]/route'
+import { authOptions } from '../../../../auth/[...nextauth]/route'
 import { prisma } from '@/lib/db'
 import { FinanceProviderFactory } from '@/lib/integrations/finance-factory'
 import {
