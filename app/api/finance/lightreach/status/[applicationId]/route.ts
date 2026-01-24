@@ -59,12 +59,40 @@ export async function GET(
       })
     }
 
-    // Fetch latest status from lender using external application ID
+    // For test mode applications or if externalApplicationId is missing, return cached data
     if (!application.externalApplicationId) {
+      // Check if we have response data (from test mode)
+      if (application.responseData) {
+        const cachedData = application.responseData as any
+        return NextResponse.json({
+          ...application,
+          cached: true,
+          cacheAge: Math.floor(timeSinceUpdate / 1000),
+          lastUpdated: application.updatedAt,
+          testMode: true,
+        })
+      }
+      
+      // No data available
       return NextResponse.json(
-        { error: 'External application ID not found' },
+        { error: 'External application ID not found and no cached data available' },
         { status: 400 }
       )
+    }
+
+    // Check if we're in test mode (no credentials configured)
+    const isTestMode = !process.env.PALMETTO_FINANCE_ACCOUNT_EMAIL || !process.env.PALMETTO_FINANCE_ACCOUNT_PASSWORD
+    
+    // If test mode and we have cached data, return it without API call
+    if (isTestMode && application.responseData) {
+      const cachedData = application.responseData as any
+      return NextResponse.json({
+        ...application,
+        cached: true,
+        cacheAge: Math.floor(timeSinceUpdate / 1000),
+        lastUpdated: application.updatedAt,
+        testMode: true,
+      })
     }
 
     // Fetch payment schedule if available
