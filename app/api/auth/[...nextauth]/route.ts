@@ -30,20 +30,29 @@ export const authOptions: NextAuthOptions = {
             return null
           }
 
-          console.log('Verifying password for user:', credentials.email)
-          console.log('Password length:', credentials.password?.length)
-          console.log('Stored hash prefix:', user.password?.substring(0, 10))
+          console.log('=== AUTH DEBUG ===')
+          console.log('Email:', credentials.email)
+          console.log('Password provided length:', credentials.password?.length)
+          console.log('Password provided (first 3 chars):', credentials.password?.substring(0, 3))
+          console.log('User found:', !!user)
+          console.log('Stored hash prefix:', user.password?.substring(0, 20))
+          console.log('Stored hash length:', user.password?.length)
+          
+          // Test the password directly with bcrypt
+          const bcrypt = require('bcryptjs')
+          const directTest = await bcrypt.compare(credentials.password, user.password)
+          console.log('Direct bcrypt.compare result:', directTest)
           
           const isValid = await verifyPassword(credentials.password, user.password)
-          
-          console.log('Password verification result:', isValid)
+          console.log('verifyPassword result:', isValid)
+          console.log('=== END AUTH DEBUG ===')
 
           if (!isValid) {
-            console.error('Invalid password for user:', credentials.email)
-            console.error('Provided password:', credentials.password)
-            console.error('Stored hash:', user.password)
+            console.error('❌ AUTH FAILED - Invalid password for user:', credentials.email)
             return null
           }
+          
+          console.log('✅ AUTH SUCCESS for user:', credentials.email)
 
           return {
             id: user.id,
