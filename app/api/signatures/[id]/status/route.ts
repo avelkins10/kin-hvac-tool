@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../auth/[...nextauth]/route'
 import { prisma } from '@/lib/db'
-import { docuSignClient } from '@/lib/integrations/docusign'
+import { signNowClient } from '@/lib/integrations/signnow'
 
 export async function GET(
   request: NextRequest,
@@ -30,19 +30,31 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Fetch latest status from DocuSign using stored envelope ID
+    // Fetch latest status from SignNow using stored document ID
     if (!signatureRequest.envelopeId) {
-      return NextResponse.json({ error: 'Envelope ID not found' }, { status: 400 })
+      return NextResponse.json({ error: 'Document ID not found' }, { status: 400 })
     }
 
-    const status = await docuSignClient.getEnvelopeStatus(signatureRequest.envelopeId)
+    const status = await signNowClient.getDocumentStatus(signatureRequest.envelopeId)
+
+    // Map SignNow status to our status enum
+    let mappedStatus = status.status.toUpperCase()
+    if (mappedStatus === 'COMPLETED') {
+      mappedStatus = 'COMPLETED'
+    } else if (mappedStatus === 'PENDING') {
+      mappedStatus = 'PENDING'
+    } else if (mappedStatus === 'SENT') {
+      mappedStatus = 'SENT'
+    } else {
+      mappedStatus = 'PENDING'
+    }
 
     // Update database with latest status
     const updated = await prisma.signatureRequest.update({
       where: { id: params.id },
       data: {
-        status: status.status.toUpperCase() as any,
-        ...(status.status === 'completed' && { completedAt: new Date(status.completedDateTime || new Date()) }),
+        status: mappedStatus as any,
+        ...(status.status === 'completed' && { completedAt: new Date(status.dateCompleted || new Date()) }),
       },
     })
 

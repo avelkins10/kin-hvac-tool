@@ -1,0 +1,8 @@
+{
+  "buildCommand": "prisma generate && prisma migrate deploy && next build",
+  "framework": "nextjs",
+  "installCommand": "pnpm install",
+  "env": {
+    "NEXT_PRIVATE_SKIP_TURBO": "1"
+  }
+}

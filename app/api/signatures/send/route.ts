@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../auth/[...nextauth]/route'
 import { prisma } from '@/lib/db'
-import { docuSignClient } from '@/lib/integrations/docusign'
+import { signNowClient } from '@/lib/integrations/signnow'
 import { generateAgreementPDF } from '@/lib/templates/agreement-generator'
 
 export async function POST(request: NextRequest) {
@@ -39,24 +39,36 @@ export async function POST(request: NextRequest) {
     const pdfBuffer = await generateAgreementPDF(proposal)
     const documentBase64 = pdfBuffer.toString('base64')
 
-    // Create DocuSign envelope
-    const envelope = await docuSignClient.createEnvelope({
+    // Create SignNow document and send for signing
+    const document = await signNowClient.createDocument({
       proposalId,
       documentBase64,
       documentName: `Proposal_${proposalId}.pdf`,
       signers,
       emailSubject: emailSubject || 'Please sign your HVAC proposal agreement',
-      emailBlurb: emailBlurb || 'Please review and sign the attached proposal agreement.',
+      emailMessage: emailBlurb || 'Please review and sign the attached proposal agreement.',
     })
 
-    // Save signature request to database with envelope ID
+    // Map SignNow status to our status enum
+    let mappedStatus = document.status.toUpperCase()
+    if (mappedStatus === 'COMPLETED') {
+      mappedStatus = 'COMPLETED'
+    } else if (mappedStatus === 'PENDING') {
+      mappedStatus = 'PENDING'
+    } else if (mappedStatus === 'SENT') {
+      mappedStatus = 'SENT'
+    } else {
+      mappedStatus = 'PENDING'
+    }
+
+    // Save signature request to database with document ID
     const signatureRequest = await prisma.signatureRequest.create({
       data: {
         proposalId,
-        provider: 'docusign',
-        envelopeId: envelope.envelopeId,
-        status: envelope.status.toUpperCase() as any,
-        documentUrl: `https://demo.docusign.net/Member/PowerFormSigning.aspx?PowerFormId=${envelope.envelopeId}`,
+        provider: 'signnow',
+        envelopeId: document.documentId, // Using envelopeId field to store SignNow document ID
+        status: mappedStatus as any,
+        documentUrl: `https://app.signnow.com/document/${document.documentId}`,
         signers: signers,
       },
     })

@@ -81,11 +81,11 @@ This document summarizes all the files and changes implemented according to the 
 ### 6. E-Signature Integration
 
 **Files Created:**
-- `lib/integrations/docusign.ts` - DocuSign API client
+- `lib/integrations/signnow.ts` - SignNow API client
 - `lib/templates/agreement-generator.ts` - PDF agreement generator
 - `app/api/signatures/send/route.ts` - Send signature request
 - `app/api/signatures/[id]/status/route.ts` - Get signature status
-- `app/api/webhooks/docusign/route.ts` - DocuSign webhook handler
+- `app/api/webhooks/signnow/route.ts` - SignNow webhook handler
 
 **Status:** ✅ Complete
 
@@ -164,7 +164,7 @@ The project uses NextAuth v5 beta. If you encounter adapter issues:
 All variables listed in `.env.example` must be configured:
 - Database connection
 - NextAuth secrets
-- API keys (OpenAI, LightReach, DocuSign)
+- API keys (OpenAI, LightReach, SignNow)
 - SMTP email configuration
 
 ## 📝 Next Steps
@@ -190,7 +190,7 @@ All variables listed in `.env.example` must be configured:
 
 5. **Test integrations:**
    - Test LightReach finance API (with test credentials)
-   - Test DocuSign integration (with sandbox account)
+   - Test SignNow integration (with test account)
    - Test email sending
 
 6. **Deploy:**
@@ -202,7 +202,7 @@ All variables listed in `.env.example` must be configured:
 
 1. **NextAuth v5 Beta**: May have compatibility issues with Prisma adapter. Consider using v4 for production.
 
-2. **DocuSign Envelope ID Storage**: The signature request schema may need an `envelopeId` field to properly track DocuSign envelopes. Currently using `documentUrl` as a workaround.
+2. **SignNow Document ID Storage**: The signature request schema uses the `envelopeId` field to store SignNow document IDs for tracking.
 
 3. **Finance Application External ID**: Consider adding an `externalApplicationId` field to `FinanceApplication` to store the lender's application ID separately.
 
@@ -215,7 +215,7 @@ All variables listed in `.env.example` must be configured:
 - **Total Files Created:** 50+
 - **API Routes:** 30+
 - **Database Models:** 15
-- **Integration Clients:** 3 (LightReach, DocuSign, Email)
+- **Integration Clients:** 3 (LightReach, SignNow, Email)
 - **UI Components:** 5+ (Login, ProposalList, etc.)
 
 All core infrastructure is in place. The remaining work involves updating existing components to use the new API infrastructure.

@@ -25,3 +25,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local packages (uv/uvx installation)
+local-packages/
+
+# macOS
+.DS_Store
+
+# npm lock file (using pnpm)
+package-lock.json

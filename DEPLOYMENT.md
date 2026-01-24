@@ -44,11 +44,11 @@ In Vercel Dashboard → Project Settings → Environment Variables, add:
 **Optional (for full functionality):**
 - `OPENAI_API_KEY` - For nameplate analysis
 - `LIGHTREACH_API_KEY` - For finance integration
-- `DOCUSIGN_INTEGRATION_KEY` - For e-signatures
-- `DOCUSIGN_USER_ID`
-- `DOCUSIGN_ACCOUNT_ID`
-- `DOCUSIGN_PRIVATE_KEY`
-- `DOCUSIGN_BASE_PATH`
+- `SIGNNOW_API_HOST` - SignNow API host (default: https://api.signnow.com)
+- `SIGNNOW_BASIC_TOKEN` - SignNow basic authentication token
+- `SIGNNOW_USERNAME` - SignNow account username
+- `SIGNNOW_PASSWORD` - SignNow account password
+- `SIGNNOW_FROM_EMAIL` - Email address to send signature requests from (optional, defaults to username)
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` - For email
 
 ### 4. Database Migrations

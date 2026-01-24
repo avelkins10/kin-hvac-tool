@@ -322,7 +322,7 @@ model SignatureRequest {
   id                String                @id @default(cuid())
   proposalId        String
   proposal          Proposal              @relation(fields: [proposalId], references: [id], onDelete: Cascade)
-  provider          String                // DocuSign, HelloSign, etc.
+  provider          String                // signnow, pandadoc, docusign, etc.
   envelopeId        String?               // External envelope ID from provider
   status            SignatureRequestStatus @default(DRAFT)
   documentUrl       String?

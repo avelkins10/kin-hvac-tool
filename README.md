@@ -8,7 +8,7 @@ A full-stack transactional platform for creating, managing, and processing HVAC 
 - **Proposal Management**: Create, edit, duplicate, and track proposals with version history
 - **Company Configuration**: Admin portal for managing pricing, equipment, add-ons, materials, labor rates, and more
 - **Finance Integration**: LightReach API integration for financing applications
-- **E-Signature**: DocuSign integration for digital agreement signing
+- **E-Signature**: SignNow integration for digital agreement signing
 - **Email Notifications**: Automated emails for proposals, signatures, and finance approvals
 - **Customer Portal**: Public proposal viewing with secure access
 - **Database**: PostgreSQL with Prisma ORM (Neon PostgreSQL recommended)
@@ -23,7 +23,7 @@ A full-stack transactional platform for creating, managing, and processing HVAC 
 - **PDF Generation**: jsPDF
 - **Email**: Nodemailer
 - **Finance API**: LightReach
-- **E-Signature**: DocuSign
+- **E-Signature**: SignNow
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ A full-stack transactional platform for creating, managing, and processing HVAC 
 - PostgreSQL database (Neon PostgreSQL recommended)
 - Accounts for:
   - LightReach (finance API)
-  - DocuSign (e-signature)
+  - SignNow (e-signature)
   - SMTP email service (Gmail, SendGrid, etc.)
 
 ## Setup Instructions
@@ -63,7 +63,7 @@ Required environment variables:
 - `NEXTAUTH_URL`: Your application URL (http://localhost:3000 for local)
 - `OPENAI_API_KEY`: For nameplate analysis
 - `LIGHTREACH_API_KEY`: LightReach finance API key
-- `DOCUSIGN_*`: DocuSign API credentials
+- `SIGNNOW_*`: SignNow API credentials (SIGNNOW_API_HOST, SIGNNOW_BASIC_TOKEN, SIGNNOW_USERNAME, SIGNNOW_PASSWORD, SIGNNOW_FROM_EMAIL)
 - `SMTP_*`: Email service configuration
 
 ### 4. Set Up Database Schema
