@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { proposalId, applicationData } = body
+    const systemPrice = applicationData?.systemPrice || 0
 
     // Add external reference to link back to our proposal
     if (proposalId && !applicationData.externalReference) {
@@ -101,9 +102,71 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     })
 
-    // Create finance application via LightReach
-    const provider = FinanceProviderFactory.createProvider('lightreach')
-    const response = await provider.createApplication(applicationData)
+    // Check if we're in test mode (no credentials configured)
+    const isTestMode = !process.env.PALMETTO_FINANCE_ACCOUNT_EMAIL || !process.env.PALMETTO_FINANCE_ACCOUNT_PASSWORD
+    const enableTestMode = process.env.ENABLE_FINANCE_TEST_MODE === 'true' || isTestMode
+
+    let response: any
+
+    if (enableTestMode) {
+      // Test mode: Generate mock response based on SSN
+      console.log('[Finance] Running in TEST MODE - generating mock response')
+      const ssn = applicationData.ssn || ''
+      
+      // Map test SSNs to mock responses (monthly payment as percentage of system price)
+      const mockResponses: Record<string, any> = {
+        '500101005': { status: 'conditional', monthlyPaymentPercent: 0.0167, apr: 4.99, term: 60, message: 'Approved with stipulations (FICO 802)' },
+        '500101006': { status: 'conditional', monthlyPaymentPercent: 0.0183, apr: 5.49, term: 60, message: 'Approved with stipulations (FICO 761)' },
+        '500101007': { status: 'conditional', monthlyPaymentPercent: 0.0200, apr: 6.99, term: 60, message: 'Approved with stipulations (FICO 724) - Limited payment options' },
+        '500101008': { status: 'conditional', monthlyPaymentPercent: 0.0213, apr: 7.49, term: 60, message: 'Approved with stipulations (FICO 703) - Limited payment options' },
+        '500101009': { status: 'conditional', monthlyPaymentPercent: 0.0233, apr: 8.99, term: 60, message: 'Approved with stipulations (FICO 662) - Limited payment options' },
+        '500101010': { status: 'denied', message: 'Declined - Low credit score (550)' },
+        '500101011': { status: 'denied', message: 'Declined - Low credit score (500)' },
+        '500101015': { status: 'pending', message: 'Credit frozen - Application pending' },
+        '500101016': { status: 'pending', message: 'Credit frozen - Application pending' },
+        '666222525': { status: 'conditional', monthlyPaymentPercent: 0.0187, apr: 5.99, term: 60, message: 'Approved with stipulations (FICO 671)' },
+        '666822307': { status: 'denied', message: 'Declined - Low credit score (593)' },
+        '666381719': { status: 'conditional', monthlyPaymentPercent: 0.0180, apr: 5.79, term: 60, message: 'Approved with stipulations (FICO 675)' },
+        '666113332': { status: 'conditional', monthlyPaymentPercent: 0.0173, apr: 5.29, term: 60, message: 'Approved with stipulations (FICO 702)' },
+        '666427102': { status: 'denied', message: 'Declined - Low credit score (383)' },
+        '666706006': { status: 'denied', message: 'Declined - Bankruptcy' },
+        '666563316': { status: 'conditional', monthlyPaymentPercent: 0.0160, apr: 4.49, term: 60, message: 'Approved with stipulations (FICO 750)' },
+        '666386118': { status: 'conditional', monthlyPaymentPercent: 0.0157, apr: 4.29, term: 60, message: 'Approved with stipulations (FICO 757)' },
+      }
+
+      // Default to approved if SSN not in test list
+      const mockResponse = mockResponses[ssn] || {
+        status: 'conditional',
+        monthlyPaymentPercent: 0.0167, // ~1.67% of system price
+        apr: 5.99,
+        term: 60,
+        message: 'Test mode - Application approved (default response)',
+      }
+
+      // Calculate monthly payment based on system price
+      const monthlyPayment = mockResponse.monthlyPaymentPercent
+        ? Math.round(systemPrice * mockResponse.monthlyPaymentPercent)
+        : Math.round(systemPrice / (mockResponse.term || 60))
+
+      // Generate a mock application ID
+      const mockApplicationId = `test_${Date.now()}_${Math.random().toString(36).substring(7)}`
+
+      response = {
+        applicationId: mockApplicationId,
+        status: mockResponse.status,
+        monthlyPayment: monthlyPayment,
+        totalCost: systemPrice,
+        apr: mockResponse.apr,
+        term: mockResponse.term || 60,
+        message: mockResponse.message || 'Test mode response',
+      }
+
+      console.log('[Finance] Test mode response:', response)
+    } else {
+      // Production mode: Use real LightReach API
+      const provider = FinanceProviderFactory.createProvider('lightreach')
+      response = await provider.createApplication(applicationData)
+    }
 
     // Save application to database with external application ID
     const financeApplication = await prisma.financeApplication.create({
