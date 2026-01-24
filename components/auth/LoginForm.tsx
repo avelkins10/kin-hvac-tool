@@ -20,8 +20,8 @@ export function LoginForm() {
 
     try {
       const result = await signIn('credentials', {
-        email,
-        password,
+        email: email.trim(),
+        password: password.trim(),
         redirect: false,
       })
 

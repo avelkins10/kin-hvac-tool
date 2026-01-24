@@ -30,10 +30,18 @@ export const authOptions: NextAuthOptions = {
             return null
           }
 
+          console.log('Verifying password for user:', credentials.email)
+          console.log('Password length:', credentials.password?.length)
+          console.log('Stored hash prefix:', user.password?.substring(0, 10))
+          
           const isValid = await verifyPassword(credentials.password, user.password)
+          
+          console.log('Password verification result:', isValid)
 
           if (!isValid) {
             console.error('Invalid password for user:', credentials.email)
+            console.error('Provided password:', credentials.password)
+            console.error('Stored hash:', user.password)
             return null
           }
 
