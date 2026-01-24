@@ -1,9 +1,7 @@
-"use client"
+import { redirect } from 'next/navigation'
+import { requireAuth } from '@/lib/auth-helpers'
 
-import dynamic from "next/dynamic"
-
-const App = dynamic(() => import("@/src/App"), { ssr: false })
-
-export default function Page() {
-  return <App />
+export default async function Page() {
+  await requireAuth()
+  redirect('/dashboard')
 }

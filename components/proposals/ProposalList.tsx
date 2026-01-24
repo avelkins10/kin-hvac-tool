@@ -94,12 +94,19 @@ export function ProposalList() {
     <div className="p-8 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Proposals</h1>
-        <Link href="/proposals/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Proposal
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/proposals/pipeline">
+            <Button variant="outline">
+              Pipeline View
+            </Button>
+          </Link>
+          <Link href="/builder">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Proposal
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="flex gap-4">

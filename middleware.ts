@@ -6,6 +6,11 @@ export default withAuth(
     const token = req.nextauth.token
     const path = req.nextUrl.pathname
 
+    // Protect root route - redirect to signin if not authenticated
+    if (path === '/' && !token) {
+      return NextResponse.redirect(new URL('/auth/signin', req.url))
+    }
+
     // Protect admin routes
     if (path.startsWith('/admin')) {
       if (token?.role !== 'COMPANY_ADMIN' && token?.role !== 'SUPER_ADMIN') {
@@ -20,6 +25,27 @@ export default withAuth(
       }
     }
 
+    // Protect dashboard routes
+    if (path.startsWith('/dashboard')) {
+      if (!token) {
+        return NextResponse.redirect(new URL('/auth/signin', req.url))
+      }
+    }
+
+    // Protect clients routes
+    if (path.startsWith('/clients')) {
+      if (!token) {
+        return NextResponse.redirect(new URL('/auth/signin', req.url))
+      }
+    }
+
+    // Protect builder route
+    if (path.startsWith('/builder')) {
+      if (!token) {
+        return NextResponse.redirect(new URL('/auth/signin', req.url))
+      }
+    }
+
     return NextResponse.next()
   },
   {
@@ -31,7 +57,6 @@ export default withAuth(
         if (
           path.startsWith('/api/auth') ||
           (path.startsWith('/proposals/') && path.endsWith('/view')) ||
-          path === '/' ||
           path === '/unauthorized' ||
           path === '/auth/signin'
         ) {
@@ -39,7 +64,14 @@ export default withAuth(
         }
 
         // Protected routes require authentication
-        if (path.startsWith('/admin') || (path.startsWith('/proposals') && !path.endsWith('/view'))) {
+        if (
+          path === '/' ||
+          path.startsWith('/admin') ||
+          path.startsWith('/dashboard') ||
+          path.startsWith('/clients') ||
+          path.startsWith('/builder') ||
+          (path.startsWith('/proposals') && !path.endsWith('/view'))
+        ) {
           return !!token
         }
 
@@ -50,5 +82,5 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/admin/:path*', '/proposals/:path*'],
+  matcher: ['/', '/admin/:path*', '/proposals/:path*', '/dashboard/:path*', '/clients/:path*', '/builder/:path*'],
 }
