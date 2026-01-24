@@ -46,6 +46,16 @@ export default withAuth(
       }
     }
 
+    // Protect users route - only admins
+    if (path.startsWith('/users')) {
+      if (!token) {
+        return NextResponse.redirect(new URL('/auth/signin', req.url))
+      }
+      if (token.role !== 'COMPANY_ADMIN' && token.role !== 'SUPER_ADMIN') {
+        return NextResponse.redirect(new URL('/unauthorized', req.url))
+      }
+    }
+
     return NextResponse.next()
   },
   {
@@ -70,6 +80,7 @@ export default withAuth(
           path.startsWith('/dashboard') ||
           path.startsWith('/clients') ||
           path.startsWith('/builder') ||
+          path.startsWith('/users') ||
           (path.startsWith('/proposals') && !path.endsWith('/view'))
         ) {
           return !!token
@@ -82,5 +93,5 @@ export default withAuth(
 )
 
 export const config = {
-  matcher: ['/', '/admin/:path*', '/proposals/:path*', '/dashboard/:path*', '/clients/:path*', '/builder/:path*'],
+  matcher: ['/', '/admin/:path*', '/proposals/:path*', '/dashboard/:path*', '/clients/:path*', '/builder/:path*', '/users/:path*'],
 }

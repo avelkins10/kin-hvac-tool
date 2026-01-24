@@ -36,12 +36,15 @@ export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
+  const isAdmin = session?.user?.role === 'COMPANY_ADMIN' || session?.user?.role === 'SUPER_ADMIN'
+  
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Proposals', href: '/proposals', icon: FileText },
     { name: 'Pipeline', href: '/proposals/pipeline', icon: Workflow },
     { name: 'Clients', href: '/clients', icon: Users },
     { name: 'Builder', href: '/builder', icon: Plus },
+    ...(isAdmin ? [{ name: 'Users', href: '/users', icon: Settings }] : []),
   ]
 
   const isActive = (href: string) => {

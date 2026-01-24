@@ -10,6 +10,10 @@ import { Plus, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
 
+async function getSession() {
+  return await getServerSession(authOptions)
+}
+
 async function getDashboardData() {
   const session = await getServerSession(authOptions)
   if (!session?.user) {
@@ -119,6 +123,7 @@ async function getDashboardData() {
 
 export default async function DashboardPage() {
   await requireAuth()
+  const session = await getSession()
   const data = await getDashboardData()
 
   return (
@@ -183,7 +188,7 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Link href="/proposals">
           <Card className="hover:shadow-lg transition-shadow cursor-pointer">
             <CardHeader>
@@ -208,6 +213,16 @@ export default async function DashboardPage() {
             </CardHeader>
           </Card>
         </Link>
+        {(session?.user?.role === 'COMPANY_ADMIN' || session?.user?.role === 'SUPER_ADMIN') && (
+          <Link href="/users">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader>
+                <CardTitle>Users</CardTitle>
+                <CardDescription>Manage team members</CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        )}
       </div>
     </div>
     </AuthenticatedLayout>
