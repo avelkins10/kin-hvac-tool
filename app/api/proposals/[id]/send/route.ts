@@ -6,7 +6,7 @@ import { emailClient } from '@/lib/email/email-client'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -14,8 +14,11 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const resolvedParams = await Promise.resolve(params)
+    const proposalId = resolvedParams.id
+
     const proposal = await prisma.proposal.findUnique({
-      where: { id: params.id },
+      where: { id: proposalId },
     })
 
     if (!proposal) {
@@ -33,11 +36,11 @@ export async function POST(
     }
 
     // Generate proposal URL (public view)
-    const proposalUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/proposals/${params.id}/view`
+    const proposalUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/proposals/${proposalId}/view`
 
     // Send email
     try {
-      await emailClient.sendProposalEmail(customerData.email, params.id, proposalUrl)
+      await emailClient.sendProposalEmail(customerData.email, proposalId, proposalUrl)
     } catch (emailError) {
       console.error('Error sending email:', emailError)
       // Continue even if email fails
@@ -45,7 +48,7 @@ export async function POST(
 
     // Update proposal status
     const updated = await prisma.proposal.update({
-      where: { id: params.id },
+      where: { id: proposalId },
       data: {
         status: 'SENT',
       },

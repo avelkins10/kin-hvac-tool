@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -13,8 +13,11 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const resolvedParams = await Promise.resolve(params)
+    const proposalId = resolvedParams.id
+
     const existingProposal = await prisma.proposal.findUnique({
-      where: { id: params.id },
+      where: { id: proposalId },
     })
 
     if (!existingProposal) {

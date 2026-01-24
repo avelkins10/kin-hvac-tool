@@ -5,13 +5,16 @@ import { prisma } from '@/lib/db'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const resolvedParams = await Promise.resolve(params)
+    const proposalId = resolvedParams.id
 
     const body = await request.json()
     const { status } = body
@@ -27,7 +30,7 @@ export async function PATCH(
     }
 
     const existing = await prisma.proposal.findUnique({
-      where: { id: params.id },
+      where: { id: proposalId },
     })
 
     if (!existing) {
@@ -46,7 +49,7 @@ export async function PATCH(
 
     // Update proposal status
     const updated = await prisma.proposal.update({
-      where: { id: params.id },
+      where: { id: proposalId },
       data: {
         status: status as any,
       },

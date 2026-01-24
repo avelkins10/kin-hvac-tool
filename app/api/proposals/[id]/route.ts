@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -13,8 +13,11 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const resolvedParams = await Promise.resolve(params)
+    const proposalId = resolvedParams.id
+
     const proposal = await prisma.proposal.findUnique({
-      where: { id: params.id },
+      where: { id: proposalId },
       include: {
         user: {
           select: {
@@ -48,7 +51,7 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -56,8 +59,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const resolvedParams = await Promise.resolve(params)
+    const proposalId = resolvedParams.id
+
     const existing = await prisma.proposal.findUnique({
-      where: { id: params.id },
+      where: { id: proposalId },
     })
 
     if (!existing) {
@@ -93,7 +99,7 @@ export async function PATCH(
     } = body
 
     const proposal = await prisma.proposal.update({
-      where: { id: params.id },
+      where: { id: proposalId },
       data: {
         customerData: customerData || null,
         homeData: homeData || null,
@@ -122,7 +128,7 @@ export async function PATCH(
 
     // Create new version
     const latestVersion = await prisma.proposalVersion.findFirst({
-      where: { proposalId: params.id },
+      where: { proposalId: proposalId },
       orderBy: { versionNumber: 'desc' },
     })
 
@@ -130,7 +136,7 @@ export async function PATCH(
 
     await prisma.proposalVersion.create({
       data: {
-        proposalId: params.id,
+        proposalId: proposalId,
         versionNumber: nextVersionNumber,
         data: body,
       },
