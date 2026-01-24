@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Plus, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
+import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
 
 async function getDashboardData() {
   const session = await getServerSession(authOptions)
@@ -121,7 +122,8 @@ export default async function DashboardPage() {
   const data = await getDashboardData()
 
   return (
-    <div className="p-8 space-y-6">
+    <AuthenticatedLayout>
+      <div className="p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -208,5 +210,6 @@ export default async function DashboardPage() {
         </Link>
       </div>
     </div>
+    </AuthenticatedLayout>
   )
 }

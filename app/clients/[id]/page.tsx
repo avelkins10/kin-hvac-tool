@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Mail, Phone, MapPin, Plus } from 'lucide-react'
 import Link from 'next/link'
+import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
 
 async function getClientData(id: string) {
   const session = await getServerSession(authOptions)
@@ -97,20 +98,23 @@ export default async function ClientDetailPage({
 
   if (!data) {
     return (
-      <div className="p-8">
-        <h1 className="text-2xl font-bold mb-4">Client Not Found</h1>
-        <p className="text-gray-500">The client you're looking for doesn't exist.</p>
-        <Link href="/clients" className="text-blue-600 hover:underline mt-4 inline-block">
-          ← Back to Clients
-        </Link>
-      </div>
+      <AuthenticatedLayout>
+        <div className="p-8">
+          <h1 className="text-2xl font-bold mb-4">Client Not Found</h1>
+          <p className="text-gray-500">The client you're looking for doesn't exist.</p>
+          <Link href="/clients" className="text-blue-600 hover:underline mt-4 inline-block">
+            ← Back to Clients
+          </Link>
+        </div>
+      </AuthenticatedLayout>
     )
   }
 
   const { client, proposals, totalValue, proposalCount } = data
 
   return (
-    <div className="p-8 space-y-6">
+    <AuthenticatedLayout>
+      <div className="p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">{client.name || 'Unnamed Customer'}</h1>
@@ -176,6 +180,7 @@ export default async function ClientDetailPage({
       </div>
 
       <ClientProposals proposals={proposals} clientEmail={client.email} />
-    </div>
+      </div>
+    </AuthenticatedLayout>
   )
 }

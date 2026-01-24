@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/db'
+import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
 
 interface PageProps {
   params: { id: string }
@@ -19,8 +20,9 @@ export default async function ProposalViewPage({ params }: PageProps) {
   const selectedEquipment = proposal.selectedEquipment as any
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-8">
+    <AuthenticatedLayout>
+      <div className="bg-gray-50 p-8">
+        <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-8">
         <h1 className="text-3xl font-bold mb-6">HVAC Proposal</h1>
 
         {customerData && (
@@ -92,6 +94,6 @@ export default async function ProposalViewPage({ params }: PageProps) {
           </p>
         </div>
       </div>
-    </div>
+    </AuthenticatedLayout>
   )
 }
