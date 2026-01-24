@@ -26,6 +26,9 @@ interface ApplicationData {
     totalCost?: number
     apr?: number
     term?: number
+    termYears?: number
+    escalatorRate?: number
+    leaseType?: string
     message?: string
     paymentSchedule?: any
     lastFetched?: string
@@ -200,18 +203,51 @@ export function FinanceApplicationStatus({
                 </div>
               )}
             </div>
-            {(responseData.apr || responseData.term) && (
-              <div className="mt-4 flex gap-4 text-sm">
-                {responseData.apr && (
-                  <div>
-                    <span className="text-muted-foreground">APR: </span>
-                    <span className="font-medium">{responseData.apr}%</span>
+            {(responseData.term || responseData.termYears || responseData.escalatorRate !== undefined) && (
+              <div className="mt-4 space-y-2">
+                {application.lenderId === 'lightreach' && responseData.leaseType ? (
+                  // Comfort Plan lease display
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Plan: </span>
+                      <span className="font-medium">{responseData.leaseType}</span>
+                    </div>
+                    {responseData.termYears && (
+                      <div>
+                        <span className="text-muted-foreground">Term: </span>
+                        <span className="font-medium">{responseData.termYears} years ({responseData.term || responseData.termYears * 12} months)</span>
+                      </div>
+                    )}
+                    {responseData.escalatorRate !== undefined && (
+                      <div>
+                        <span className="text-muted-foreground">Escalator: </span>
+                        <span className="font-medium">
+                          {responseData.escalatorRate === 0 
+                            ? '0% (Fixed payment)' 
+                            : `${responseData.escalatorRate}% annually`}
+                        </span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-muted-foreground">APR: </span>
+                      <span className="font-medium">0% (Lease)</span>
+                    </div>
                   </div>
-                )}
-                {responseData.term && (
-                  <div>
-                    <span className="text-muted-foreground">Term: </span>
-                    <span className="font-medium">{responseData.term} months</span>
+                ) : (
+                  // Regular loan display
+                  <div className="flex gap-4 text-sm">
+                    {responseData.apr !== undefined && (
+                      <div>
+                        <span className="text-muted-foreground">APR: </span>
+                        <span className="font-medium">{responseData.apr}%</span>
+                      </div>
+                    )}
+                    {responseData.term && (
+                      <div>
+                        <span className="text-muted-foreground">Term: </span>
+                        <span className="font-medium">{responseData.term} months</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

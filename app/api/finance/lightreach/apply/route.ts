@@ -113,40 +113,86 @@ export async function POST(request: NextRequest) {
       console.log('[Finance] Running in TEST MODE - generating mock response')
       const ssn = applicationData.ssn || ''
       
-      // Map test SSNs to mock responses (monthly payment as percentage of system price)
-      const mockResponses: Record<string, any> = {
-        '500101005': { status: 'conditional', monthlyPaymentPercent: 0.0167, apr: 4.99, term: 60, message: 'Approved with stipulations (FICO 802)' },
-        '500101006': { status: 'conditional', monthlyPaymentPercent: 0.0183, apr: 5.49, term: 60, message: 'Approved with stipulations (FICO 761)' },
-        '500101007': { status: 'conditional', monthlyPaymentPercent: 0.0200, apr: 6.99, term: 60, message: 'Approved with stipulations (FICO 724) - Limited payment options' },
-        '500101008': { status: 'conditional', monthlyPaymentPercent: 0.0213, apr: 7.49, term: 60, message: 'Approved with stipulations (FICO 703) - Limited payment options' },
-        '500101009': { status: 'conditional', monthlyPaymentPercent: 0.0233, apr: 8.99, term: 60, message: 'Approved with stipulations (FICO 662) - Limited payment options' },
-        '500101010': { status: 'denied', message: 'Declined - Low credit score (550)' },
-        '500101011': { status: 'denied', message: 'Declined - Low credit score (500)' },
-        '500101015': { status: 'pending', message: 'Credit frozen - Application pending' },
-        '500101016': { status: 'pending', message: 'Credit frozen - Application pending' },
-        '666222525': { status: 'conditional', monthlyPaymentPercent: 0.0187, apr: 5.99, term: 60, message: 'Approved with stipulations (FICO 671)' },
-        '666822307': { status: 'denied', message: 'Declined - Low credit score (593)' },
-        '666381719': { status: 'conditional', monthlyPaymentPercent: 0.0180, apr: 5.79, term: 60, message: 'Approved with stipulations (FICO 675)' },
-        '666113332': { status: 'conditional', monthlyPaymentPercent: 0.0173, apr: 5.29, term: 60, message: 'Approved with stipulations (FICO 702)' },
-        '666427102': { status: 'denied', message: 'Declined - Low credit score (383)' },
-        '666706006': { status: 'denied', message: 'Declined - Bankruptcy' },
-        '666563316': { status: 'conditional', monthlyPaymentPercent: 0.0160, apr: 4.49, term: 60, message: 'Approved with stipulations (FICO 750)' },
-        '666386118': { status: 'conditional', monthlyPaymentPercent: 0.0157, apr: 4.29, term: 60, message: 'Approved with stipulations (FICO 757)' },
+      // Get Comfort Plan terms from proposal financing option
+      const financingOption = proposal.financingOption as any
+      const planName = financingOption?.name || ''
+      const termMonths = financingOption?.termMonths || 120 // Default to 10 years
+      
+      // Extract escalator from plan name
+      let escalatorRate = 0
+      if (planName.includes('1.99%')) {
+        escalatorRate = 1.99
+      } else if (planName.includes('0.99%')) {
+        escalatorRate = 0.99
+      } else {
+        escalatorRate = 0
       }
-
-      // Default to approved if SSN not in test list
-      const mockResponse = mockResponses[ssn] || {
-        status: 'conditional',
-        monthlyPaymentPercent: 0.0167, // ~1.67% of system price
-        apr: 5.99,
-        term: 60,
-        message: 'Test mode - Application approved (default response)',
+      
+      // Determine term years
+      const termYears = termMonths === 144 ? 12 : 10
+      
+      // Use Comfort Plan payment factors based on term and escalator
+      const paymentFactors: Record<string, number> = {
+        '10yr_0%': 0.01546,
+        '10yr_0.99%': 0.01487,
+        '10yr_1.99%': 0.01416,
+        '12yr_0%': 0.01397,
+        '12yr_0.99%': 0.01321,
+        '12yr_1.99%': 0.01247,
       }
-
-      // Calculate monthly payment based on system price
-      const monthlyPayment = mockResponse.monthlyPaymentPercent
-        ? Math.round(systemPrice * mockResponse.monthlyPaymentPercent)
-        : Math.round(systemPrice / (mockResponse.term || 60))
+      
+      const factorKey = `${termYears}yr_${escalatorRate}%` as keyof typeof paymentFactors
+      const paymentFactor = paymentFactors[factorKey] || paymentFactors['10yr_0%']
+      
+      // Map test SSNs to status (but use Comfort Plan terms for all)
+      const statusMap: Record<string, string> = {
+        '500101005': 'conditional',
+        '500101006': 'conditional',
+        '500101007': 'conditional',
+        '500101008': 'conditional',
+        '500101009': 'conditional',
+        '500101010': 'denied',
+        '500101011': 'denied',
+        '500101015': 'pending',
+        '500101016': 'pending',
+        '666222525': 'conditional',
+        '666822307': 'denied',
+        '666381719': 'conditional',
+        '666113332': 'conditional',
+        '666427102': 'denied',
+        '666706006': 'denied',
+        '666563316': 'conditional',
+        '666386118': 'conditional',
+      }
+      
+      const status = statusMap[ssn] || 'conditional'
+      
+      // Calculate monthly payment using Comfort Plan factor
+      const monthlyPayment = Math.round(systemPrice * paymentFactor * 100) / 100
+      
+      // Build message based on status
+      let message = ''
+      if (status === 'denied') {
+        message = ssn === '666706006' ? 'Declined - Bankruptcy' : 'Declined - Low credit score'
+      } else if (status === 'pending') {
+        message = 'Credit frozen - Application pending'
+      } else {
+        const escalatorText = escalatorRate > 0 
+          ? ` (${escalatorRate}% annual escalator)`
+          : ' (Fixed monthly payment)'
+        message = `Approved with stipulations - ${termYears} Year Comfort Plan${escalatorText}`
+      }
+      
+      const mockResponse = {
+        status,
+        monthlyPayment,
+        totalCost: systemPrice,
+        termMonths,
+        termYears,
+        escalatorRate,
+        apr: 0, // Comfort Plans have 0% APR (it's a lease)
+        message,
+      }
 
       // Generate a mock application ID
       const mockApplicationId = `test_${Date.now()}_${Math.random().toString(36).substring(7)}`
@@ -154,11 +200,14 @@ export async function POST(request: NextRequest) {
       response = {
         applicationId: mockApplicationId,
         status: mockResponse.status,
-        monthlyPayment: monthlyPayment,
-        totalCost: systemPrice,
+        monthlyPayment: mockResponse.monthlyPayment,
+        totalCost: mockResponse.totalCost,
         apr: mockResponse.apr,
-        term: mockResponse.term || 60,
-        message: mockResponse.message || 'Test mode response',
+        term: mockResponse.termMonths,
+        termYears: mockResponse.termYears,
+        escalatorRate: mockResponse.escalatorRate,
+        leaseType: 'Comfort Plan',
+        message: mockResponse.message,
       }
 
       console.log('[Finance] Test mode response:', response)
