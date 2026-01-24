@@ -3,6 +3,6 @@
   "framework": "nextjs",
   "installCommand": "pnpm install",
   "env": {
-    "NEXT_PRIVATE_SKIP_TURBO": "1"
+    "SKIP_ENV_VALIDATION": "1"
   }
 }
