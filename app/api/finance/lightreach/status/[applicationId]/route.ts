@@ -26,12 +26,42 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams
     const forceRefresh = searchParams.get('refresh') === 'true'
 
-    const application = await prisma.financeApplication.findUnique({
-      where: { id: params.applicationId },
-      include: {
-        proposal: true,
-      },
-    })
+    let application
+    try {
+      application = await prisma.financeApplication.findUnique({
+        where: { id: params.applicationId },
+        include: {
+          proposal: true,
+        },
+      })
+    } catch (dbError: any) {
+      // Handle case where externalApplicationId column doesn't exist yet
+      if (dbError?.message?.includes('externalApplicationId') || dbError?.code === 'P2021') {
+        console.warn('[Finance] externalApplicationId column may not exist yet, trying alternative query')
+        // Try querying without the problematic field by selecting specific fields
+        application = await prisma.$queryRaw`
+          SELECT 
+            id, "proposalId", "lenderId", status, "applicationData", "responseData", 
+            "createdAt", "updatedAt"
+          FROM "FinanceApplication"
+          WHERE id = ${params.applicationId}
+        ` as any
+        
+        if (application && Array.isArray(application) && application.length > 0) {
+          application = application[0]
+          // Fetch proposal separately
+          const proposal = await prisma.proposal.findUnique({
+            where: { id: (application as any).proposalId },
+          })
+          ;(application as any).proposal = proposal
+          ;(application as any).externalApplicationId = null // Column doesn't exist
+        } else {
+          application = null
+        }
+      } else {
+        throw dbError
+      }
+    }
 
     if (!application) {
       return NextResponse.json({ error: 'Application not found' }, { status: 404 })
