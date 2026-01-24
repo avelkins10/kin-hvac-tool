@@ -135,7 +135,7 @@ export async function GET(
 
       // Update database with latest status
       const updated = await prisma.financeApplication.update({
-        where: { id: params.applicationId },
+        where: { id: applicationId },
         data: {
           status: status.status.toUpperCase() as any,
           responseData: {
