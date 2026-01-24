@@ -12,7 +12,8 @@ import {
   LogOut,
   Menu,
   X,
-  Workflow
+  Workflow,
+  UserCog
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -44,7 +45,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     { name: 'Pipeline', href: '/proposals/pipeline', icon: Workflow },
     { name: 'Clients', href: '/clients', icon: Users },
     { name: 'Builder', href: '/builder', icon: Plus },
-    ...(isAdmin ? [{ name: 'Users', href: '/users', icon: Settings }] : []),
+    ...(isAdmin ? [{ name: 'Users', href: '/users', icon: UserCog }] : []),
   ]
 
   const isActive = (href: string) => {
