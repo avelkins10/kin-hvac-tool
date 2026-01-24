@@ -1,0 +1,375 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Core entities
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  role          UserRole  @default(SALES_REP)
+  companyId     String?
+  company       Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  emailVerified DateTime?
+  name          String?
+  image         String?
+
+  proposals     Proposal[]
+  accounts      Account[]
+  sessions      Session[]
+
+  @@index([companyId])
+  @@index([email])
+}
+
+// NextAuth adapter models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Company {
+  id       String   @id @default(cuid())
+  name     String
+  settings Json?    // Company-specific settings
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            User[]
+  proposals        Proposal[]
+  hvacSystems      HVACSystem[]
+  addOns           AddOn[]
+  materials        Material[]
+  laborRates       LaborRate[]
+  permitFees       PermitFee[]
+  priceBookUnits   PriceBookUnit[]
+  financingOptions FinancingOption[]
+  maintenancePlans MaintenancePlan[]
+  incentives       Incentive[]
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  SALES_REP
+  CUSTOMER
+}
+
+enum ProposalStatus {
+  DRAFT
+  SENT
+  VIEWED
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model Proposal {
+  id                String         @id @default(cuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId         String
+  company           Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  status            ProposalStatus @default(DRAFT)
+  customerData      Json?          // Customer information
+  homeData          Json?          // Home assessment data
+  hvacData          Json?          // HVAC system data
+  solarData         Json?          // Solar data
+  electricalData    Json?          // Electrical data
+  preferencesData   Json?          // User preferences
+  selectedEquipment Json?          // Selected equipment details
+  addOns            Json?          // Selected add-ons
+  maintenancePlan   Json?          // Selected maintenance plan
+  incentives        Json?          // Applied incentives
+  paymentMethod     Json?          // Payment method details
+  financingOption   Json?          // Financing option details
+  totals            Json?          // Calculated totals
+  nameplateAnalysis Json?          // AI nameplate analysis results
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  expiresAt         DateTime?
+
+  versions           ProposalVersion[]
+  financeApplications FinanceApplication[]
+  signatureRequests   SignatureRequest[]
+  payments            Payment[]
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ProposalVersion {
+  id            String   @id @default(cuid())
+  proposalId    String
+  proposal      Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  data          Json     // Full proposal data snapshot
+  createdAt     DateTime @default(now())
+
+  @@unique([proposalId, versionNumber])
+  @@index([proposalId])
+}
+
+// Configuration entities (company-specific)
+model HVACSystem {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  tier        String?  // good, better, best
+  baseCost    Float
+  marginType  String?  // percentage, fixed
+  marginAmount Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model AddOn {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  baseCost    Float
+  marginType  String?
+  marginAmount Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model Material {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  cost      Float
+  unit      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model LaborRate {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  rate      Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model PermitFee {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  cost      Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model PriceBookUnit {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  brand     String
+  model     String
+  tonnage   Float?
+  tier      String?
+  baseCost  Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([brand, model])
+}
+
+model FinancingOption {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  type      String   // lease, loan, etc.
+  terms     Json?    // Terms and conditions
+  apr       Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model MaintenancePlan {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  tier        String?
+  baseCost    Float
+  marginType  String?
+  marginAmount Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+model Incentive {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  amount      Float
+  type        String?  // rebate, tax_credit, etc.
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+}
+
+// Transaction entities
+enum FinanceApplicationStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  DENIED
+  CONDITIONAL
+  CANCELLED
+}
+
+model FinanceApplication {
+  id                  String                    @id @default(cuid())
+  proposalId          String
+  proposal            Proposal                  @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  lenderId            String                    // LightReach, Synchrony, etc.
+  externalApplicationId String?                 // External lender application ID
+  status              FinanceApplicationStatus  @default(PENDING)
+  applicationData     Json?                     // Application form data
+  responseData        Json?                     // Lender response data
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  @@index([proposalId])
+  @@index([status])
+  @@index([externalApplicationId])
+}
+
+enum SignatureRequestStatus {
+  DRAFT
+  SENT
+  DELIVERED
+  SIGNED
+  COMPLETED
+  DECLINED
+  VOIDED
+}
+
+model SignatureRequest {
+  id                String                @id @default(cuid())
+  proposalId        String
+  proposal          Proposal              @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  provider          String                // DocuSign, HelloSign, etc.
+  envelopeId        String?               // External envelope ID from provider
+  status            SignatureRequestStatus @default(DRAFT)
+  documentUrl       String?
+  signedDocumentUrl String?
+  signers           Json?                 // Array of signer information
+  createdAt         DateTime              @default(now())
+  completedAt       DateTime?
+
+  @@index([proposalId])
+  @@index([status])
+  @@index([envelopeId])
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  proposalId    String
+  proposal      Proposal      @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  amount        Float
+  method        String        // credit_card, ach, check, etc.
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  createdAt     DateTime      @default(now())
+
+  @@index([proposalId])
+  @@index([status])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String?
+  companyId String?
+  type      String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([read])
+}
