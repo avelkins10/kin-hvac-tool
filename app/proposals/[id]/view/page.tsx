@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
+import { ProposalFinanceSection } from '@/components/finance/ProposalFinanceSection'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -93,6 +94,8 @@ export default async function ProposalViewPage({ params }: PageProps) {
             </div>
           </div>
         )}
+
+        <ProposalFinanceSection proposal={proposal} />
 
         <div className="mt-8 p-4 bg-blue-50 rounded">
           <p className="text-sm text-blue-800">

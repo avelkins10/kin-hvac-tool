@@ -62,7 +62,9 @@ Required environment variables:
 - `NEXTAUTH_SECRET`: Generate with `openssl rand -base64 32`
 - `NEXTAUTH_URL`: Your application URL (http://localhost:3000 for local)
 - `OPENAI_API_KEY`: For nameplate analysis
-- `LIGHTREACH_API_KEY`: LightReach finance API key
+- `PALMETTO_FINANCE_ACCOUNT_EMAIL`: Palmetto Finance service account email
+- `PALMETTO_FINANCE_ACCOUNT_PASSWORD`: Palmetto Finance service account password
+- `PALMETTO_FINANCE_ENVIRONMENT`: Environment ('next' for staging, 'prod' for production)
 - `SIGNNOW_*`: SignNow API credentials (SIGNNOW_API_HOST, SIGNNOW_BASIC_TOKEN, SIGNNOW_USERNAME, SIGNNOW_PASSWORD, SIGNNOW_FROM_EMAIL)
 - `SMTP_*`: Email service configuration
 

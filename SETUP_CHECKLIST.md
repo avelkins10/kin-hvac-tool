@@ -71,14 +71,20 @@ SMTP_FROM=your-email@gmail.com
   - Other: Your email provider's SMTP settings
 - **Status**: Code ready, needs SMTP credentials
 
-#### LightReach (for financing)
+#### Palmetto Finance / LightReach (for financing)
 ```
-LIGHTREACH_API_KEY=your-api-key
-LIGHTREACH_BASE_URL=https://api.lightreach.com/v1
+PALMETTO_FINANCE_ACCOUNT_EMAIL=your-service-account@domain.com
+PALMETTO_FINANCE_ACCOUNT_PASSWORD=your-service-account-password
+PALMETTO_FINANCE_ENVIRONMENT=next  # or 'prod' for production
+PALMETTO_SALES_REP_NAME=Austin Elkins
+PALMETTO_SALES_REP_EMAIL=austin@kinhome.com
+PALMETTO_SALES_REP_PHONE=801-928-6369
 ```
-- **Where to get**: LightReach account dashboard
-- **Status**: Code ready, needs API key
-- **Action**: Create LightReach account, get API credentials
+- **Where to get**: Contact developer-support@palmetto.com for service account credentials
+- **Status**: Code ready, needs service account credentials
+- **Action**: Request service account from Palmetto, configure credentials
+- **Note**: Uses OAuth2 authentication with username/password (not API keys)
+- **Sales Rep**: Defaults set to Austin Elkins (austin@kinhome.com, 801-928-6369)
 
 ---
 

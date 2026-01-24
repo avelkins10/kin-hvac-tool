@@ -10,6 +10,12 @@ export interface FinanceApplicationData {
   state: string
   zip: string
   systemPrice: number
+  // Palmetto Finance specific fields
+  salesRepName?: string
+  salesRepEmail?: string
+  salesRepPhoneNumber?: string
+  externalReference?: string // Link to proposal ID
+  externalReferenceIds?: Array<{ type: string; id: string }>
   [key: string]: any // Allow additional lender-specific fields
 }
 

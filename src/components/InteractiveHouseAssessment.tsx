@@ -36,6 +36,10 @@ import { usePriceBook, DEFAULT_TIER_PRICES, type FinancingOption } from "../cont
 import { useMaintenance } from "../contexts/MaintenanceContext"
 import { useIncentives } from "../contexts/IncentivesContext"
 import { toast } from "sonner"
+import { FinanceApplicationList } from "@/components/finance/FinanceApplicationList"
+import { FinanceApplicationForm } from "@/components/finance/FinanceApplicationForm"
+import { FinanceApplicationStatus } from "@/components/finance/FinanceApplicationStatus"
+import { shouldShowFinanceApplication, extractCustomerDataFromProposal, getSystemPriceFromProposal } from "@/lib/finance-helpers"
 
 async function resizeImageToJpeg(file: File, maxDim = 1600): Promise<File> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -377,6 +381,8 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
   const [selectedFinancingOption, setSelectedFinancingOption] = useState<FinancingOption | null>(null)
   const [showProposalActions, setShowProposalActions] = useState(false) // State to control proposal actions visibility
   const [proposalId, setProposalId] = useState<string | null>(null) // Store proposal ID for edits
+  const [showFinanceForm, setShowFinanceForm] = useState(false) // State for finance application form
+  const [selectedFinanceApplicationId, setSelectedFinanceApplicationId] = useState<string | null>(null) // Selected finance application to view
 
   // Expose save function and proposalId to parent
   useEffect(() => {
@@ -816,6 +822,10 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
           savedProposal = await response.json()
           setProposalId(savedProposal.id)
           toast.success("Proposal saved successfully!")
+          // Update proposalId in parent component
+          if (onProposalIdChange) {
+            onProposalIdChange(savedProposal.id)
+          }
         } else {
           throw new Error('Failed to create proposal')
         }
@@ -2309,6 +2319,30 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
               Select a lease term below. Monthly payments are based on system price of $
               {totalCustomerPrice.toLocaleString()}
             </p>
+            
+            {/* Finance Application Section - Show if Comfort Plan selected and proposal saved */}
+            {proposalId && selectedFinancingOption?.provider === "Lightreach" && (
+              <div className="mt-6 p-4 border-2 border-primary/20 rounded-lg bg-primary/5">
+                <h3 className="text-lg font-semibold mb-3">Comfort Plan Finance Application</h3>
+                {selectedFinanceApplicationId ? (
+                  <div className="space-y-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedFinanceApplicationId(null)}
+                    >
+                      ← Back to Applications
+                    </Button>
+                    <FinanceApplicationStatus applicationId={selectedFinanceApplicationId} autoRefresh />
+                  </div>
+                ) : (
+                  <FinanceApplicationList
+                    proposalId={proposalId}
+                    onNewApplication={() => setShowFinanceForm(true)}
+                  />
+                )}
+              </div>
+            )}
             {Object.entries(
               financingOptions
                 .filter(
@@ -3131,6 +3165,42 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
           {renderModalContent()}
         </DialogContent>
       </Dialog>
+
+      {/* Finance Application Form Dialog */}
+      {proposalId && selectedFinancingOption?.provider === "Lightreach" && (
+        <Dialog open={showFinanceForm} onOpenChange={setShowFinanceForm}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Submit Comfort Plan Finance Application</DialogTitle>
+            </DialogHeader>
+            <FinanceApplicationForm
+              proposalId={proposalId}
+              systemPrice={(() => {
+                const equipmentPrice = selectedEquipment?.price || 0
+                const addOnsPrice = addOns.filter((a) => a.selected).reduce((sum, a) => sum + getCustomerPrice(a.price), 0)
+                const maintenancePrice = selectedPlan ? getCustomerPrice(getPlanSalesPrice(selectedPlan)) : 0
+                const incentivesTotal = selectedIncentives.reduce((sum, i) => sum + i.amount, 0)
+                return equipmentPrice + addOnsPrice + maintenancePrice - incentivesTotal
+              })()}
+              initialData={{
+                firstName: customerData.name?.split(' ')[0] || '',
+                lastName: customerData.name?.split(' ').slice(1).join(' ') || '',
+                email: customerData.email || '',
+                phone: customerData.phone || '',
+                address: customerData.address || '',
+                city: customerData.city || '',
+                state: customerData.state || '',
+                zip: customerData.zip || '',
+              }}
+              onSuccess={(applicationId) => {
+                setShowFinanceForm(false)
+                setSelectedFinanceApplicationId(applicationId)
+              }}
+              onCancel={() => setShowFinanceForm(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

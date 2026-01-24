@@ -54,9 +54,30 @@ SMTP_FROM=your-email@gmail.com
 OPENAI_API_KEY=sk-your-openai-api-key
 ```
 
-### LightReach
+### Palmetto Finance (LightReach)
 ```
-LIGHTREACH_API_KEY=your-lightreach-api-key
+# New authentication method (recommended)
+PALMETTO_FINANCE_ACCOUNT_EMAIL=your-service-account@domain.com
+PALMETTO_FINANCE_ACCOUNT_PASSWORD=your-service-account-password
+PALMETTO_FINANCE_ENVIRONMENT=next  # or 'prod' for production
+PALMETTO_FINANCE_BASE_URL=https://next.palmetto.finance  # optional, auto-set based on environment
+PALMETTO_FINANCE_AUTH_URL=https://next.palmetto.finance/api/auth/login  # optional, auto-set based on environment
+
+# Optional - Sales Rep Defaults (used if not provided per application)
+PALMETTO_SALES_REP_NAME=Austin Elkins
+PALMETTO_SALES_REP_EMAIL=austin@kinhome.com
+PALMETTO_SALES_REP_PHONE=801-928-6369
+
+# Optional - Webhook Authentication (from webhook registration)
+# Use ONE of these methods:
+# Method 1: API Key (default)
+LIGHTREACH_WEBHOOK_API_KEY=your-webhook-api-key-from-registration
+# Method 2: Client Headers
+# LIGHTREACH_WEBHOOK_CLIENT_ID=your-client-id
+# LIGHTREACH_WEBHOOK_CLIENT_SECRET=your-client-secret
+
+# Legacy support (deprecated)
+LIGHTREACH_API_KEY=deprecated-use-palmetto-credentials-above
 LIGHTREACH_BASE_URL=https://api.lightreach.com/v1
 ```
 
