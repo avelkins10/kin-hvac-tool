@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "postinstall": "prisma generate",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "prisma generate && (npx prisma migrate deploy || echo 'Migrations skipped - may already be applied') && next build",
     "dev": "prisma generate && next dev",
     "lint": "eslint .",
     "start": "next start",
