@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
-import { RefreshCw, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react'
+import { RefreshCw, CheckCircle2, XCircle, Clock, AlertCircle, FileText, Mail, CheckCircle } from 'lucide-react'
 
 interface FinanceApplicationStatusProps {
   applicationId: string
@@ -32,6 +32,16 @@ interface ApplicationData {
     message?: string
     paymentSchedule?: any
     lastFetched?: string
+    contractStatus?: {
+      sent?: boolean
+      sentAt?: string
+      signed?: boolean
+      signedAt?: string
+      approved?: boolean
+      approvedAt?: string
+      voided?: boolean
+      voidedAt?: string
+    }
   }
   createdAt: string
   updatedAt: string
@@ -259,6 +269,99 @@ export function FinanceApplicationStatus({
           <div className="rounded-lg border p-4">
             <p className="text-sm font-medium mb-1">Message</p>
             <p className="text-sm text-muted-foreground">{responseData.message}</p>
+          </div>
+        )}
+
+        {/* Contract Status Timeline - Only show for LightReach applications */}
+        {application.lenderId === 'lightreach' && responseData.contractStatus && (
+          <div className="rounded-lg border p-4 space-y-3">
+            <p className="text-sm font-medium mb-3">Contract Status</p>
+            <div className="space-y-2">
+              {/* Contract Sent */}
+              <div className="flex items-center gap-2">
+                {responseData.contractStatus.sent ? (
+                  <>
+                    <CheckCircle className="size-4 text-green-600" />
+                    <span className="text-sm">
+                      Contract sent to customer
+                      {responseData.contractStatus.sentAt && (
+                        <span className="text-muted-foreground ml-2">
+                          {new Date(responseData.contractStatus.sentAt).toLocaleString()}
+                        </span>
+                      )}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="size-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Contract not yet sent</span>
+                  </>
+                )}
+              </div>
+
+              {/* Contract Signed */}
+              {responseData.contractStatus.sent && (
+                <div className="flex items-center gap-2">
+                  {responseData.contractStatus.signed ? (
+                    <>
+                      <CheckCircle className="size-4 text-green-600" />
+                      <span className="text-sm">
+                        Contract signed by customer
+                        {responseData.contractStatus.signedAt && (
+                          <span className="text-muted-foreground ml-2">
+                            {new Date(responseData.contractStatus.signedAt).toLocaleString()}
+                          </span>
+                        )}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="size-4 text-yellow-600" />
+                      <span className="text-sm text-muted-foreground">Awaiting customer signature</span>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Contract Approved */}
+              {responseData.contractStatus.signed && (
+                <div className="flex items-center gap-2">
+                  {responseData.contractStatus.approved ? (
+                    <>
+                      <CheckCircle2 className="size-4 text-green-600" />
+                      <span className="text-sm">
+                        Contract approved by Palmetto
+                        {responseData.contractStatus.approvedAt && (
+                          <span className="text-muted-foreground ml-2">
+                            {new Date(responseData.contractStatus.approvedAt).toLocaleString()}
+                          </span>
+                        )}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="size-4 text-yellow-600" />
+                      <span className="text-sm text-muted-foreground">Awaiting Palmetto approval</span>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Contract Voided */}
+              {responseData.contractStatus.voided && (
+                <div className="flex items-center gap-2">
+                  <XCircle className="size-4 text-red-600" />
+                  <span className="text-sm text-red-600">
+                    Contract voided
+                    {responseData.contractStatus.voidedAt && (
+                      <span className="text-muted-foreground ml-2">
+                        {new Date(responseData.contractStatus.voidedAt).toLocaleString()}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

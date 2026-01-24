@@ -262,12 +262,23 @@ export async function POST(
           // Quote voided might indicate cancellation
           newStatus = 'CANCELLED'
           break
+        case 'contractSent':
+          // Contract sent doesn't change application status, but we track it
+          // Status remains as APPROVED or CONDITIONAL
+          shouldSendEmail = false // Don't send email for contract sent (Palmetto handles this)
+          break
         case 'contractSigned':
         case 'contractApproved':
           // Contract signed/approved means application is fully approved
           newStatus = 'APPROVED'
           shouldSendEmail = true
           emailStatus = 'approved'
+          break
+        case 'contractVoided':
+          // Contract voided might indicate cancellation
+          newStatus = 'CANCELLED'
+          shouldSendEmail = true
+          emailStatus = 'cancelled'
           break
         default:
           // For other events, just log them
@@ -280,19 +291,40 @@ export async function POST(
       emailStatus = body.status
     }
 
+    // Track contract events with timestamps
+    const existingResponseData = (application.responseData as any) || {}
+    const contractStatus: any = { ...existingResponseData.contractStatus }
+    
+    if (event === 'contractSent') {
+      contractStatus.sentAt = new Date().toISOString()
+      contractStatus.sent = true
+    } else if (event === 'contractSigned') {
+      contractStatus.signedAt = new Date().toISOString()
+      contractStatus.signed = true
+    } else if (event === 'contractApproved') {
+      contractStatus.approvedAt = new Date().toISOString()
+      contractStatus.approved = true
+    } else if (event === 'contractVoided') {
+      contractStatus.voidedAt = new Date().toISOString()
+      contractStatus.voided = true
+    }
+
     // Update application status
     const updated = await prisma.financeApplication.update({
       where: { id: application.id },
       data: {
         status: newStatus,
         responseData: {
-          ...((application.responseData as any) || {}),
+          ...existingResponseData,
           ...otherData,
           event,
           accountId,
           accountReference,
+          contractReference: otherData.contractReference,
+          quoteReference: otherData.quoteReference,
           status: status || body.status,
           webhookReceivedAt: new Date().toISOString(),
+          contractStatus: Object.keys(contractStatus).length > 0 ? contractStatus : undefined,
         },
       },
     })
