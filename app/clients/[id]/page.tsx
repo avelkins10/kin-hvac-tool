@@ -91,10 +91,11 @@ async function getClientData(id: string) {
 export default async function ClientDetailPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
   await requireAuth()
-  const data = await getClientData(params.id)
+  const { id } = await params
+  const data = await getClientData(id)
 
   if (!data) {
     return (
