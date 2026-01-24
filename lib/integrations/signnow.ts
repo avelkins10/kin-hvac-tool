@@ -18,9 +18,13 @@ interface SignatureRequest {
 }
 
 export class SignNowClient {
-  private client: SignNow
+  private client: SignNow | null = null
 
-  constructor() {
+  private getClient(): SignNow {
+    if (this.client) {
+      return this.client
+    }
+
     const apiHost = process.env.SIGNNOW_API_HOST || 'https://api.signnow.com'
     const basicToken = process.env.SIGNNOW_BASIC_TOKEN || ''
     const username = process.env.SIGNNOW_USERNAME || ''
@@ -38,12 +42,15 @@ export class SignNowClient {
         password,
       },
     })
+
+    return this.client
   }
 
   async createDocument(request: SignatureRequest): Promise<{ documentId: string; status: string }> {
     try {
+      const client = this.getClient()
       // Upload document from base64 PDF
-      const uploadResponse = await this.client.document.upload({
+      const uploadResponse = await client.document.upload({
         file: {
           name: request.documentName,
           data: Buffer.from(request.documentBase64, 'base64'),
@@ -69,7 +76,7 @@ export class SignNowClient {
       })
 
       // Create and send invite for signing
-      const inviteResponse = await this.client.document.invite({
+      const inviteResponse = await client.document.invite({
         document_id: documentId,
         invite: {
           to: invitees.map((inv) => inv.email),
@@ -99,7 +106,8 @@ export class SignNowClient {
     dateCompleted?: string
   }> {
     try {
-      const document = await this.client.document.get({ document_id: documentId })
+      const client = this.getClient()
+      const document = await client.document.get({ document_id: documentId })
 
       // Map SignNow status to our status
       let status = 'unknown'
@@ -125,7 +133,8 @@ export class SignNowClient {
 
   async downloadSignedDocument(documentId: string): Promise<Buffer> {
     try {
-      const pdf = await this.client.document.download({ document_id: documentId })
+      const client = this.getClient()
+      const pdf = await client.document.download({ document_id: documentId })
 
       // SignNow returns the PDF as a buffer/stream
       if (Buffer.isBuffer(pdf)) {
