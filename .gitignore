@@ -34,3 +34,4 @@ local-packages/
 
 # npm lock file (using pnpm)
 package-lock.json
+.env*.local

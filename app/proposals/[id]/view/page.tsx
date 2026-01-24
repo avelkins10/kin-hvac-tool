@@ -3,12 +3,18 @@ import { prisma } from '@/lib/db'
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
 
 interface PageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default async function ProposalViewPage({ params }: PageProps) {
+  const { id } = await params
+  
+  if (!id) {
+    notFound()
+  }
+  
   const proposal = await prisma.proposal.findUnique({
-    where: { id: params.id },
+    where: { id },
   })
 
   if (!proposal) {
