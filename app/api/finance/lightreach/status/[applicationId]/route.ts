@@ -35,32 +35,20 @@ export async function GET(
         },
       })
     } catch (dbError: any) {
-      // Handle case where externalApplicationId column doesn't exist yet
-      if (dbError?.message?.includes('externalApplicationId') || dbError?.code === 'P2021') {
-        console.warn('[Finance] externalApplicationId column may not exist yet, trying alternative query')
-        // Try querying without the problematic field by selecting specific fields
-        application = await prisma.$queryRaw`
-          SELECT 
-            id, "proposalId", "lenderId", status, "applicationData", "responseData", 
-            "createdAt", "updatedAt"
-          FROM "FinanceApplication"
-          WHERE id = ${params.applicationId}
-        ` as any
-        
-        if (application && Array.isArray(application) && application.length > 0) {
-          application = application[0]
-          // Fetch proposal separately
-          const proposal = await prisma.proposal.findUnique({
-            where: { id: (application as any).proposalId },
-          })
-          ;(application as any).proposal = proposal
-          ;(application as any).externalApplicationId = null // Column doesn't exist
-        } else {
-          application = null
-        }
-      } else {
-        throw dbError
+      // Handle case where externalApplicationId column doesn't exist yet (migration not run)
+      if (dbError?.message?.includes('does not exist') || dbError?.code === 'P2021' || dbError?.code === 'P2010') {
+        console.warn('[Finance] Database schema may be out of sync. Migration may need to be run.')
+        logFinanceError(dbError, 'getStatus - schema mismatch')
+        return NextResponse.json(
+          {
+            error: 'Database schema needs to be updated. Please run migrations.',
+            code: 'SCHEMA_MISMATCH',
+            details: 'The externalApplicationId column may not exist yet. Run: npx prisma migrate deploy',
+          },
+          { status: 500 }
+        )
       }
+      throw dbError
     }
 
     if (!application) {
