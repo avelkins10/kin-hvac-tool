@@ -39,19 +39,24 @@ export const authOptions: NextAuthOptions = {
           console.log('Password provided length:', credentials.password?.length)
           console.log('Password provided (first 3 chars):', credentials.password?.substring(0, 3))
           console.log('User found:', !!user)
-          if (user) {
-            console.log('User email in DB:', user.email)
-            console.log('Stored hash prefix:', user.password?.substring(0, 20))
-            console.log('Stored hash length:', user.password?.length)
-            
-            // Test the password directly with bcrypt
-            const bcrypt = require('bcryptjs')
-            const directTest = await bcrypt.compare(credentials.password.trim(), user.password)
-            console.log('Direct bcrypt.compare result:', directTest)
-            
-            const isValid = await verifyPassword(credentials.password.trim(), user.password)
-            console.log('verifyPassword result:', isValid)
+          
+          if (!user) {
+            console.log('=== END AUTH DEBUG (no user) ===')
+            return null
           }
+          
+          console.log('User email in DB:', user.email)
+          console.log('Stored hash prefix:', user.password?.substring(0, 20))
+          console.log('Stored hash length:', user.password?.length)
+          
+          // Test the password directly with bcrypt
+          const bcrypt = require('bcryptjs')
+          const trimmedPassword = credentials.password.trim()
+          const directTest = await bcrypt.compare(trimmedPassword, user.password)
+          console.log('Direct bcrypt.compare result:', directTest)
+          
+          const isValid = await verifyPassword(trimmedPassword, user.password)
+          console.log('verifyPassword result:', isValid)
           console.log('=== END AUTH DEBUG ===')
 
           if (!isValid) {
