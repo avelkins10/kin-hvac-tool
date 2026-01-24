@@ -222,11 +222,9 @@ export function FinanceApplicationForm({
             <div className="mb-4 p-4 border rounded-lg bg-muted/50">
               <p className="text-sm text-muted-foreground mb-3">
                 Quick-fill test data for testing different finance application scenarios. Click a scenario to auto-fill the form.
-                {!process.env.PALMETTO_FINANCE_ACCOUNT_EMAIL && (
-                  <span className="block mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                    ⚠️ Test mode active: Using mock responses (no API credentials configured)
-                  </span>
-                )}
+                <span className="block mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                  ⚠️ Test mode: Using mock responses when API credentials are not configured
+                </span>
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {TEST_SCENARIOS.map((scenario) => (
