@@ -1,0 +1,40 @@
+Test Data
+Below is a list of test data that can be used to create resources in various configurations
+
+Simulated Credit Check - No Credit Provider
+First Name	Last Name	Address 1	City	State	Zip	Social Security Number	Finance decision (reason/FICO)	Limited Monthly Payment Options
+any value						500101005	approved With Stipulations (802)	
+any value						500101006	approved With Stipulations (761)	
+any value						500101007	approved With Stipulations (724)	Yes
+any value						500101008	approved With Stipulations (703)	Yes
+any value						500101009	approved With Stipulations (662)	Yes
+any value						500101010	declined (low score, 550)	
+any value						500101011	declined (low score, 500)	
+any value						500101015	creditFrozen	
+any value						500101016	creditFrozen	
+any value						500101017	applicant not found	
+Sandbox Credit Check - TransUnion
+First Name	Middle Name	Last Name	Address 1	City	State	Zip	SSN	Finance decision (reason/FICO)
+Cranberry		Saucey	876 Turkey St	Fantasy Island	IL	60750	666222525	approved With Stipulations (671)
+Qjohn		Zehorne	11315 Gordon st	Fantasy Island	IL	60750	666822307	declined (low score, 593)
+Susan		Toomany	585 Wonderway st	Fantasy Island	IL	60750	666381719	approved With Stipulations (675)
+Juice		Grape	224 South st	Fantasy Island	IL	60750	666113332	approved With Stipulations (702)
+Alfredo		Sanchez	2821 Warren Dorris dr	Joliet	IL	60435	666427102	declined (low score, 383)
+Jaquline		Carr	229 North Oakley dr	Columbus	GA	31906	666706006	declined (bankruptcy)
+Sarah		Knesley	104 Bonita Avenue	Fowler	CA	93625	666563316	approved With Stipulations (750)
+Eunice		Bolt	400 Elizabeth st	Charleroi	PA	15022	666386118	approved With Stipulations (757)
+Sandbox Credit Check - Equifax
+First Name	Middle Name	Last Name	Address 1	City	State	Zip	SSN	Finance decision (reason/FICO)
+ABIEKKRO	X	ECUVKU	7896 HECHHDZERV TRCE	HARRISONVILLE	MO	64718	666014657	approved with stipulations (711)
+ABDXNMA		IIAMUHXSIUL	4936 ASDA STRA	FLAT RIVER	MO	63683	666015082	approved with stipulations (708)
+ABHN	H	QOHQML	7519 VFCUWH MT	TEXARKANA	TX	71829	666023218	declined (low score, 536)
+ABHNW		VXTJFVU	423 JOVEEKLU PASS	CORPUS CHRISTI	TX	78402	666025355	declined (low score, 503)
+ABHBO	Z	FJCTR	91996 RSFYJAYA TR	GALLUP	NM	87342	666016863	approved with stipulations (781)
+ABGWEB	XWPTGU	PROF	372 HCVFZFXRSEU SPG	COLUMBUS	GA	31817	666009007	approved with stipulations (703)
+ABEX	H	YYRMGLGXI	78790 HKQGNN BYU	SAN FRANCISCO	CA	94013	666002288	declined (low score, 568)
+ABEMY	J	JUTHIO	34684 JIZDSMXFCPMS WALK	WINGATE	MD	21675	666013312	declined (low score, 589)
+ABDBOXVN	M	THLY	38 JEEFEZINO CMNS	PORTLAND	ME	4531	666012493	declined (low score, 617)
+ABBXAQH	M	ZELUWH	995 XKTTGIHVLP XRDS	SAN BERNARDINO	CA	92577	666001613	declined (bankruptcy)
+ABAYNJ	L	HYIQKKEDXDGFUZ	2438 JACVEAXP PRT	ELLERSLIE	GA	31807	666008413	declined (low score, 610)
+UQPFP	SCRP	XUMEO	4012 DNTQTW BYP	TATE	GA	30177	666028580	not found (bureau manual review)
+UWRLU	DLLTT	ATMTDGHT	917 YYFIIWDWF PRT	ENNICE	NC	28623	666028611	credit frozen

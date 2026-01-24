@@ -14,13 +14,17 @@ const CACHE_DURATION_MS = 5 * 60 * 1000
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { applicationId: string } }
+  { params }: { params: Promise<{ applicationId: string }> | { applicationId: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Handle Next.js 15 async params
+    const resolvedParams = await Promise.resolve(params)
+    const applicationId = resolvedParams.applicationId
 
     // Check for force refresh parameter
     const searchParams = request.nextUrl.searchParams
@@ -29,7 +33,7 @@ export async function GET(
     let application
     try {
       application = await prisma.financeApplication.findUnique({
-        where: { id: params.applicationId },
+        where: { id: applicationId },
         include: {
           proposal: true,
         },
