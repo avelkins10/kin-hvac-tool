@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { usePriceBook } from '@/src/contexts/PriceBookContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,6 +35,7 @@ interface FinancingOption {
 }
 
 export function FinancingOptionsManager() {
+  const { refreshPriceBook } = usePriceBook()
   const [options, setOptions] = useState<FinancingOption[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -121,7 +123,8 @@ export function FinancingOptionsManager() {
       if (response.ok) {
         toast.success(editingOption ? 'Financing option updated' : 'Financing option created')
         setDialogOpen(false)
-        fetchOptions()
+        await fetchOptions()
+        await refreshPriceBook()
       } else {
         toast.error('Failed to save financing option')
       }
@@ -141,7 +144,8 @@ export function FinancingOptionsManager() {
 
       if (response.ok) {
         toast.success('Financing option deleted')
-        fetchOptions()
+        await fetchOptions()
+        await refreshPriceBook()
       } else {
         toast.error('Failed to delete financing option')
       }

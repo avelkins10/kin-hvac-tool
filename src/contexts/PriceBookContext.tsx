@@ -715,6 +715,8 @@ const defaultPriceBook: PriceBook = {
 
 interface PriceBookContextType {
   priceBook: PriceBook
+  loading: boolean
+  refreshPriceBook: () => Promise<void>
   // HVAC Systems
   updateHVACSystem: (system: HVACSystem) => void
   addHVACSystem: (system: Omit<HVACSystem, "id">) => void
@@ -770,8 +772,7 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   // Load from API
-  useEffect(() => {
-    const loadPriceBook = async () => {
+  const loadPriceBook = async () => {
       try {
         // Load all entities from their respective API routes
         const [systemsRes, addonsRes, materialsRes, laborRatesRes, permitsRes, unitsRes, financingRes, settingsRes] =
@@ -899,8 +900,16 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
         setLoading(false)
       }
     }
+
+  useEffect(() => {
     loadPriceBook()
   }, [])
+
+  // Expose refresh function
+  const refreshPriceBook = async () => {
+    setLoading(true)
+    await loadPriceBook()
+  }
 
   // Calculate system sales price
   const getSystemSalesPrice = (system: HVACSystem): number => {
@@ -1362,6 +1371,8 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
     <PriceBookContext.Provider
       value={{
         priceBook,
+        loading,
+        refreshPriceBook,
         updateHVACSystem,
         addHVACSystem,
         deleteHVACSystem,

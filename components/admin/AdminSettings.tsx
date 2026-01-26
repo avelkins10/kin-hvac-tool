@@ -14,6 +14,7 @@ import { PriceBookProvider } from "@/src/contexts/PriceBookContext"
 import { MaintenanceProvider } from "@/src/contexts/MaintenanceContext"
 import { IncentivesProvider } from "@/src/contexts/IncentivesContext"
 import { usePriceBook } from "@/src/contexts/PriceBookContext"
+import { useRouter } from "next/navigation"
 import {
   Plus,
   Trash2,
@@ -45,9 +46,11 @@ import { PriceBookManager } from "./PriceBookManager"
 import { APIRoutesManager } from "./APIRoutesManager"
 
 function AdminSettingsContent() {
+  const router = useRouter()
   const {
     priceBook,
     updateSettings,
+    refreshPriceBook,
   } = usePriceBook()
 
   const [activeTab, setActiveTab] = useState("company")
@@ -70,9 +73,8 @@ function AdminSettingsContent() {
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbPage>Admin Settings</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+          </BreadcrumbList>
+        </Breadcrumb>
 
       {/* Header */}
       <div className="mb-8">

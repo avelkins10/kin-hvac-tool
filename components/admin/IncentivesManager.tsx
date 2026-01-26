@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { useIncentives } from '@/src/contexts/IncentivesContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +29,7 @@ interface Incentive {
 }
 
 export function IncentivesManager() {
+  const { incentives: contextIncentives } = useIncentives()
   const [incentives, setIncentives] = useState<Incentive[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -106,7 +108,8 @@ export function IncentivesManager() {
       if (response.ok) {
         toast.success(editingIncentive ? 'Incentive updated' : 'Incentive created')
         setDialogOpen(false)
-        fetchIncentives()
+        await fetchIncentives()
+        // Note: Context will refresh on next page load or manual refresh
       } else {
         toast.error('Failed to save incentive')
       }
@@ -126,7 +129,8 @@ export function IncentivesManager() {
 
       if (response.ok) {
         toast.success('Incentive deleted')
-        fetchIncentives()
+        await fetchIncentives()
+        // Note: Context will refresh on next page load or manual refresh
       } else {
         toast.error('Failed to delete incentive')
       }

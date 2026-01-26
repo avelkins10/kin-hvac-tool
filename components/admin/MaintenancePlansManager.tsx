@@ -117,7 +117,8 @@ export function MaintenancePlansManager() {
       if (response.ok) {
         toast.success(editingPlan ? 'Maintenance plan updated' : 'Maintenance plan created')
         setDialogOpen(false)
-        fetchPlans()
+        await fetchPlans()
+        // Note: Context will refresh on next page load or manual refresh
       } else {
         toast.error('Failed to save maintenance plan')
       }
@@ -137,7 +138,8 @@ export function MaintenancePlansManager() {
 
       if (response.ok) {
         toast.success('Maintenance plan deleted')
-        fetchPlans()
+        await fetchPlans()
+        // Note: Context will refresh on next page load or manual refresh
       } else {
         toast.error('Failed to delete maintenance plan')
       }

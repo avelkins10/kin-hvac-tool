@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { usePriceBook } from '@/src/contexts/PriceBookContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,6 +35,7 @@ interface AddOn {
 }
 
 export function AddOnsManager() {
+  const { refreshPriceBook } = usePriceBook()
   const [addons, setAddons] = useState<AddOn[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -112,7 +114,8 @@ export function AddOnsManager() {
       if (response.ok) {
         toast.success(editingAddon ? 'Add-on updated' : 'Add-on created')
         setDialogOpen(false)
-        fetchAddons()
+        await fetchAddons()
+        await refreshPriceBook()
       } else {
         toast.error('Failed to save add-on')
       }
@@ -132,7 +135,8 @@ export function AddOnsManager() {
 
       if (response.ok) {
         toast.success('Add-on deleted')
-        fetchAddons()
+        await fetchAddons()
+        await refreshPriceBook()
       } else {
         toast.error('Failed to delete add-on')
       }

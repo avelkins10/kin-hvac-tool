@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { usePriceBook } from '@/src/contexts/PriceBookContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,6 +37,7 @@ interface HVACSystem {
 }
 
 export function HVACSystemsManager() {
+  const { refreshPriceBook } = usePriceBook()
   const [systems, setSystems] = useState<HVACSystem[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -118,7 +120,8 @@ export function HVACSystemsManager() {
       if (response.ok) {
         toast.success(editingSystem ? 'HVAC system updated' : 'HVAC system created')
         setDialogOpen(false)
-        fetchSystems()
+        await fetchSystems()
+        await refreshPriceBook()
       } else {
         toast.error('Failed to save HVAC system')
       }
@@ -138,7 +141,8 @@ export function HVACSystemsManager() {
 
       if (response.ok) {
         toast.success('HVAC system deleted')
-        fetchSystems()
+        await fetchSystems()
+        await refreshPriceBook()
       } else {
         toast.error('Failed to delete HVAC system')
       }
