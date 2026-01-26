@@ -35,20 +35,8 @@ interface PriceBookManagerProps {
 export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookManagerProps) {
   const {
     priceBook,
-    updateUnit,
-    addUnit,
-    deleteUnit,
     calculateUnitTotalCost,
-    updateLaborRate,
-    addLaborRate,
-    deleteLaborRate,
     setDefaultLaborRate,
-    updatePermitFee,
-    addPermitFee,
-    deletePermitFee,
-    updateMaterial,
-    addMaterial,
-    deleteMaterial,
     refreshPriceBook,
   } = usePriceBook()
 
@@ -114,26 +102,33 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
 
   const handleSaveUnit = async () => {
     try {
-      const unitData = {
-        ...unitFormData,
-        tonnage: Number(unitFormData.tonnage),
-        equipmentCost: Number(unitFormData.equipmentCost),
-        installLaborHours: Number(unitFormData.installLaborHours),
-        seerRating: Number(unitFormData.seerRating),
-        leadTimeDays: Number(unitFormData.leadTimeDays),
-        name: `${unitFormData.brand} ${unitFormData.modelNumber}`,
-      }
+      const url = editingUnit?.id
+        ? `/api/company/pricebook/${editingUnit.id}`
+        : '/api/company/pricebook'
+      const method = editingUnit ? 'PATCH' : 'POST'
 
-      if (editingUnit) {
-        updateUnit({ ...editingUnit, ...unitData })
-        toast.success('Unit updated')
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brand: unitFormData.brand,
+          model: unitFormData.modelNumber,
+          tonnage: Number(unitFormData.tonnage) || null,
+          tier: unitFormData.tier,
+          baseCost: Number(unitFormData.equipmentCost),
+        }),
+      })
+
+      if (response.ok) {
+        toast.success(editingUnit ? 'Unit updated' : 'Unit added')
+        setUnitDialogOpen(false)
+        await refreshPriceBook()
       } else {
-        addUnit(unitData)
-        toast.success('Unit added')
+        const error = await response.json()
+        toast.error(error.error || 'Failed to save unit')
       }
-      setUnitDialogOpen(false)
-      await refreshPriceBook()
     } catch (error) {
+      console.error('Error saving unit:', error)
       toast.error('Failed to save unit')
     }
   }
@@ -166,11 +161,6 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
       })
 
       if (response.ok) {
-        if (editingLabor) {
-          updateLaborRate({ ...editingLabor, name: laborFormData.name, description: laborFormData.description, rate: Number(laborFormData.rate) })
-        } else {
-          addLaborRate({ name: laborFormData.name, description: laborFormData.description, rate: Number(laborFormData.rate), isDefault: false })
-        }
         toast.success(editingLabor ? 'Labor rate updated' : 'Labor rate added')
         setLaborDialogOpen(false)
         await refreshPriceBook()
@@ -210,11 +200,6 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
       })
 
       if (response.ok) {
-        if (editingPermit) {
-          updatePermitFee({ ...editingPermit, name: permitFormData.name, tonnageRange: permitFormData.tonnageRange, fee: Number(permitFormData.fee) })
-        } else {
-          addPermitFee({ name: permitFormData.name, tonnageRange: permitFormData.tonnageRange, fee: Number(permitFormData.fee) })
-        }
         toast.success(editingPermit ? 'Permit fee updated' : 'Permit fee added')
         setPermitDialogOpen(false)
         await refreshPriceBook()
@@ -256,11 +241,6 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
       })
 
       if (response.ok) {
-        if (editingMaterial) {
-          updateMaterial({ ...editingMaterial, name: materialFormData.name, description: materialFormData.description, costPerUnit: Number(materialFormData.unitCost), unit: materialFormData.unit })
-        } else {
-          addMaterial({ name: materialFormData.name, description: materialFormData.description, unitCost: Number(materialFormData.unitCost), unit: materialFormData.unit })
-        }
         toast.success(editingMaterial ? 'Material updated' : 'Material added')
         setMaterialDialogOpen(false)
         await refreshPriceBook()
@@ -352,7 +332,27 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
                         <Button variant="ghost" size="icon" onClick={() => handleEditUnit(unit)}>
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteUnit(unit.id)}>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={async () => {
+                            if (confirm('Are you sure you want to delete this unit?')) {
+                              try {
+                                const response = await fetch(`/api/company/pricebook/${unit.id}`, {
+                                  method: 'DELETE',
+                                })
+                                if (response.ok) {
+                                  toast.success('Unit deleted')
+                                  await refreshPriceBook()
+                                } else {
+                                  toast.error('Failed to delete unit')
+                                }
+                              } catch (error) {
+                                toast.error('Failed to delete unit')
+                              }
+                            }
+                          }}
+                        >
                           <Trash2 className="w-4 h-4 text-red-500" />
                         </Button>
                       </div>
@@ -435,7 +435,27 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
                       <Button variant="ghost" size="icon" onClick={() => handleEditLabor(rate)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deleteLaborRate(rate.id)}>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={async () => {
+                          if (confirm('Are you sure you want to delete this labor rate?')) {
+                            try {
+                              const response = await fetch(`/api/company/labor-rates/${rate.id}`, {
+                                method: 'DELETE',
+                              })
+                              if (response.ok) {
+                                toast.success('Labor rate deleted')
+                                await refreshPriceBook()
+                              } else {
+                                toast.error('Failed to delete labor rate')
+                              }
+                            } catch (error) {
+                              toast.error('Failed to delete labor rate')
+                            }
+                          }
+                        }}
+                      >
                         <Trash2 className="w-4 h-4 text-red-500" />
                       </Button>
                     </div>
@@ -473,9 +493,34 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
                       )}
                       <p className="text-lg font-bold text-green-600 mt-1">${permit.fee}</p>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => handleEditPermit(permit)}>
-                      <Pencil className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => handleEditPermit(permit)}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={async () => {
+                          if (confirm('Are you sure you want to delete this permit fee?')) {
+                            try {
+                              const response = await fetch(`/api/company/permits/${permit.id}`, {
+                                method: 'DELETE',
+                              })
+                              if (response.ok) {
+                                toast.success('Permit fee deleted')
+                                await refreshPriceBook()
+                              } else {
+                                toast.error('Failed to delete permit fee')
+                              }
+                            } catch (error) {
+                              toast.error('Failed to delete permit fee')
+                            }
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -514,9 +559,29 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
                       <Button variant="ghost" size="icon" onClick={() => handleEditMaterial(material)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deleteMaterial(material.id)}>
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={async () => {
+                        if (confirm('Are you sure you want to delete this material?')) {
+                          try {
+                            const response = await fetch(`/api/company/materials/${material.id}`, {
+                              method: 'DELETE',
+                            })
+                            if (response.ok) {
+                              toast.success('Material deleted')
+                              await refreshPriceBook()
+                            } else {
+                              toast.error('Failed to delete material')
+                            }
+                          } catch (error) {
+                            toast.error('Failed to delete material')
+                          }
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
                     </div>
                   </div>
                 </div>
