@@ -880,7 +880,8 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
         // Load settings from company settings JSON
         const settings: PricingSettings = company?.settings?.pricing || defaultSettings
 
-        // Always update priceBook, even if no API data (to ensure settings are set)
+        // Always update priceBook with API data (or defaults if no API data)
+        // This ensures settings are always loaded even if no systems/addons exist yet
         setPriceBook({
           ...defaultPriceBook,
           hvacSystems: transformedSystems.length > 0 ? transformedSystems : defaultPriceBook.hvacSystems,
@@ -890,7 +891,7 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
           permitFees: transformedPermitFees.length > 0 ? transformedPermitFees : defaultPriceBook.permitFees,
           units: transformedUnits.length > 0 ? transformedUnits : defaultPriceBook.units,
           financingOptions: transformedFinancing,
-          settings,
+          settings, // Always use settings from database (or defaults)
         })
       } catch (error) {
         console.error("Failed to load price book from API", error)
@@ -1361,11 +1362,7 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
 
   // Get customer-facing price (with cash markup)
   const getCustomerPrice = (salesPrice: number): number => {
-    if (!salesPrice || isNaN(salesPrice)) {
-      return 0
-    }
-    const cashMarkup = priceBook?.settings?.cashMarkup ?? 0
-    return applyCashMarkup(salesPrice, cashMarkup)
+    return applyCashMarkup(salesPrice, priceBook.settings.cashMarkup)
   }
 
   // Get system customer price
