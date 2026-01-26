@@ -463,7 +463,7 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
   const { incentives, selectedIncentives, toggleIncentive, getTotalIncentives } = useIncentives()
 
   useEffect(() => {
-    if (paymentMethod === "leasing" && !selectedFinancingOption && financingOptions) {
+    if (paymentMethod === "leasing" && !selectedFinancingOption && financingOptions && Array.isArray(financingOptions)) {
       const leasingOptions = financingOptions.filter((opt) => opt.type === "lease" && opt.available)
       if (leasingOptions.length > 0) {
         const defaultLightreach = leasingOptions.find(

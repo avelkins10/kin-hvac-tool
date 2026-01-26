@@ -972,8 +972,10 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
       })?.fee || 200
 
     const subtotal = unit.equipmentCost + labor + permit
-    const withOverhead = subtotal * priceBook.settings.overheadMultiplier
-    const total = Math.round(withOverhead * (1 + priceBook.settings.profitMargin / 100))
+    const overheadMultiplier = priceBook?.settings?.overheadMultiplier ?? 1.15
+    const profitMargin = priceBook?.settings?.profitMargin ?? 20
+    const withOverhead = subtotal * overheadMultiplier
+    const total = Math.round(withOverhead * (1 + profitMargin / 100))
 
     return { equipment: unit.equipmentCost, labor, permit, total }
   }
@@ -1342,6 +1344,9 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
 
   // Get tier price
   const getTierPrice = (tier: "good" | "better" | "best", tonnage: number): number => {
+    if (!priceBook?.hvacSystems || !Array.isArray(priceBook.hvacSystems)) {
+      return DEFAULT_TIER_PRICES[tier]
+    }
     const system = priceBook.hvacSystems.find((s) => s.tier === tier && s.enabled)
     if (system) {
       return getSystemSalesPrice(system)
