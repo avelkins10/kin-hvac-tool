@@ -42,6 +42,7 @@ import { MaintenancePlansManager } from "./MaintenancePlansManager"
 import { IncentivesManager } from "./IncentivesManager"
 import { FinancingOptionsManager } from "./FinancingOptionsManager"
 import { PriceBookManager } from "./PriceBookManager"
+import { APIRoutesManager } from "./APIRoutesManager"
 
 function AdminSettingsContent() {
   const {
@@ -178,6 +179,10 @@ function AdminSettingsContent() {
             <CreditCard className="w-4 h-4" />
             Financing
           </TabsTrigger>
+          <TabsTrigger value="api" className="flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            API Routes
+          </TabsTrigger>
         </TabsList>
 
         {/* Company Settings Tab */}
@@ -216,6 +221,11 @@ function AdminSettingsContent() {
         {/* Financing Options Tab */}
         <TabsContent value="financing" className="mt-6">
           <FinancingOptionsManager />
+        </TabsContent>
+
+        {/* API Routes Tab */}
+        <TabsContent value="api" className="mt-6">
+          <APIRoutesManager />
         </TabsContent>
       </Tabs>
     </div>
