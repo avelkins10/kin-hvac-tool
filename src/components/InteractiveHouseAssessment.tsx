@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -458,9 +458,32 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
   } | null>(null)
 
   // Contexts
-  const { getTierPrice, financingOptions, calculateMonthlyPayment, getCustomerPrice } = usePriceBook()
+  const { getTierPrice, financingOptions, calculateMonthlyPayment, getCustomerPrice, priceBook, getAddOnSalesPrice } = usePriceBook()
   const { plans, selectedPlan, setSelectedPlan, getPlanSalesPrice, getPlanMonthlyPrice } = useMaintenance()
   const { incentives, selectedIncentives, toggleIncentive, getTotalIncentives } = useIncentives()
+
+  // Load add-ons from database (via context) instead of using hardcoded defaults
+  useEffect(() => {
+    if (priceBook.addOns && priceBook.addOns.length > 0) {
+      const transformedAddOns = priceBook.addOns
+        .filter(addon => addon.enabled)
+        .map(addon => ({
+          id: addon.id,
+          name: addon.name,
+          price: getAddOnSalesPrice(addon), // Use sales price from context (baseCost + margin)
+          description: addon.description,
+          selected: false,
+        }))
+      // Only update if we have database add-ons, preserve selected state
+      setAddOns(prev => {
+        const newAddOns = transformedAddOns.map(newAddon => {
+          const existing = prev.find(p => p.id === newAddon.id)
+          return existing ? { ...newAddon, selected: existing.selected } : newAddon
+        })
+        return newAddOns
+      })
+    }
+  }, [priceBook.addOns, getAddOnSalesPrice])
 
   useEffect(() => {
     if (paymentMethod === "leasing" && !selectedFinancingOption && financingOptions) {
@@ -549,7 +572,7 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
       competitorQuotes: false,
     })
     setSelectedEquipment(null)
-    setAddOns(defaultAddOns)
+    // Reset add-ons will be handled by useEffect that loads from context
     setPaymentMethod("leasing")
     setSelectedFinancingOption(null)
     setSelectedPlan(null)
@@ -794,7 +817,7 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
     setPricingStep("equipment")
     setCompletedSections(new Set())
     setSelectedEquipment(null)
-    setAddOns(defaultAddOns)
+    // Reset add-ons will be handled by useEffect that loads from context
     setSelectedPlan(null)
     // Reset payment method and financing selection
     setPaymentMethod("leasing")
@@ -2145,15 +2168,6 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
 
   // Render equipment selection
   const renderEquipmentStep = () => {
-    // Add safety checks for context functions
-    if (!getTierPrice || !getCustomerPrice) {
-      return (
-        <div className="p-4 text-center">
-          <p>Loading pricing information...</p>
-        </div>
-      )
-    }
-
     const tonnage = selectedEquipment?.tonnage || calculateTonnage()
     const tiers = getEquipmentTiers(tonnage)
     const recommendedTier = getRecommendedTier()
@@ -3360,9 +3374,6 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">{activeModal && getModalTitle(activeModal)}</DialogTitle>
-            <DialogDescription>
-              {activeModal && `Enter ${activeModal === "customer" ? "customer" : activeModal === "home" ? "home" : activeModal === "hvac" ? "HVAC system" : activeModal === "solar" ? "solar" : activeModal === "electrical" ? "electrical" : "preference"} information for this proposal.`}
-            </DialogDescription>
           </DialogHeader>
           <div className="max-h-[calc(90vh-100px)] overflow-y-auto">
             {renderModalContent()}
@@ -3410,9 +3421,6 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Submit Comfort Plan Finance Application</DialogTitle>
-              <DialogDescription>
-                Complete the finance application form to submit a Comfort Plan application for this proposal.
-              </DialogDescription>
             </DialogHeader>
             <FinanceApplicationForm
               proposalId={proposalId}

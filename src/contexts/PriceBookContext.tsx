@@ -880,20 +880,19 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
         // Load settings from company settings JSON
         const settings: PricingSettings = company?.settings?.pricing || defaultSettings
 
-        // Only update if we have data from API
-        if (systems.length > 0 || addons.length > 0 || materials.length > 0) {
-          setPriceBook({
-            ...defaultPriceBook,
-            hvacSystems: transformedSystems.length > 0 ? transformedSystems : defaultPriceBook.hvacSystems,
-            addOns: transformedAddOns.length > 0 ? transformedAddOns : defaultPriceBook.addOns,
-            materials: transformedMaterials.length > 0 ? transformedMaterials : defaultPriceBook.materials,
-            laborRates: transformedLaborRates.length > 0 ? transformedLaborRates : defaultPriceBook.laborRates,
-            permitFees: transformedPermitFees.length > 0 ? transformedPermitFees : defaultPriceBook.permitFees,
-            units: transformedUnits.length > 0 ? transformedUnits : defaultPriceBook.units,
-            financingOptions: transformedFinancing,
-            settings,
-          })
-        }
+        // Always update priceBook with API data (or defaults if no API data)
+        // This ensures settings are always loaded even if no systems/addons exist yet
+        setPriceBook({
+          ...defaultPriceBook,
+          hvacSystems: transformedSystems.length > 0 ? transformedSystems : defaultPriceBook.hvacSystems,
+          addOns: transformedAddOns.length > 0 ? transformedAddOns : defaultPriceBook.addOns,
+          materials: transformedMaterials.length > 0 ? transformedMaterials : defaultPriceBook.materials,
+          laborRates: transformedLaborRates.length > 0 ? transformedLaborRates : defaultPriceBook.laborRates,
+          permitFees: transformedPermitFees.length > 0 ? transformedPermitFees : defaultPriceBook.permitFees,
+          units: transformedUnits.length > 0 ? transformedUnits : defaultPriceBook.units,
+          financingOptions: transformedFinancing,
+          settings, // Always use settings from database (or defaults)
+        })
       } catch (error) {
         console.error("Failed to load price book from API", error)
       } finally {
@@ -1358,11 +1357,7 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
 
   // Get customer-facing price (with cash markup)
   const getCustomerPrice = (salesPrice: number): number => {
-    if (!salesPrice || isNaN(salesPrice)) {
-      return 0
-    }
-    const cashMarkup = priceBook?.settings?.cashMarkup ?? 0
-    return applyCashMarkup(salesPrice, cashMarkup)
+    return applyCashMarkup(salesPrice, priceBook.settings.cashMarkup)
   }
 
   // Get system customer price
