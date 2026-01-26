@@ -67,11 +67,11 @@ export function AppLayout({ children }: AppLayoutProps) {
           <div className="flex justify-between items-center h-16">
             {/* Logo and Desktop Navigation */}
             <div className="flex items-center">
-              <Link href="/dashboard" className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Link href="/dashboard" className="flex items-center space-x-2 group">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
                   <span className="text-white font-bold text-sm">HV</span>
                 </div>
-                <span className="font-semibold text-gray-900 hidden sm:block">
+                <span className="font-semibold text-gray-900 hidden sm:block group-hover:text-blue-600 transition-colors">
                   HVAC Proposals
                 </span>
               </Link>
@@ -85,9 +85,9 @@ export function AppLayout({ children }: AppLayoutProps) {
                       key={item.name}
                       href={item.href}
                       className={cn(
-                        'inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                        'inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200',
                         isActive(item.href)
-                          ? 'bg-blue-50 text-blue-700'
+                          ? 'bg-blue-50 text-blue-700 shadow-sm'
                           : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                       )}
                     >
