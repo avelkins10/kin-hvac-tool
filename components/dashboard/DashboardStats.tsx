@@ -112,10 +112,14 @@ export function DashboardStats({ statusCounts, totalProposals }: DashboardStatsP
               </div>
             </CardHeader>
             <CardContent className="relative z-10">
-              <div className={cn(
-                "text-3xl font-bold transition-all duration-300",
-                stat.color
-              )}>
+              <div 
+                className={cn(
+                  "text-3xl font-bold transition-all duration-300",
+                  stat.color
+                )}
+                aria-live="polite"
+                aria-atomic="true"
+              >
                 {mounted ? stat.value : '0'}
               </div>
             </CardContent>

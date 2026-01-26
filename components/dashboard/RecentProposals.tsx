@@ -7,11 +7,20 @@ import { format } from 'date-fns'
 import { ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+interface CustomerData {
+  name?: string
+  email?: string
+}
+
+interface ProposalTotals {
+  total?: number
+}
+
 interface Proposal {
   id: string
   status: string
-  customerData: any
-  totals: any
+  customerData: CustomerData | null
+  totals: ProposalTotals | null
   createdAt: string
   user: {
     id: string
@@ -69,8 +78,8 @@ export function RecentProposals({ proposals }: RecentProposalsProps) {
       <CardContent>
         <div className="space-y-3">
           {proposals.slice(0, 5).map((proposal) => {
-            const customer = proposal.customerData as any
-            const totals = proposal.totals as any
+            const customer = proposal.customerData
+            const totals = proposal.totals
 
             return (
               <Link

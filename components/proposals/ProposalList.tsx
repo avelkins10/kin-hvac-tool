@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,13 +9,24 @@ import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, Search, Filter, FileText } from 'lucide-react'
+import { toast } from 'sonner'
 import Link from 'next/link'
+import { useDebounce } from '@/hooks/use-debounce'
+
+interface CustomerData {
+  name?: string
+  email?: string
+}
+
+interface ProposalTotals {
+  total?: number
+}
 
 interface Proposal {
   id: string
   status: string
-  customerData: any
-  totals: any
+  customerData: CustomerData | null
+  totals: ProposalTotals | null
   createdAt: string
   user: {
     id: string
@@ -30,12 +41,11 @@ export function ProposalList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [page, setPage] = useState(1)
+  
+  // Debounce search term to avoid excessive filtering
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
-  useEffect(() => {
-    fetchProposals()
-  }, [statusFilter, page])
-
-  const fetchProposals = async () => {
+  const fetchProposals = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -49,18 +59,24 @@ export function ProposalList() {
       if (response.ok) {
         const data = await response.json()
         setProposals(data.proposals || [])
+      } else {
+        toast.error('Failed to load proposals. Please try again.')
       }
     } catch (error) {
-      console.error('Error fetching proposals:', error)
+      toast.error('An error occurred while loading proposals.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [statusFilter, page])
+
+  useEffect(() => {
+    fetchProposals()
+  }, [fetchProposals])
 
   const filteredProposals = proposals.filter((proposal) => {
-    if (!searchTerm) return true
-    const customer = proposal.customerData as any
-    const searchLower = searchTerm.toLowerCase()
+    if (!debouncedSearchTerm) return true
+    const customer = proposal.customerData
+    const searchLower = debouncedSearchTerm.toLowerCase()
     return (
       customer?.name?.toLowerCase().includes(searchLower) ||
       customer?.email?.toLowerCase().includes(searchLower) ||
@@ -137,17 +153,21 @@ export function ProposalList() {
 
       <div className="flex gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search 
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" 
+            aria-hidden="true"
+          />
           <Input
             placeholder="Search proposals..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
+            aria-label="Search proposals by customer name, email, or proposal ID"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="mr-2 h-4 w-4" />
+          <SelectTrigger className="w-[180px]" aria-label="Filter proposals by status">
+            <Filter className="mr-2 h-4 w-4" aria-hidden="true" />
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
@@ -164,8 +184,8 @@ export function ProposalList() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredProposals.map((proposal) => {
-          const customer = proposal.customerData as any
-          const totals = proposal.totals as any
+          const customer = proposal.customerData
+          const totals = proposal.totals
 
           return (
             <Link key={proposal.id} href={`/proposals/${proposal.id}`}>

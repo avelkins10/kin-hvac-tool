@@ -177,8 +177,8 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {data.expiringSoon.map((proposal: any) => {
-                  const customer = proposal.customerData as any
+                {data.expiringSoon.map((proposal) => {
+                  const customer = proposal.customerData as { name?: string; email?: string } | null
                   const expiresAt = proposal.expiresAt ? new Date(proposal.expiresAt) : null
                   const daysUntilExpiry = expiresAt 
                     ? Math.ceil((expiresAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
