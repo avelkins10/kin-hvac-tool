@@ -458,7 +458,7 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
   } | null>(null)
 
   // Contexts
-  const { getTierPrice, financingOptions, calculateMonthlyPayment, getCustomerPrice } = usePriceBook()
+  const { getTierPrice, financingOptions, calculateMonthlyPayment, getCustomerPrice, loading: priceBookLoading } = usePriceBook()
   const { plans, selectedPlan, setSelectedPlan, getPlanSalesPrice, getPlanMonthlyPrice } = useMaintenance()
   const { incentives, selectedIncentives, toggleIncentive, getTotalIncentives } = useIncentives()
 
@@ -2145,8 +2145,8 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
 
   // Render equipment selection
   const renderEquipmentStep = () => {
-    // Add safety checks for context functions
-    if (!getTierPrice || !getCustomerPrice) {
+    // Wait for price book to load
+    if (priceBookLoading || !getTierPrice || !getCustomerPrice) {
       return (
         <div className="p-4 text-center">
           <p>Loading pricing information...</p>
@@ -2903,6 +2903,18 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
 
   // Main render
   if (showPricing) {
+    // Show loading state if price book is still loading
+    if (priceBookLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center">
+            <p className="text-lg font-semibold mb-2">Loading pricing information...</p>
+            <p className="text-sm text-muted-foreground">Please wait while we prepare your options.</p>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div
         className="min-h-screen flex flex-col bg-background"

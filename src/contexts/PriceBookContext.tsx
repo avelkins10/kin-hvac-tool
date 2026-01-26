@@ -880,20 +880,18 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
         // Load settings from company settings JSON
         const settings: PricingSettings = company?.settings?.pricing || defaultSettings
 
-        // Only update if we have data from API
-        if (systems.length > 0 || addons.length > 0 || materials.length > 0) {
-          setPriceBook({
-            ...defaultPriceBook,
-            hvacSystems: transformedSystems.length > 0 ? transformedSystems : defaultPriceBook.hvacSystems,
-            addOns: transformedAddOns.length > 0 ? transformedAddOns : defaultPriceBook.addOns,
-            materials: transformedMaterials.length > 0 ? transformedMaterials : defaultPriceBook.materials,
-            laborRates: transformedLaborRates.length > 0 ? transformedLaborRates : defaultPriceBook.laborRates,
-            permitFees: transformedPermitFees.length > 0 ? transformedPermitFees : defaultPriceBook.permitFees,
-            units: transformedUnits.length > 0 ? transformedUnits : defaultPriceBook.units,
-            financingOptions: transformedFinancing,
-            settings,
-          })
-        }
+        // Always update priceBook, even if no API data (to ensure settings are set)
+        setPriceBook({
+          ...defaultPriceBook,
+          hvacSystems: transformedSystems.length > 0 ? transformedSystems : defaultPriceBook.hvacSystems,
+          addOns: transformedAddOns.length > 0 ? transformedAddOns : defaultPriceBook.addOns,
+          materials: transformedMaterials.length > 0 ? transformedMaterials : defaultPriceBook.materials,
+          laborRates: transformedLaborRates.length > 0 ? transformedLaborRates : defaultPriceBook.laborRates,
+          permitFees: transformedPermitFees.length > 0 ? transformedPermitFees : defaultPriceBook.permitFees,
+          units: transformedUnits.length > 0 ? transformedUnits : defaultPriceBook.units,
+          financingOptions: transformedFinancing,
+          settings,
+        })
       } catch (error) {
         console.error("Failed to load price book from API", error)
       } finally {
