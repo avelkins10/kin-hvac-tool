@@ -86,9 +86,9 @@ LIGHTREACH_WEBHOOK_CLIENT_SECRET=your-client-secret
 ## Summary - What I Need From You
 
 **Minimum Required:**
-1. ✅ `PALMETTO_FINANCE_ACCOUNT_EMAIL` - Service account email
-2. ✅ `PALMETTO_FINANCE_ACCOUNT_PASSWORD` - Service account password
-3. ✅ `PALMETTO_FINANCE_ENVIRONMENT` - `next` (staging) or `prod` (production)
+1. ✅ `PALMETTO_FINANCE_ACCOUNT_EMAIL` - Service account email: `scott@kinhome.com`
+2. ✅ `PALMETTO_FINANCE_ACCOUNT_PASSWORD` - Service account password: `Lionhive1!` (add in Vercel)
+3. ✅ `PALMETTO_FINANCE_ENVIRONMENT` - `next` (staging) or `prod` (production) - **Which environment should we use?**
 
 **Recommended:**
 4. `PALMETTO_SALES_REP_NAME` - Your name
