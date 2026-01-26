@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -3161,6 +3161,9 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{activeModal && getModalTitle(activeModal)}</DialogTitle>
+            <DialogDescription>
+              {activeModal && `Enter ${activeModal === "customer" ? "customer" : activeModal === "home" ? "home" : activeModal === "hvac" ? "HVAC system" : activeModal === "solar" ? "solar" : activeModal === "electrical" ? "electrical" : "preference"} information for this proposal.`}
+            </DialogDescription>
           </DialogHeader>
           {renderModalContent()}
         </DialogContent>
@@ -3172,6 +3175,9 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Submit Comfort Plan Finance Application</DialogTitle>
+              <DialogDescription>
+                Complete the finance application form to submit a Comfort Plan application for this proposal.
+              </DialogDescription>
             </DialogHeader>
             <FinanceApplicationForm
               proposalId={proposalId}
