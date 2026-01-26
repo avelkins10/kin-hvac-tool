@@ -1,10 +1,9 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { format } from 'date-fns'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, AlertCircle, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface CustomerData {
@@ -33,101 +32,115 @@ interface RecentProposalsProps {
   proposals: Proposal[]
 }
 
-export function RecentProposals({ proposals }: RecentProposalsProps) {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'DRAFT':
-        return 'bg-slate-500 text-white'
-      case 'SENT':
-        return 'bg-blue-500 text-white'
-      case 'VIEWED':
-        return 'bg-amber-500 text-white'
-      case 'ACCEPTED':
-        return 'bg-emerald-500 text-white'
-      case 'REJECTED':
-        return 'bg-red-500 text-white'
-      case 'EXPIRED':
-        return 'bg-gray-400 text-white'
-      default:
-        return 'bg-slate-500 text-white'
-    }
-  }
+function ProposalListItem({ proposal }: { proposal: Proposal }) {
+  const customer = proposal.customerData
+  const totals = proposal.totals
+  
+  const initials = customer?.name
+    ? customer.name
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : '??'
 
-  if (proposals.length === 0) {
-    return (
-      <Card className="border-2">
-        <CardHeader>
-          <CardTitle>Recent Proposals</CardTitle>
-          <CardDescription>No proposals yet</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-gray-500">
-            <p className="text-sm">Create your first proposal to see it here</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
+  const statusColors: Record<string, string> = {
+    DRAFT: 'bg-gray-100 text-gray-700',
+    SENT: 'bg-blue-100 text-blue-700',
+    VIEWED: 'bg-amber-100 text-amber-700',
+    ACCEPTED: 'bg-green-100 text-green-700',
+    REJECTED: 'bg-red-100 text-red-700',
+    EXPIRED: 'bg-gray-100 text-gray-500',
   }
 
   return (
-    <Card className="border-2">
-      <CardHeader>
-        <CardTitle>Recent Proposals</CardTitle>
-        <CardDescription>Your latest proposal activity</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {proposals.slice(0, 5).map((proposal) => {
-            const customer = proposal.customerData
-            const totals = proposal.totals
+    <Link 
+      href={`/proposals/${proposal.id}/view`}
+      className="flex items-center gap-4 p-4 rounded-lg border border-gray-100 
+                 hover:border-gray-200 hover:shadow-sm transition-all group"
+    >
+      {/* Avatar */}
+      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 
+                      flex items-center justify-center font-medium text-sm flex-shrink-0">
+        {initials}
+      </div>
 
-            return (
-              <Link
-                key={proposal.id}
-                href={`/proposals/${proposal.id}/view`}
-                className="block p-4 border-2 rounded-lg hover:border-blue-200 hover:bg-blue-50/50 transition-all duration-200 group"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
-                        {customer?.name || 'Unnamed Customer'}
-                      </h3>
-                      <Badge className={cn("shrink-0 text-xs font-medium", getStatusColor(proposal.status))}>
-                        {proposal.status}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-gray-500 mb-1 truncate">
-                      {customer?.email || 'No email'}
-                    </p>
-                    <div className="flex items-center gap-3 text-xs text-gray-400">
-                      <span>{format(new Date(proposal.createdAt), 'MMM d, yyyy')}</span>
-                      {totals?.total && (
-                        <>
-                          <span>•</span>
-                          <span className="font-semibold text-gray-700">
-                            ${totals.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors shrink-0 mt-1" />
-                </div>
-              </Link>
-            )
-          })}
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <span className="font-medium text-gray-900 truncate">
+            {customer?.name || 'Unnamed Customer'}
+          </span>
+          <span className={cn(
+            "px-2 py-0.5 text-xs font-medium rounded-full",
+            statusColors[proposal.status] || 'bg-gray-100 text-gray-700'
+          )}>
+            {proposal.status}
+          </span>
         </div>
-        <div className="mt-6 pt-4 border-t">
-          <Link
-            href="/proposals"
-            className="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors group"
-          >
-            View all proposals
-            <ArrowRight className="ml-1 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          {customer?.email ? (
+            <span className="truncate">{customer.email}</span>
+          ) : (
+            <span className="flex items-center gap-1 text-amber-600">
+              <AlertCircle className="w-3 h-3" />
+              No email
+            </span>
+          )}
+          <span>•</span>
+          <span>{format(new Date(proposal.createdAt), 'MMM d, yyyy')}</span>
+        </div>
+      </div>
+
+      {/* Amount & Arrow */}
+      <div className="text-right flex-shrink-0">
+        {totals?.total && (
+          <div className="font-semibold text-gray-900">
+            ${totals.total.toLocaleString()}
+          </div>
+        )}
+        <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500 
+                               group-hover:translate-x-1 transition-all ml-auto mt-1" />
+      </div>
+    </Link>
+  )
+}
+
+export function RecentProposals({ proposals }: RecentProposalsProps) {
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="font-semibold text-gray-900">Recent Proposals</h3>
+          <p className="text-sm text-gray-500">Your latest proposal activity</p>
+        </div>
+        <Link 
+          href="/proposals" 
+          className="text-sm text-blue-500 hover:text-blue-600 font-medium"
+        >
+          View all →
+        </Link>
+      </div>
+
+      <div className="space-y-2">
+        {proposals.slice(0, 5).map(proposal => (
+          <ProposalListItem key={proposal.id} proposal={proposal} />
+        ))}
+      </div>
+
+      {proposals.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+          <p>No proposals yet</p>
+          <Link href="/builder">
+            <Button className="mt-3" variant="outline" size="sm">
+              Create your first proposal
+            </Button>
           </Link>
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   )
 }
