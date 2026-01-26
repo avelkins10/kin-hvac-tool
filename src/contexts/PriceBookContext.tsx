@@ -956,6 +956,9 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
 
   // Get default labor rate
   const getDefaultLaborRate = (): LaborRate | undefined => {
+    if (!priceBook?.laborRates || !Array.isArray(priceBook.laborRates)) {
+      return undefined
+    }
     return priceBook.laborRates.find((r) => r.isDefault)
   }
 
@@ -966,11 +969,13 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
     const labor = unit.installLaborHours * laborRate
 
     const permit =
-      priceBook.permitFees.find((p) => {
-        if (unit.tonnage <= 2.5) return p.tonnageRange === "2-2.5 Ton"
-        if (unit.tonnage <= 3.5) return p.tonnageRange === "3-3.5 Ton"
-        return p.tonnageRange === "4-5 Ton"
-      })?.fee || 200
+      (priceBook?.permitFees && Array.isArray(priceBook.permitFees)
+        ? priceBook.permitFees.find((p) => {
+            if (unit.tonnage <= 2.5) return p.tonnageRange === "2-2.5 Ton"
+            if (unit.tonnage <= 3.5) return p.tonnageRange === "3-3.5 Ton"
+            return p.tonnageRange === "4-5 Ton"
+          })?.fee
+        : undefined) || 200
 
     const subtotal = unit.equipmentCost + labor + permit
     const overheadMultiplier = priceBook?.settings?.overheadMultiplier ?? 1.15
@@ -983,6 +988,9 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
 
   // Get financing by type
   const getFinancingByType = (type: "cash" | "finance" | "lease"): FinancingOption[] => {
+    if (!priceBook?.financingOptions || !Array.isArray(priceBook.financingOptions)) {
+      return []
+    }
     const options = priceBook.financingOptions.filter((opt) => opt.type === type && opt.available)
 
     if (type === "lease") {
@@ -1362,7 +1370,11 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
 
   // Get customer-facing price (with cash markup)
   const getCustomerPrice = (salesPrice: number): number => {
-    return applyCashMarkup(salesPrice, priceBook.settings.cashMarkup)
+    if (!salesPrice || isNaN(salesPrice)) {
+      return 0
+    }
+    const cashMarkup = priceBook?.settings?.cashMarkup ?? 0
+    return applyCashMarkup(salesPrice, cashMarkup)
   }
 
   // Get system customer price
@@ -1405,7 +1417,7 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
         addUnit,
         deleteUnit,
         calculateUnitTotalCost,
-        financingOptions: priceBook.financingOptions,
+        financingOptions: priceBook?.financingOptions || [],
         updateFinancingOption,
         addFinancingOption,
         deleteFinancingOption,

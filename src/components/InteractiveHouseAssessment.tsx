@@ -464,26 +464,39 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
 
   // Load add-ons from database (via context) instead of using hardcoded defaults
   useEffect(() => {
-    if (priceBook.addOns && priceBook.addOns.length > 0) {
-      const transformedAddOns = priceBook.addOns
-        .filter(addon => addon.enabled)
-        .map(addon => ({
-          id: addon.id,
-          name: addon.name,
-          price: getAddOnSalesPrice(addon), // Use sales price from context (baseCost + margin)
-          description: addon.description,
-          selected: false,
-        }))
-      // Only update if we have database add-ons, preserve selected state
-      setAddOns(prev => {
-        const newAddOns = transformedAddOns.map(newAddon => {
-          const existing = prev.find(p => p.id === newAddon.id)
-          return existing ? { ...newAddon, selected: existing.selected } : newAddon
-        })
-        return newAddOns
-      })
+    if (!priceBook?.addOns || !Array.isArray(priceBook.addOns) || priceBook.addOns.length === 0) {
+      return
     }
-  }, [priceBook.addOns, getAddOnSalesPrice])
+    
+    if (!getAddOnSalesPrice) {
+      return
+    }
+
+    const transformedAddOns = priceBook.addOns
+      .filter(addon => addon.enabled)
+      .map(addon => ({
+        id: addon.id,
+        name: addon.name,
+        price: getAddOnSalesPrice(addon), // Use sales price from context (baseCost + margin)
+        description: addon.description,
+        selected: false,
+      }))
+    
+    // Only update if we have database add-ons, preserve selected state
+    setAddOns(prev => {
+      const newAddOns = transformedAddOns.map(newAddon => {
+        const existing = prev.find(p => p.id === newAddon.id)
+        return existing ? { ...newAddon, selected: existing.selected } : newAddon
+      })
+      // Only update if the add-ons actually changed to prevent infinite loops
+      const hasChanged = newAddOns.length !== prev.length || 
+        newAddOns.some((newAddon, i) => {
+          const old = prev[i]
+          return !old || old.id !== newAddon.id || old.price !== newAddon.price
+        })
+      return hasChanged ? newAddOns : prev
+    })
+  }, [priceBook?.addOns, getAddOnSalesPrice])
 
   useEffect(() => {
     if (paymentMethod === "leasing" && !selectedFinancingOption && financingOptions && Array.isArray(financingOptions)) {
