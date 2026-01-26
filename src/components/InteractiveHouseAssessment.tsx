@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -22,6 +22,7 @@ import {
   RotateCcw,
   Settings,
   ChevronRight,
+  ChevronLeft,
   Info,
   Camera,
   CheckCircle2,
@@ -31,6 +32,10 @@ import {
   Wrench,
   DollarSign,
   Download,
+  AlertCircle,
+  AlertTriangle,
+  Edit,
+  X,
 } from "lucide-react"
 import { usePriceBook, DEFAULT_TIER_PRICES, type FinancingOption } from "../contexts/PriceBookContext"
 import { useMaintenance } from "../contexts/MaintenanceContext"
@@ -40,6 +45,10 @@ import { FinanceApplicationList } from "@/components/finance/FinanceApplicationL
 import { FinanceApplicationForm } from "@/components/finance/FinanceApplicationForm"
 import { FinanceApplicationStatus } from "@/components/finance/FinanceApplicationStatus"
 import { shouldShowFinanceApplication, extractCustomerDataFromProposal, getSystemPriceFromProposal } from "@/lib/finance-helpers"
+import { StepNavigation } from "@/components/builder/StepNavigation"
+import { AutoSaveIndicator } from "@/components/builder/AutoSaveIndicator"
+import { HelpTooltip } from "@/components/builder/HelpTooltip"
+import { AssessmentCompletionCard } from "@/components/builder/AssessmentCompletionCard"
 
 async function resizeImageToJpeg(file: File, maxDim = 1600): Promise<File> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -383,6 +392,34 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
   const [proposalId, setProposalId] = useState<string | null>(null) // Store proposal ID for edits
   const [showFinanceForm, setShowFinanceForm] = useState(false) // State for finance application form
   const [selectedFinanceApplicationId, setSelectedFinanceApplicationId] = useState<string | null>(null) // Selected finance application to view
+
+  // Auto-save state
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Validation state
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+
+  // Step navigation
+  const pricingSteps: string[] = ["equipment", "addons", "maintenance", "incentives", "payment", "review"]
+  const stepLabels: Record<string, string> = {
+    equipment: "Equipment",
+    addons: "Add-ons",
+    maintenance: "Maintenance",
+    incentives: "Incentives",
+    payment: "Payment",
+    review: "Review"
+  }
+  const estimatedTimes: Record<string, number> = {
+    equipment: 3,
+    addons: 2,
+    maintenance: 2,
+    incentives: 1,
+    payment: 2,
+    review: 1
+  }
 
   // Expose save function and proposalId to parent
   useEffect(() => {
@@ -768,6 +805,156 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
     setShowProposalActions(false) // Hide proposal actions when starting over
   }
 
+  // Validation functions
+  const validateStep = (step: string): boolean => {
+    const errors: Record<string, string> = {}
+    
+    if (step === "equipment" && !selectedEquipment) {
+      errors.equipment = "Please select an equipment option"
+    }
+    
+    if (step === "payment" && paymentMethod !== "cash" && !selectedFinancingOption) {
+      errors.payment = "Please select a financing option"
+    }
+
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const canProceedToNextStep = (): boolean => {
+    return validateStep(pricingStep)
+  }
+
+  // Step navigation functions
+  const goToNextStep = () => {
+    if (!canProceedToNextStep()) {
+      return
+    }
+    const currentIndex = pricingSteps.indexOf(pricingStep)
+    if (currentIndex < pricingSteps.length - 1) {
+      setPricingStep(pricingSteps[currentIndex + 1])
+      setValidationErrors({})
+    }
+  }
+
+  const goToPreviousStep = () => {
+    const currentIndex = pricingSteps.indexOf(pricingStep)
+    if (currentIndex > 0) {
+      setPricingStep(pricingSteps[currentIndex - 1])
+      setValidationErrors({})
+    }
+  }
+
+  const goToStep = (step: string) => {
+    const currentIndex = pricingSteps.indexOf(pricingStep)
+    const targetIndex = pricingSteps.indexOf(step)
+    // Only allow jumping to completed steps or next step
+    if (targetIndex <= currentIndex || targetIndex === currentIndex + 1) {
+      setPricingStep(step as "equipment" | "addons" | "maintenance" | "incentives" | "payment" | "review")
+      setValidationErrors({})
+    }
+  }
+
+  // Auto-save function
+  const autoSave = useCallback(async () => {
+    if (!proposalId) return // Don't auto-save if no proposal exists yet
+    
+    setIsAutoSaving(true)
+    setSaveError(null)
+    
+    try {
+      const proposalData = {
+        customerData,
+        homeData,
+        hvacData,
+        solarData,
+        electricalData,
+        preferencesData,
+        selectedEquipment,
+        addOns: addOns.filter((a) => a.selected),
+        maintenancePlan: selectedPlan,
+        incentives: selectedIncentives,
+        paymentMethod: {
+          method: paymentMethod,
+          option: paymentMethod === "cash" ? null : selectedFinancingOption,
+        },
+        financingOption: paymentMethod === "cash" ? null : selectedFinancingOption,
+        totals: {
+          equipment: selectedEquipment?.price || 0,
+          addOns: getAddOnsTotal(),
+          maintenance: getMaintenanceTotal(),
+          incentives: getTotalIncentives(),
+          total: getTotal(),
+        },
+        nameplateAnalysis: nameplateAnalysis,
+      }
+
+      const response = await fetch(`/api/proposals/${proposalId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(proposalData),
+      })
+
+      if (response.ok) {
+        setLastSaved(new Date())
+        setSaveError(null)
+      } else {
+        throw new Error('Failed to auto-save')
+      }
+    } catch (error) {
+      setSaveError("Auto-save failed")
+    } finally {
+      setIsAutoSaving(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposalId, customerData, homeData, hvacData, solarData, electricalData, preferencesData, selectedEquipment, addOns, selectedPlan, selectedIncentives, paymentMethod, selectedFinancingOption, nameplateAnalysis])
+
+  // Auto-save effect - debounced
+  useEffect(() => {
+    if (proposalId && showPricing) {
+      // Clear existing timeout
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+      }
+      
+      // Set new timeout for auto-save
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        autoSave()
+      }, 3000) // Auto-save after 3 seconds of inactivity
+
+      return () => {
+        if (autoSaveTimeoutRef.current) {
+          clearTimeout(autoSaveTimeoutRef.current)
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposalId, showPricing, customerData, homeData, hvacData, selectedEquipment, addOns, selectedPlan, selectedIncentives, paymentMethod, selectedFinancingOption])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (!showPricing) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + Arrow keys for navigation
+      if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowRight') {
+        e.preventDefault()
+        goToNextStep()
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowLeft') {
+        e.preventDefault()
+        goToPreviousStep()
+      }
+      // Ctrl/Cmd + S to save
+      else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        handleSendToKin()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showPricing, pricingStep])
+
   // Handle send to Kin - Save proposal via API
   const handleSendToKin = async () => {
     const proposalData = {
@@ -797,6 +984,8 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
     }
 
     try {
+      setIsAutoSaving(true)
+      setSaveError(null)
       let savedProposal
       if (proposalId) {
         // Update existing proposal
@@ -807,6 +996,7 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
         })
         if (response.ok) {
           savedProposal = await response.json()
+          setLastSaved(new Date())
           toast.success("Proposal updated successfully!")
         } else {
           throw new Error('Failed to update proposal')
@@ -821,6 +1011,7 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
         if (response.ok) {
           savedProposal = await response.json()
           setProposalId(savedProposal.id)
+          setLastSaved(new Date())
           toast.success("Proposal saved successfully!")
           // Update proposalId in parent component
           if (onProposalIdChange) {
@@ -831,8 +1022,10 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
         }
       }
     } catch (error) {
+      setSaveError("Failed to save proposal")
       toast.error("Failed to save proposal")
-      console.error("Error saving proposal:", error)
+    } finally {
+      setIsAutoSaving(false)
     }
   }
 
@@ -1957,23 +2150,23 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
     const recommendedTier = getRecommendedTier()
     const recommendationReason = getRecommendationReason()
 
-    // Helper function to determine if a tier should be shown based on budget
-    // const shouldShowTier = (tier: "good" | "better" | "best"): boolean => {
-    //   const budget = preferencesData.budgetRange
-
-    //   if (budget === "under_8000") {
-    //     return tier === "good"
-    //   } else if (budget === "8000-10000") {
-    //     return tier === "good"
-    //   } else if (budget === "10000-15000") {
-    //     return tier === "good" || tier === "better"
-    //   }
-    //   // For 15000-20000 and >20000, show all tiers
-    //   return true
-    // }
-
     return (
       <div className="bg-card/10 backdrop-blur-sm rounded-lg p-4 md:p-6 border shadow-lg">
+        {/* Header with help */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="text-2xl font-bold">Select Your HVAC Equipment</h2>
+            <HelpTooltip content="Choose the equipment tier that best fits your needs. Higher SEER ratings mean better energy efficiency and lower operating costs." />
+          </div>
+          {recommendedTier && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg mb-4">
+              <p className="text-sm text-green-800">
+                <strong>Recommendation:</strong> Based on {recommendationReason}, we recommend the <strong>{recommendedTier === "best" ? "Ultimate Comfort" : recommendedTier === "better" ? "Premium Comfort" : "Essential Comfort"}</strong> tier.
+              </p>
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {tiers
             .filter((t) => shouldShowTier(t.tier))
@@ -2021,7 +2214,10 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
                   </div>
                 </div>
                 {/* </CHANGE> */}
-                <p className="text-sm text-muted-foreground mb-3">{tier.seer} SEER Rating</p>
+                <div className="flex items-center gap-2 mb-3">
+                  <p className="text-sm text-muted-foreground">{tier.seer} SEER Rating</p>
+                  <HelpTooltip content={`SEER (Seasonal Energy Efficiency Ratio) measures cooling efficiency. ${tier.seer} SEER means this system is ${tier.seer >= 18 ? 'highly' : tier.seer >= 16 ? 'moderately' : 'basically'} efficient. Higher SEER = lower energy bills.`} />
+                </div>
 
                 <ul className="space-y-1">
                   {tier.features.map((feature, i) => (
@@ -2497,14 +2693,34 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
           backgroundAttachment: "fixed",
         }}
       >
-        {/* Header */}
-        <div className="text-center border-b border-white/20 pb-6">
+        {/* Header with Edit button */}
+        <div className="text-center border-b border-white/20 pb-6 relative">
           <h2 className="text-3xl md:text-4xl font-bold mb-2 text-white">Your Custom HVAC Solution</h2>
           <p className="text-gray-300 text-lg">KIN HOME</p>
+          <div className="absolute top-0 right-0 flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPricingStep("equipment")}
+              className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Proposal
+            </Button>
+          </div>
         </div>
 
-        {/* Equipment Details */}
-        <div className="bg-card/10 backdrop-blur-sm border-2 border-primary/20 rounded-2xl p-6 md:p-8 shadow-lg">
+        {/* Equipment Details with Edit */}
+        <div className="bg-card/10 backdrop-blur-sm border-2 border-primary/20 rounded-2xl p-6 md:p-8 shadow-lg relative group">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setPricingStep("equipment")}
+            className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-white/10 hover:bg-white/20 text-white"
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Edit
+          </Button>
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
@@ -2688,36 +2904,85 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
           backgroundAttachment: "fixed",
         }}
       >
-        {/* Progress bar */}
+        {/* Progress bar with clickable steps */}
         <div className="p-3 border-b bg-card/40 backdrop-blur-sm">
           <div className="flex items-center justify-center gap-2 text-xs">
-            {["equipment", "addons", "maintenance", "incentives", "payment", "review"].map((step, i) => (
-              <div key={step} className="flex items-center">
-                <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-                    pricingStep === step
-                      ? "bg-primary text-primary-foreground"
-                      : ["equipment", "addons", "maintenance", "incentives", "payment", "review"].indexOf(pricingStep) >
-                          i
-                        ? "bg-green-500 text-white"
-                        : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {["equipment", "addons", "maintenance", "incentives", "payment", "review"].indexOf(pricingStep) >
-                  i ? (
-                    <Check className="w-3 h-3" />
-                  ) : (
-                    i + 1
+            {pricingSteps.map((step, i) => {
+              const currentIndex = pricingSteps.indexOf(pricingStep)
+              const isActive = step === pricingStep
+              const isCompleted = i < currentIndex
+              const canClick = isCompleted || i === currentIndex || i === currentIndex + 1
+
+              return (
+                <div key={step} className="flex items-center">
+                  <button
+                    onClick={() => canClick && goToStep(step)}
+                    disabled={!canClick}
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all ${
+                      isActive
+                        ? "bg-primary text-primary-foreground scale-110"
+                        : isCompleted
+                          ? "bg-green-500 text-white hover:bg-green-600 cursor-pointer"
+                          : canClick
+                            ? "bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer"
+                            : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
+                    }`}
+                    title={stepLabels[step]}
+                  >
+                    {isCompleted ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      i + 1
+                    )}
+                  </button>
+                  {i < pricingSteps.length - 1 && (
+                    <div className={`w-4 md:w-8 h-0.5 transition-colors ${
+                      isCompleted ? "bg-green-500" : "bg-muted"
+                    }`} />
                   )}
                 </div>
-                {i < 5 && <div className="w-4 md:w-8 h-0.5 bg-muted mx-1" />}
-              </div>
-            ))}
+              )
+            })}
           </div>
+          {/* Auto-save indicator */}
+          {proposalId && (
+            <div className="flex justify-center mt-2">
+              <AutoSaveIndicator
+                isSaving={isAutoSaving}
+                lastSaved={lastSaved}
+                error={saveError}
+              />
+            </div>
+          )}
         </div>
 
         {/* Main Content */}
         <div className="flex-1 overflow-auto p-4">
+          {/* Step Navigation */}
+          <StepNavigation
+            currentStep={pricingStep}
+            steps={pricingSteps}
+            onNext={goToNextStep}
+            onPrevious={goToPreviousStep}
+            canProceed={canProceedToNextStep()}
+            estimatedTime={estimatedTimes[pricingStep]}
+          />
+
+          {/* Validation Errors */}
+          {Object.keys(validationErrors).length > 0 && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center gap-2 text-red-800 mb-2">
+                <AlertCircle className="w-4 h-4" />
+                <span className="font-semibold">Please fix the following:</span>
+              </div>
+              <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+                {Object.values(validationErrors).map((error, i) => (
+                  <li key={i}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {pricingStep === "equipment" && (
             <div className="bg-card/10 backdrop-blur-sm rounded-lg p-4 md:p-6 border shadow-lg">
               {renderEquipmentStep()}
@@ -2848,238 +3113,145 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
           )}
         </div>
 
-        {/* Footer Navigation */}
-        <div className="p-3 md:p-4 bg-card/15 sticky bottom-0 backdrop-blur-sm">
-          <div className="flex flex-col gap-3">
-            <div className="flex gap-3">
-              {/* Single back button with proper navigation logic */}
-              {pricingStep === "addons" && (
-                <Button variant="outline" onClick={() => setPricingStep("equipment")}>
-                  Back
-                </Button>
-              )}
-              {pricingStep === "maintenance" && (
-                <Button variant="outline" onClick={() => setPricingStep("addons")}>
-                  Back
-                </Button>
-              )}
-              {pricingStep === "incentives" && (
-                <Button variant="outline" onClick={() => setPricingStep("maintenance")}>
-                  Back
-                </Button>
-              )}
-              {pricingStep === "payment" && (
-                <Button variant="outline" onClick={() => setPricingStep("incentives")}>
-                  Back
-                </Button>
-              )}
-              {pricingStep === "review" && (
-                <Button variant="outline" onClick={() => setPricingStep("payment")}>
-                  Back
-                </Button>
-              )}
+        {/* Footer Actions - Only show on review step */}
+        {pricingStep === "review" && showProposalActions && (
+          <div className="p-3 md:p-4 bg-card/15 sticky bottom-0 backdrop-blur-sm border-t">
+            <div className="flex flex-col sm:flex-row gap-3 max-w-5xl mx-auto">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  const element = document.getElementById("proposal-content")
+                  if (!element) return
 
-              {pricingStep === "equipment" && (
-                <Button
-                  className="flex-1"
-                  size="lg"
-                  disabled={!selectedEquipment}
-                  onClick={() => setPricingStep("addons")}
-                >
-                  Continue to Add-ons
-                  <ChevronRight className="w-4 h-4 ml-2" />
-                </Button>
-              )}
-              {pricingStep === "addons" && (
-                <div className="flex-1 flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setAddOns(addOns.map((a) => ({ ...a, selected: false })))
-                      setPricingStep("maintenance")
-                    }}
-                  >
-                    Skip Add-ons
-                  </Button>
-                  <Button className="bg-pink-500 hover:bg-pink-600" onClick={() => setPricingStep("maintenance")}>
-                    Continue to Maintenance
-                    <ChevronRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </div>
-              )}
-              {pricingStep === "maintenance" && (
-                <div className="flex-1 flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedPlan(null)
-                      setPricingStep("incentives")
-                    }}
-                  >
-                    Skip Maintenance
-                  </Button>
-                  <Button className="bg-pink-500 hover:bg-pink-600" onClick={() => setPricingStep("incentives")}>
-                    Continue to Incentives
-                    <ChevronRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </div>
-              )}
-              {pricingStep === "incentives" && (
-                <div className="flex-1 flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setPricingStep("payment")
-                    }}
-                  >
-                    Skip Incentives
-                  </Button>
-                  <Button className="bg-pink-500 hover:bg-pink-600" onClick={() => setPricingStep("payment")}>
-                    Continue to Payment
-                    <ChevronRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </div>
-              )}
-              {pricingStep === "payment" && (
-                <Button
-                  className="flex-1 bg-pink-500 hover:bg-pink-600"
-                  disabled={!paymentMethod || (paymentMethod !== "cash" && !selectedFinancingOption)}
-                  onClick={() => {
-                    setPricingStep("review")
-                    setShowProposalActions(true) // Show proposal actions when moving to review
-                  }}
-                >
-                  Continue to Review
-                  <ChevronRight className="w-4 h-4 ml-2" />
-                </Button>
-              )}
-              {pricingStep === "review" && (
-                <div className="flex-1 flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      const element = document.getElementById("proposal-content")
-                      if (!element) return
+                  try {
+                    const html2canvas = (await import("html2canvas")).default
+                    const jsPDF = (await import("jspdf")).default
 
-                      try {
-                        // Import libraries dynamically
-                        const html2canvas = (await import("html2canvas")).default
-                        const jsPDF = (await import("jspdf")).default
+                    const clone = element.cloneNode(true) as HTMLElement
+                    clone.style.position = "absolute"
+                    clone.style.left = "-9999px"
+                    clone.style.top = "0"
+                    document.body.appendChild(clone)
 
-                        // Clone the element to avoid modifying the original
-                        const clone = element.cloneNode(true) as HTMLElement
-                        clone.style.position = "absolute"
-                        clone.style.left = "-9999px"
-                        clone.style.top = "0"
-                        document.body.appendChild(clone)
+                    const convertOklchToRgba = (element: HTMLElement) => {
+                      const computedStyle = window.getComputedStyle(element)
+                      const colorProps = [
+                        "color", "backgroundColor", "borderColor",
+                        "borderTopColor", "borderRightColor", "borderBottomColor",
+                        "borderLeftColor", "outlineColor", "fill", "stroke",
+                      ]
 
-                        // Function to convert oklch to rgba
-                        const convertOklchToRgba = (element: HTMLElement) => {
-                          const computedStyle = window.getComputedStyle(element)
-
-                          // Convert color properties
-                          const colorProps = [
-                            "color",
-                            "backgroundColor",
-                            "borderColor",
-                            "borderTopColor",
-                            "borderRightColor",
-                            "borderBottomColor",
-                            "borderLeftColor",
-                            "outlineColor",
-                            "fill",
-                            "stroke",
-                          ]
-
-                          colorProps.forEach((prop) => {
-                            const value = computedStyle.getPropertyValue(prop)
-                            if (value && value.includes("oklch")) {
-                              // Get the computed RGB value
-                              const tempDiv = document.createElement("div")
-                              tempDiv.style.color = value
-                              document.body.appendChild(tempDiv)
-                              const computed = window.getComputedStyle(tempDiv).color
-                              document.body.removeChild(tempDiv)
-
-                              // Apply the computed value
-                              ;(element.style as any)[prop] = computed
-                            }
-                          })
-
-                          // Recursively process children
-                          Array.from(element.children).forEach((child) => {
-                            convertOklchToRgba(child as HTMLElement)
-                          })
+                      colorProps.forEach((prop) => {
+                        const value = computedStyle.getPropertyValue(prop)
+                        if (value && value.includes("oklch")) {
+                          const tempDiv = document.createElement("div")
+                          tempDiv.style.color = value
+                          document.body.appendChild(tempDiv)
+                          const computed = window.getComputedStyle(tempDiv).color
+                          document.body.removeChild(tempDiv)
+                          clone.style.setProperty(prop, computed, "important")
                         }
+                      })
 
-                        // Convert all oklch colors in the clone
-                        convertOklchToRgba(clone)
+                      Array.from(clone.children).forEach((child) => {
+                        convertOklchToRgba(child as HTMLElement)
+                      })
+                    }
 
-                        // Wait a brief moment for styles to apply
-                        await new Promise((resolve) => setTimeout(resolve, 100))
+                    convertOklchToRgba(clone)
+                    await new Promise((resolve) => setTimeout(resolve, 500))
 
-                        // Capture the cloned element as canvas
-                        const canvas = await html2canvas(clone, {
-                          scale: 2,
-                          useCORS: true,
-                          logging: false,
-                          backgroundColor: "#1a1a1a",
-                          foreignObjectRendering: false,
-                          allowTaint: true,
-                        })
+                    const canvas = await html2canvas(clone, {
+                      scale: 2,
+                      useCORS: true,
+                      logging: false,
+                    })
 
-                        // Remove the clone
-                        document.body.removeChild(clone)
+                    document.body.removeChild(clone)
 
-                        // Convert to PDF
-                        const imgData = canvas.toDataURL("image/png")
-                        const pdf = new jsPDF({
-                          orientation: "portrait",
-                          unit: "mm",
-                          format: "a4",
-                        })
+                    const imgData = canvas.toDataURL("image/png")
+                    const pdf = new jsPDF({
+                      orientation: "portrait",
+                      unit: "mm",
+                      format: "a4",
+                    })
 
-                        const imgWidth = 210 // A4 width in mm
-                        const imgHeight = (canvas.height * imgWidth) / canvas.width
+                    const imgWidth = 210
+                    const pageHeight = 297
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width
+                    let heightLeft = imgHeight
+                    let position = 0
 
-                        pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight)
-                        pdf.save("hvac-proposal.pdf")
-                      } catch (error) {
-                        console.error("Error generating PDF:", error)
-                        alert("Failed to generate PDF. Please try again.")
-                      }
-                    }}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download PDF
-                  </Button>
-                  <Button className="flex-1 bg-pink-500 hover:bg-pink-600" onClick={handleSendToKin}>
-                    <Send className="w-4 h-4 mr-2" />
-                    Send to Kin
-                  </Button>
-                </div>
-              )}
+                    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
+                    heightLeft -= pageHeight
+
+                    while (heightLeft >= 0) {
+                      position = heightLeft - imgHeight
+                      pdf.addPage()
+                      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
+                      heightLeft -= pageHeight
+                    }
+
+                    pdf.save(`proposal-${customerData.name || "customer"}-${new Date().toISOString().split("T")[0]}.pdf`)
+                    toast.success("PDF downloaded successfully!")
+                  } catch (error) {
+                    console.error("Error generating PDF:", error)
+                    toast.error("Failed to generate PDF. Please try again.")
+                  }
+                }}
+                className="w-full sm:w-auto"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download PDF
+              </Button>
+              <Button 
+                className="flex-1 bg-pink-500 hover:bg-pink-600" 
+                onClick={handleSendToKin}
+                disabled={isAutoSaving}
+              >
+                <Send className="w-4 h-4 mr-2" />
+                {isAutoSaving ? "Saving..." : "Send to Customer"}
+              </Button>
             </div>
-            {pricingStep === "review" && (
-              <div className="flex gap-3">
-                <Button variant="ghost" size="sm" onClick={handleStartOver} className="flex-1">
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Start Over
-                </Button>
-                <Button variant="ghost" size="sm" onClick={handleAdminClick} className="flex-1">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Admin
-                </Button>
-              </div>
-            )}
+            <div className="flex gap-3 mt-3 justify-center">
+              <Button variant="ghost" size="sm" onClick={handleStartOver}>
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Start Over
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleAdminClick}>
+                <Settings className="w-4 h-4 mr-2" />
+                Admin
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     )
   }
 
   // Determine if all hotspots are completed
   const allHotspotsCompleted = completedSections.size === hotspots.length
+
+  // Get missing sections for completion card
+  const getMissingSections = (): string[] => {
+    const missing: string[] = []
+    const sectionLabels: Record<string, string> = {
+      customer: "Customer Information",
+      home: "Home Details",
+      hvac: "HVAC System",
+      solar: "Solar Interest",
+      electrical: "Electrical Panel",
+      preferences: "Customer Preferences"
+    }
+    
+    hotspots.forEach(hotspot => {
+      if (!completedSections.has(hotspot.id)) {
+        missing.push(sectionLabels[hotspot.id] || hotspot.label)
+      }
+    })
+    
+    return missing
+  }
 
   // Handle hotspot click
   const handleHotspotClick = (hotspotId: string) => {
@@ -3135,39 +3307,93 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
         />
 
         {/* Progress indicator */}
-        <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+        <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm z-10">
           {completedSections.size}/{hotspots.length} complete
         </div>
       </div>
 
-      {/* Bottom bar with Go to Pricing button */}
-      <div className="p-3 md:p-4 bg-card/95 sticky bottom-0 backdrop-blur-sm">
+      {/* Assessment Completion Card */}
+      {completedSections.size > 0 && (
+        <AssessmentCompletionCard
+          completedSections={completedSections}
+          totalSections={hotspots.length}
+          onContinue={() => {
+            if (allHotspotsCompleted) {
+              setShowPricing(true)
+              setShowProposalActions(true)
+            }
+          }}
+          missingSections={getMissingSections()}
+        />
+      )}
+
+      {/* Bottom bar with Go to Pricing button - Mobile optimized */}
+      <div className="p-3 md:p-4 bg-card/95 sticky bottom-0 backdrop-blur-sm border-t">
         <Button
-          className={`w-full ${!allHotspotsCompleted ? "opacity-0" : ""}`}
+          className={`w-full transition-all ${!allHotspotsCompleted ? "opacity-50 cursor-not-allowed" : ""}`}
           size="lg"
+          disabled={!allHotspotsCompleted}
           onClick={() => {
-            setShowPricing(true)
-            setShowProposalActions(true) // Ensure proposal actions are visible when entering pricing
+            if (allHotspotsCompleted) {
+              setShowPricing(true)
+              setShowProposalActions(true)
+            }
           }}
         >
           {allHotspotsCompleted && <Check className="w-4 h-4 mr-2 text-green-500" />}
-          Go to Pricing
+          {allHotspotsCompleted ? "Go to Pricing" : `Complete ${hotspots.length - completedSections.size} more section${hotspots.length - completedSections.size !== 1 ? 's' : ''}`}
           <ChevronRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
 
-      {/* Hotspot modals */}
+      {/* Hotspot modals - Mobile optimized */}
       <Dialog open={activeModal !== null} onOpenChange={() => setActiveModal(null)}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
           <DialogHeader>
-            <DialogTitle>{activeModal && getModalTitle(activeModal)}</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">{activeModal && getModalTitle(activeModal)}</DialogTitle>
             <DialogDescription>
               {activeModal && `Enter ${activeModal === "customer" ? "customer" : activeModal === "home" ? "home" : activeModal === "hvac" ? "HVAC system" : activeModal === "solar" ? "solar" : activeModal === "electrical" ? "electrical" : "preference"} information for this proposal.`}
             </DialogDescription>
           </DialogHeader>
-          {renderModalContent()}
+          <div className="max-h-[calc(90vh-100px)] overflow-y-auto">
+            {renderModalContent()}
+          </div>
         </DialogContent>
       </Dialog>
+
+      {/* Mobile-friendly section list (shown on small screens) */}
+      <div className="md:hidden p-4 bg-card/95 backdrop-blur-sm border-t">
+        <div className="space-y-2">
+          {hotspots.map((hotspot) => (
+            <button
+              key={hotspot.id}
+              onClick={() => handleHotspotClick(hotspot.id)}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
+                completedSections.has(hotspot.id)
+                  ? "border-green-500 bg-green-50"
+                  : "border-border hover:border-primary"
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                completedSections.has(hotspot.id) ? "bg-green-500" : "bg-primary"
+              }`}>
+                {completedSections.has(hotspot.id) ? (
+                  <Check className="w-5 h-5 text-white" />
+                ) : (
+                  hotspot.icon
+                )}
+              </div>
+              <div className="flex-1 text-left">
+                <div className="font-medium">{hotspot.label}</div>
+                {completedSections.has(hotspot.id) && (
+                  <div className="text-xs text-green-600">Completed</div>
+                )}
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400" />
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Finance Application Form Dialog */}
       {proposalId && selectedFinancingOption?.provider === "Lightreach" && (

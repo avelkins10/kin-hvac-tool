@@ -80,6 +80,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    // Prevent editing finalized proposals (ACCEPTED, REJECTED, EXPIRED)
+    const finalizedStatuses = ['ACCEPTED', 'REJECTED', 'EXPIRED']
+    if (finalizedStatuses.includes(existing.status)) {
+      return NextResponse.json({ 
+        error: 'Cannot edit a finalized proposal. Only DRAFT, SENT, and VIEWED proposals can be edited.' 
+      }, { status: 400 })
+    }
+
     const body = await request.json()
     const {
       customerData,
