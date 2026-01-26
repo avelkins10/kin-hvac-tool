@@ -1,11 +1,31 @@
 "use client"
 
+import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { usePriceBook } from "@/src/contexts/PriceBookContext"
-import { Wind, Wrench, FileText, Package, DollarSign, Plus, Trash2, Pencil, Check } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { usePriceBook, type PriceBookUnit, type LaborRate, type PermitFee, type Material } from "@/src/contexts/PriceBookContext"
+import { Wind, Wrench, FileText, Package, Plus, Trash2, Pencil, Check, Save, X } from "lucide-react"
+import { toast } from "sonner"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface PriceBookManagerProps {
   activeSubTab: string
@@ -24,10 +44,233 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
     deleteLaborRate,
     setDefaultLaborRate,
     updatePermitFee,
+    addPermitFee,
+    deletePermitFee,
     updateMaterial,
     addMaterial,
     deleteMaterial,
+    refreshPriceBook,
   } = usePriceBook()
+
+  // Units state
+  const [unitDialogOpen, setUnitDialogOpen] = useState(false)
+  const [editingUnit, setEditingUnit] = useState<PriceBookUnit | null>(null)
+  const [unitFormData, setUnitFormData] = useState({
+    brand: '',
+    modelNumber: '',
+    tier: 'good' as 'good' | 'better' | 'best',
+    tonnage: '',
+    equipmentCost: '',
+    installLaborHours: '',
+    seerRating: '',
+    leadTimeDays: '',
+    systemType: '',
+  })
+
+  // Labor state
+  const [laborDialogOpen, setLaborDialogOpen] = useState(false)
+  const [editingLabor, setEditingLabor] = useState<LaborRate | null>(null)
+  const [laborFormData, setLaborFormData] = useState({
+    name: '',
+    description: '',
+    rate: '',
+  })
+
+  // Permit state
+  const [permitDialogOpen, setPermitDialogOpen] = useState(false)
+  const [editingPermit, setEditingPermit] = useState<PermitFee | null>(null)
+  const [permitFormData, setPermitFormData] = useState({
+    name: '',
+    tonnageRange: '',
+    fee: '',
+  })
+
+  // Material state
+  const [materialDialogOpen, setMaterialDialogOpen] = useState(false)
+  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null)
+  const [materialFormData, setMaterialFormData] = useState({
+    name: '',
+    description: '',
+    unitCost: '',
+    unit: '',
+  })
+
+  // Units handlers
+  const handleEditUnit = (unit: PriceBookUnit) => {
+    setEditingUnit(unit)
+    setUnitFormData({
+      brand: unit.brand,
+      modelNumber: unit.modelNumber,
+      tier: unit.tier,
+      tonnage: unit.tonnage.toString(),
+      equipmentCost: unit.equipmentCost.toString(),
+      installLaborHours: unit.installLaborHours.toString(),
+      seerRating: unit.seerRating.toString(),
+      leadTimeDays: unit.leadTimeDays.toString(),
+      systemType: unit.systemType,
+    })
+    setUnitDialogOpen(true)
+  }
+
+  const handleSaveUnit = async () => {
+    try {
+      const unitData = {
+        ...unitFormData,
+        tonnage: Number(unitFormData.tonnage),
+        equipmentCost: Number(unitFormData.equipmentCost),
+        installLaborHours: Number(unitFormData.installLaborHours),
+        seerRating: Number(unitFormData.seerRating),
+        leadTimeDays: Number(unitFormData.leadTimeDays),
+        name: `${unitFormData.brand} ${unitFormData.modelNumber}`,
+      }
+
+      if (editingUnit) {
+        updateUnit({ ...editingUnit, ...unitData })
+        toast.success('Unit updated')
+      } else {
+        addUnit(unitData)
+        toast.success('Unit added')
+      }
+      setUnitDialogOpen(false)
+      await refreshPriceBook()
+    } catch (error) {
+      toast.error('Failed to save unit')
+    }
+  }
+
+  // Labor handlers
+  const handleEditLabor = (rate: LaborRate) => {
+    setEditingLabor(rate)
+    setLaborFormData({
+      name: rate.name,
+      description: rate.description,
+      rate: rate.rate.toString(),
+    })
+    setLaborDialogOpen(true)
+  }
+
+  const handleSaveLabor = async () => {
+    try {
+      const url = editingLabor?.id
+        ? `/api/company/labor-rates/${editingLabor.id}`
+        : '/api/company/labor-rates'
+      const method = editingLabor ? 'PATCH' : 'POST'
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: laborFormData.name,
+          rate: Number(laborFormData.rate),
+        }),
+      })
+
+      if (response.ok) {
+        if (editingLabor) {
+          updateLaborRate({ ...editingLabor, name: laborFormData.name, description: laborFormData.description, rate: Number(laborFormData.rate) })
+        } else {
+          addLaborRate({ name: laborFormData.name, description: laborFormData.description, rate: Number(laborFormData.rate), isDefault: false })
+        }
+        toast.success(editingLabor ? 'Labor rate updated' : 'Labor rate added')
+        setLaborDialogOpen(false)
+        await refreshPriceBook()
+      } else {
+        toast.error('Failed to save labor rate')
+      }
+    } catch (error) {
+      toast.error('Failed to save labor rate')
+    }
+  }
+
+  // Permit handlers
+  const handleEditPermit = (permit: PermitFee) => {
+    setEditingPermit(permit)
+    setPermitFormData({
+      name: permit.name,
+      tonnageRange: permit.tonnageRange,
+      fee: permit.fee.toString(),
+    })
+    setPermitDialogOpen(true)
+  }
+
+  const handleSavePermit = async () => {
+    try {
+      const url = editingPermit?.id
+        ? `/api/company/permits/${editingPermit.id}`
+        : '/api/company/permits'
+      const method = editingPermit ? 'PATCH' : 'POST'
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: permitFormData.name,
+          cost: Number(permitFormData.fee),
+        }),
+      })
+
+      if (response.ok) {
+        if (editingPermit) {
+          updatePermitFee({ ...editingPermit, name: permitFormData.name, tonnageRange: permitFormData.tonnageRange, fee: Number(permitFormData.fee) })
+        } else {
+          addPermitFee({ name: permitFormData.name, tonnageRange: permitFormData.tonnageRange, fee: Number(permitFormData.fee) })
+        }
+        toast.success(editingPermit ? 'Permit fee updated' : 'Permit fee added')
+        setPermitDialogOpen(false)
+        await refreshPriceBook()
+      } else {
+        toast.error('Failed to save permit fee')
+      }
+    } catch (error) {
+      toast.error('Failed to save permit fee')
+    }
+  }
+
+  // Material handlers
+  const handleEditMaterial = (material: Material) => {
+    setEditingMaterial(material)
+    setMaterialFormData({
+      name: material.name,
+      description: material.description,
+      unitCost: material.costPerUnit.toString(),
+      unit: material.unit,
+    })
+    setMaterialDialogOpen(true)
+  }
+
+  const handleSaveMaterial = async () => {
+    try {
+      const url = editingMaterial?.id
+        ? `/api/company/materials/${editingMaterial.id}`
+        : '/api/company/materials'
+      const method = editingMaterial ? 'PATCH' : 'POST'
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: materialFormData.name,
+          cost: Number(materialFormData.unitCost),
+          unit: materialFormData.unit,
+        }),
+      })
+
+      if (response.ok) {
+        if (editingMaterial) {
+          updateMaterial({ ...editingMaterial, name: materialFormData.name, description: materialFormData.description, costPerUnit: Number(materialFormData.unitCost), unit: materialFormData.unit })
+        } else {
+          addMaterial({ name: materialFormData.name, description: materialFormData.description, unitCost: Number(materialFormData.unitCost), unit: materialFormData.unit })
+        }
+        toast.success(editingMaterial ? 'Material updated' : 'Material added')
+        setMaterialDialogOpen(false)
+        await refreshPriceBook()
+      } else {
+        toast.error('Failed to save material')
+      }
+    } catch (error) {
+      toast.error('Failed to save material')
+    }
+  }
 
   return (
     <Card>
@@ -64,20 +307,21 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
               <h3 className="font-semibold">HVAC Units</h3>
               <Button
                 size="sm"
-                onClick={() =>
-                  addUnit({
-                    name: "New Unit",
-                    tier: "good",
-                    tonnage: 2,
-                    equipmentCost: 2500,
-                    installLaborHours: 8,
-                    seerRating: 16,
-                    brand: "Goodman",
-                    modelNumber: "GSX160241",
-                    leadTimeDays: 3,
-                    systemType: "Air Conditioner",
+                onClick={() => {
+                  setEditingUnit(null)
+                  setUnitFormData({
+                    brand: '',
+                    modelNumber: '',
+                    tier: 'good',
+                    tonnage: '',
+                    equipmentCost: '',
+                    installLaborHours: '8',
+                    seerRating: '16',
+                    leadTimeDays: '3',
+                    systemType: 'Air Conditioner',
                   })
-                }
+                  setUnitDialogOpen(true)
+                }}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Unit
@@ -105,7 +349,7 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
                         <Badge variant="outline">{unit.seerRating} SEER</Badge>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditUnit(unit)}>
                           <Pencil className="w-4 h-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => deleteUnit(unit.id)}>
@@ -158,7 +402,11 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
               <h3 className="font-semibold">Labor Rates</h3>
               <Button
                 size="sm"
-                onClick={() => addLaborRate({ name: "New Rate", description: "", rate: 100, isDefault: false })}
+                onClick={() => {
+                  setEditingLabor(null)
+                  setLaborFormData({ name: '', description: '', rate: '' })
+                  setLaborDialogOpen(true)
+                }}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Labor Rate
@@ -184,7 +432,7 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
                         </Button>
                       )}
                       {rate.isDefault && <Check className="w-5 h-5 text-green-600" />}
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" onClick={() => handleEditLabor(rate)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => deleteLaborRate(rate.id)}>
@@ -201,6 +449,17 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
           <TabsContent value="permits">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold">Permit Fees</h3>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditingPermit(null)
+                  setPermitFormData({ name: '', tonnageRange: '', fee: '' })
+                  setPermitDialogOpen(true)
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Permit Fee
+              </Button>
             </div>
 
             <div className="space-y-4">
@@ -208,11 +467,13 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
                 <div key={permit.id} className="border rounded-lg p-4 bg-white">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="font-semibold">{permit.jurisdiction}</h4>
-                      <p className="text-sm text-gray-500">{permit.description}</p>
+                      <h4 className="font-semibold">{permit.name}</h4>
+                      {permit.tonnageRange && (
+                        <p className="text-sm text-gray-500">{permit.tonnageRange}</p>
+                      )}
                       <p className="text-lg font-bold text-green-600 mt-1">${permit.fee}</p>
                     </div>
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" onClick={() => handleEditPermit(permit)}>
                       <Pencil className="w-4 h-4" />
                     </Button>
                   </div>
@@ -227,7 +488,11 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
               <h3 className="font-semibold">Materials</h3>
               <Button
                 size="sm"
-                onClick={() => addMaterial({ name: "New Material", description: "", unitCost: 0, unit: "each" })}
+                onClick={() => {
+                  setEditingMaterial(null)
+                  setMaterialFormData({ name: '', description: '', unitCost: '', unit: 'each' })
+                  setMaterialDialogOpen(true)
+                }}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Material
@@ -242,11 +507,11 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
                       <h4 className="font-semibold">{material.name}</h4>
                       <p className="text-sm text-gray-500">{material.description}</p>
                       <p className="text-lg font-bold text-green-600 mt-1">
-                        ${material.unitCost}/{material.unit}
+                        ${material.costPerUnit}/{material.unit}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" onClick={() => handleEditMaterial(material)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
                       <Button variant="ghost" size="icon" onClick={() => deleteMaterial(material.id)}>
@@ -260,6 +525,278 @@ export function PriceBookManager({ activeSubTab, onSubTabChange }: PriceBookMana
           </TabsContent>
         </Tabs>
       </CardContent>
+
+      {/* Unit Edit Dialog */}
+      <Dialog open={unitDialogOpen} onOpenChange={setUnitDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingUnit ? 'Edit Unit' : 'Add Unit'}</DialogTitle>
+            <DialogDescription>Configure HVAC unit details</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="brand">Brand</Label>
+                <Input
+                  id="brand"
+                  value={unitFormData.brand}
+                  onChange={(e) => setUnitFormData({ ...unitFormData, brand: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="modelNumber">Model Number</Label>
+                <Input
+                  id="modelNumber"
+                  value={unitFormData.modelNumber}
+                  onChange={(e) => setUnitFormData({ ...unitFormData, modelNumber: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="tier">Tier</Label>
+                <Select
+                  value={unitFormData.tier}
+                  onValueChange={(v: 'good' | 'better' | 'best') => setUnitFormData({ ...unitFormData, tier: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="good">Good</SelectItem>
+                    <SelectItem value="better">Better</SelectItem>
+                    <SelectItem value="best">Best</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="tonnage">Tonnage</Label>
+                <Input
+                  id="tonnage"
+                  type="number"
+                  value={unitFormData.tonnage}
+                  onChange={(e) => setUnitFormData({ ...unitFormData, tonnage: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="equipmentCost">Equipment Cost ($)</Label>
+                <Input
+                  id="equipmentCost"
+                  type="number"
+                  value={unitFormData.equipmentCost}
+                  onChange={(e) => setUnitFormData({ ...unitFormData, equipmentCost: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="installLaborHours">Install Hours</Label>
+                <Input
+                  id="installLaborHours"
+                  type="number"
+                  value={unitFormData.installLaborHours}
+                  onChange={(e) => setUnitFormData({ ...unitFormData, installLaborHours: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="seerRating">SEER Rating</Label>
+                <Input
+                  id="seerRating"
+                  type="number"
+                  value={unitFormData.seerRating}
+                  onChange={(e) => setUnitFormData({ ...unitFormData, seerRating: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="leadTimeDays">Lead Time (days)</Label>
+                <Input
+                  id="leadTimeDays"
+                  type="number"
+                  value={unitFormData.leadTimeDays}
+                  onChange={(e) => setUnitFormData({ ...unitFormData, leadTimeDays: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="systemType">System Type</Label>
+              <Input
+                id="systemType"
+                value={unitFormData.systemType}
+                onChange={(e) => setUnitFormData({ ...unitFormData, systemType: e.target.value })}
+                placeholder="e.g., Air Conditioner, Heat Pump"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUnitDialogOpen(false)}>
+              <X className="w-4 h-4 mr-2" />
+              Cancel
+            </Button>
+            <Button onClick={handleSaveUnit}>
+              <Save className="w-4 h-4 mr-2" />
+              {editingUnit ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Labor Edit Dialog */}
+      <Dialog open={laborDialogOpen} onOpenChange={setLaborDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingLabor ? 'Edit Labor Rate' : 'Add Labor Rate'}</DialogTitle>
+            <DialogDescription>Configure labor rate details</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="laborName">Name</Label>
+              <Input
+                id="laborName"
+                value={laborFormData.name}
+                onChange={(e) => setLaborFormData({ ...laborFormData, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="laborDescription">Description</Label>
+              <Textarea
+                id="laborDescription"
+                value={laborFormData.description}
+                onChange={(e) => setLaborFormData({ ...laborFormData, description: e.target.value })}
+                rows={2}
+              />
+            </div>
+            <div>
+              <Label htmlFor="laborRate">Rate per Hour ($)</Label>
+              <Input
+                id="laborRate"
+                type="number"
+                value={laborFormData.rate}
+                onChange={(e) => setLaborFormData({ ...laborFormData, rate: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLaborDialogOpen(false)}>
+              <X className="w-4 h-4 mr-2" />
+              Cancel
+            </Button>
+            <Button onClick={handleSaveLabor}>
+              <Save className="w-4 h-4 mr-2" />
+              {editingLabor ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Permit Edit Dialog */}
+      <Dialog open={permitDialogOpen} onOpenChange={setPermitDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingPermit ? 'Edit Permit Fee' : 'Add Permit Fee'}</DialogTitle>
+            <DialogDescription>Configure permit fee details</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="permitName">Name</Label>
+              <Input
+                id="permitName"
+                value={permitFormData.name}
+                onChange={(e) => setPermitFormData({ ...permitFormData, name: e.target.value })}
+                placeholder="e.g., Small System, Medium System"
+              />
+            </div>
+            <div>
+              <Label htmlFor="tonnageRange">Tonnage Range</Label>
+              <Input
+                id="tonnageRange"
+                value={permitFormData.tonnageRange}
+                onChange={(e) => setPermitFormData({ ...permitFormData, tonnageRange: e.target.value })}
+                placeholder="e.g., 2-2.5 Ton, 3-3.5 Ton"
+              />
+            </div>
+            <div>
+              <Label htmlFor="permitFee">Fee ($)</Label>
+              <Input
+                id="permitFee"
+                type="number"
+                value={permitFormData.fee}
+                onChange={(e) => setPermitFormData({ ...permitFormData, fee: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPermitDialogOpen(false)}>
+              <X className="w-4 h-4 mr-2" />
+              Cancel
+            </Button>
+            <Button onClick={handleSavePermit}>
+              <Save className="w-4 h-4 mr-2" />
+              {editingPermit ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Material Edit Dialog */}
+      <Dialog open={materialDialogOpen} onOpenChange={setMaterialDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingMaterial ? 'Edit Material' : 'Add Material'}</DialogTitle>
+            <DialogDescription>Configure material details</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="materialName">Name</Label>
+              <Input
+                id="materialName"
+                value={materialFormData.name}
+                onChange={(e) => setMaterialFormData({ ...materialFormData, name: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="materialDescription">Description</Label>
+              <Textarea
+                id="materialDescription"
+                value={materialFormData.description}
+                onChange={(e) => setMaterialFormData({ ...materialFormData, description: e.target.value })}
+                rows={2}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="materialUnitCost">Unit Cost ($)</Label>
+                <Input
+                  id="materialUnitCost"
+                  type="number"
+                  value={materialFormData.unitCost}
+                  onChange={(e) => setMaterialFormData({ ...materialFormData, unitCost: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="materialUnit">Unit</Label>
+                <Input
+                  id="materialUnit"
+                  value={materialFormData.unit}
+                  onChange={(e) => setMaterialFormData({ ...materialFormData, unit: e.target.value })}
+                  placeholder="e.g., each, lb, ft"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMaterialDialogOpen(false)}>
+              <X className="w-4 h-4 mr-2" />
+              Cancel
+            </Button>
+            <Button onClick={handleSaveMaterial}>
+              <Save className="w-4 h-4 mr-2" />
+              {editingMaterial ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
