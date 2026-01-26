@@ -45,7 +45,6 @@ import { FinanceApplicationList } from "@/components/finance/FinanceApplicationL
 import { FinanceApplicationForm } from "@/components/finance/FinanceApplicationForm"
 import { FinanceApplicationStatus } from "@/components/finance/FinanceApplicationStatus"
 import { shouldShowFinanceApplication, extractCustomerDataFromProposal, getSystemPriceFromProposal } from "@/lib/finance-helpers"
-import { formatDistanceToNow } from "date-fns"
 import { StepNavigation } from "@/components/builder/StepNavigation"
 import { AutoSaveIndicator } from "@/components/builder/AutoSaveIndicator"
 import { HelpTooltip } from "@/components/builder/HelpTooltip"
@@ -404,7 +403,7 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
   // Step navigation
-  const pricingSteps = ["equipment", "addons", "maintenance", "incentives", "payment", "review"] as const
+  const pricingSteps: string[] = ["equipment", "addons", "maintenance", "incentives", "payment", "review"]
   const stepLabels: Record<string, string> = {
     equipment: "Equipment",
     addons: "Add-ons",
@@ -848,10 +847,10 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
 
   const goToStep = (step: string) => {
     const currentIndex = pricingSteps.indexOf(pricingStep)
-    const targetIndex = pricingSteps.indexOf(step as typeof pricingStep)
+    const targetIndex = pricingSteps.indexOf(step)
     // Only allow jumping to completed steps or next step
     if (targetIndex <= currentIndex || targetIndex === currentIndex + 1) {
-      setPricingStep(step as typeof pricingStep)
+      setPricingStep(step as "equipment" | "addons" | "maintenance" | "incentives" | "payment" | "review")
       setValidationErrors({})
     }
   }
