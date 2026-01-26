@@ -1358,7 +1358,11 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
 
   // Get customer-facing price (with cash markup)
   const getCustomerPrice = (salesPrice: number): number => {
-    return applyCashMarkup(salesPrice, priceBook.settings.cashMarkup)
+    if (!salesPrice || isNaN(salesPrice)) {
+      return 0
+    }
+    const cashMarkup = priceBook?.settings?.cashMarkup ?? 0
+    return applyCashMarkup(salesPrice, cashMarkup)
   }
 
   // Get system customer price

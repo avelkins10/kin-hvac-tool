@@ -2145,6 +2145,15 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
 
   // Render equipment selection
   const renderEquipmentStep = () => {
+    // Add safety checks for context functions
+    if (!getTierPrice || !getCustomerPrice) {
+      return (
+        <div className="p-4 text-center">
+          <p>Loading pricing information...</p>
+        </div>
+      )
+    }
+
     const tonnage = selectedEquipment?.tonnage || calculateTonnage()
     const tiers = getEquipmentTiers(tonnage)
     const recommendedTier = getRecommendedTier()
