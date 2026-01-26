@@ -14,7 +14,7 @@ export function QuickStats({ avgValue, lastSentDaysAgo, winRate }: QuickStatsPro
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <span className="text-gray-600 text-sm">Average Value</span>
-          <span className="font-semibold">${avgValue.toLocaleString()}</span>
+          <span className="font-semibold">${(avgValue || 0).toLocaleString()}</span>
         </div>
         
         <div className="flex items-center justify-between">
