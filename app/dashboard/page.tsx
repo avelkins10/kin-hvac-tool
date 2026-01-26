@@ -221,14 +221,14 @@ export default async function DashboardPage() {
           <MetricCard
             title="Total Proposals"
             value={data.totalProposals}
-            icon={FileText}
+            icon="FileText"
             accentColor="blue"
             href="/proposals"
           />
           <MetricCard
             title="Draft"
             value={data.statusCounts.DRAFT || 0}
-            icon={FileText}
+            icon="FileText"
             accentColor="gray"
             subtitle={data.statusCounts.DRAFT > 0 ? `${data.statusCounts.DRAFT} ready to send` : undefined}
             href="/proposals?status=DRAFT"
@@ -236,7 +236,7 @@ export default async function DashboardPage() {
           <MetricCard
             title="Sent"
             value={data.statusCounts.SENT || 0}
-            icon={Send}
+            icon="Send"
             accentColor="amber"
             subtitle={data.statusCounts.SENT === 0 ? "Send your first!" : undefined}
             href="/proposals?status=SENT"
@@ -244,7 +244,7 @@ export default async function DashboardPage() {
           <MetricCard
             title="Viewed"
             value={data.statusCounts.VIEWED || 0}
-            icon={Eye}
+            icon="Eye"
             accentColor="green"
             href="/proposals?status=VIEWED"
           />
@@ -335,27 +335,27 @@ export default async function DashboardPage() {
               <NavCard
                 title="All Proposals"
                 description="View and manage all proposals"
-                icon={FileText}
+                icon="FileText"
                 count={data.totalProposals}
                 href="/proposals"
               />
               <NavCard
                 title="Pipeline View"
                 description="Visual workflow board"
-                icon={Workflow}
+                icon="Workflow"
                 href="/proposals/pipeline"
               />
               <NavCard
                 title="Clients"
                 description="Manage your customers"
-                icon={Users}
+                icon="Users"
                 href="/clients"
               />
               {(session?.user?.role === 'COMPANY_ADMIN' || session?.user?.role === 'SUPER_ADMIN') && (
                 <NavCard
                   title="Users"
                   description="Manage team members"
-                  icon={UserCog}
+                  icon="UserCog"
                   href="/users"
                 />
               )}

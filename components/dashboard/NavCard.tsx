@@ -1,17 +1,27 @@
 "use client"
 
 import Link from 'next/link'
-import { LucideIcon, ChevronRight } from 'lucide-react'
+import { ChevronRight, FileText, Users, UserCog, Workflow } from 'lucide-react'
+
+type IconName = 'FileText' | 'Users' | 'UserCog' | 'Workflow'
+
+const iconMap = {
+  FileText,
+  Users,
+  UserCog,
+  Workflow,
+}
 
 interface NavCardProps {
   title: string
   description: string
-  icon: LucideIcon
+  icon: IconName
   count?: number
   href: string
 }
 
-export function NavCard({ title, description, icon: Icon, count, href }: NavCardProps) {
+export function NavCard({ title, description, icon, count, href }: NavCardProps) {
+  const Icon = iconMap[icon]
   return (
     <Link
       href={href}

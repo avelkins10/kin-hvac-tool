@@ -1,13 +1,24 @@
 "use client"
 
 import Link from 'next/link'
-import { LucideIcon, TrendingUp, TrendingDown } from 'lucide-react'
+import { TrendingUp, TrendingDown, FileText, Send, Eye, Users, UserCog, Workflow } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+type IconName = 'FileText' | 'Send' | 'Eye' | 'Users' | 'UserCog' | 'Workflow'
+
+const iconMap = {
+  FileText,
+  Send,
+  Eye,
+  Users,
+  UserCog,
+  Workflow,
+}
 
 interface MetricCardProps {
   title: string
   value: number
-  icon: LucideIcon
+  icon: IconName
   trend?: { value: number; label: string }
   accentColor: 'blue' | 'gray' | 'amber' | 'green' | 'red'
   href?: string
@@ -17,12 +28,13 @@ interface MetricCardProps {
 export function MetricCard({
   title,
   value,
-  icon: Icon,
+  icon,
   trend,
   accentColor,
   href,
   subtitle
 }: MetricCardProps) {
+  const Icon = iconMap[icon]
   const colorClasses = {
     blue: 'bg-blue-50 border-blue-200 text-blue-600',
     gray: 'bg-gray-50 border-gray-200 text-gray-600',
