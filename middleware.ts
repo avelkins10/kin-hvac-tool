@@ -13,7 +13,10 @@ export default withAuth(
 
     // Protect admin routes
     if (path.startsWith('/admin')) {
-      if (token?.role !== 'COMPANY_ADMIN' && token?.role !== 'SUPER_ADMIN') {
+      if (!token) {
+        return NextResponse.redirect(new URL('/auth/signin', req.url))
+      }
+      if (token.role !== 'COMPANY_ADMIN' && token.role !== 'SUPER_ADMIN') {
         return NextResponse.redirect(new URL('/unauthorized', req.url))
       }
     }

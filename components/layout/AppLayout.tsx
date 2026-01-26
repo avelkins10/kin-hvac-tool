@@ -131,9 +131,9 @@ export function AppLayout({ children }: AppLayoutProps) {
                     {(session.user.role === 'COMPANY_ADMIN' || session.user.role === 'SUPER_ADMIN') && (
                       <>
                         <DropdownMenuItem asChild>
-                          <Link href="/builder" className="cursor-pointer">
+                          <Link href="/admin/settings" className="cursor-pointer">
                             <Settings className="mr-2 h-4 w-4" />
-                            <span>Admin Portal</span>
+                            <span>Admin Settings</span>
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
