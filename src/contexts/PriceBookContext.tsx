@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, type ReactNode } from "react"
 
 export const DEFAULT_TIER_PRICES = {
   good: 12499,
@@ -932,13 +932,13 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
     return Math.round((profit / system.baseCost) * 1000) / 10
   }
 
-  // Calculate add-on sales price
-  const getAddOnSalesPrice = (addon: AddOn): number => {
+  // Calculate add-on sales price - memoized
+  const getAddOnSalesPrice = useCallback((addon: AddOn): number => {
     if (addon.marginType === "fixed") {
       return addon.baseCost + addon.marginAmount
     }
     return Math.round(addon.baseCost * (1 + addon.marginAmount / 100))
-  }
+  }, [])
 
   // Calculate add-on gross profit
   const getAddOnGrossProfit = (addon: AddOn): number => {
@@ -986,8 +986,8 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
     return { equipment: unit.equipmentCost, labor, permit, total }
   }
 
-  // Get financing by type
-  const getFinancingByType = (type: "cash" | "finance" | "lease"): FinancingOption[] => {
+  // Get financing by type - memoized
+  const getFinancingByType = useCallback((type: "cash" | "finance" | "lease"): FinancingOption[] => {
     if (!priceBook?.financingOptions || !Array.isArray(priceBook.financingOptions)) {
       return []
     }
@@ -998,7 +998,7 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
     }
 
     return options
-  }
+  }, [priceBook?.financingOptions])
 
   // Calculate monthly payment for financing
   const calculateMonthlyPayment = (principal: number, option: FinancingOption): number => {
@@ -1351,8 +1351,8 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Get tier price
-  const getTierPrice = (tier: "good" | "better" | "best", tonnage: number): number => {
+  // Get tier price - memoized to prevent re-renders
+  const getTierPrice = useCallback((tier: "good" | "better" | "best", tonnage: number): number => {
     if (!priceBook?.hvacSystems || !Array.isArray(priceBook.hvacSystems)) {
       return DEFAULT_TIER_PRICES[tier]
     }
@@ -1361,74 +1361,120 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
       return getSystemSalesPrice(system)
     }
     return DEFAULT_TIER_PRICES[tier]
-  }
+  }, [priceBook?.hvacSystems])
 
   // Apply cash markup to sales price
-  const getCustomerFacingPriceWithCashMarkup = (salesPrice: number, cashMarkupPercent: number): number => {
+  const getCustomerFacingPriceWithCashMarkup = useCallback((salesPrice: number, cashMarkupPercent: number): number => {
     return applyCashMarkup(salesPrice, cashMarkupPercent)
-  }
+  }, [])
 
-  // Get customer-facing price (with cash markup)
-  const getCustomerPrice = (salesPrice: number): number => {
+  // Get customer-facing price (with cash markup) - memoized
+  const getCustomerPrice = useCallback((salesPrice: number): number => {
     if (!salesPrice || isNaN(salesPrice)) {
       return 0
     }
     const cashMarkup = priceBook?.settings?.cashMarkup ?? 0
     return applyCashMarkup(salesPrice, cashMarkup)
-  }
+  }, [priceBook?.settings?.cashMarkup])
 
-  // Get system customer price
-  const getSystemCustomerPrice = (tier: "good" | "better" | "best"): number => {
+  // Get system customer price - memoized
+  const getSystemCustomerPrice = useCallback((tier: "good" | "better" | "best"): number => {
     const salesPrice = getTierPrice(tier, 0) // tonnage 0 gets base price
     return getCustomerPrice(salesPrice)
-  }
+  }, [getTierPrice, getCustomerPrice])
+
+  // Memoize financing options array to prevent re-renders
+  const financingOptions = useMemo(() => priceBook?.financingOptions || [], [priceBook?.financingOptions])
+
+  // Memoize the entire context value to prevent infinite re-renders
+  const contextValue = useMemo(() => ({
+    priceBook,
+    loading,
+    refreshPriceBook,
+    updateHVACSystem,
+    addHVACSystem,
+    deleteHVACSystem,
+    getSystemSalesPrice,
+    getSystemGrossProfit,
+    getSystemMarkupPercent,
+    getTierPrice,
+    updateAddOn,
+    addAddOn,
+    deleteAddOn,
+    getAddOnSalesPrice,
+    getAddOnGrossProfit,
+    getAddOnMarkupPercent,
+    updateMaterial,
+    addMaterial,
+    deleteMaterial,
+    updateLaborRate,
+    addLaborRate,
+    deleteLaborRate,
+    setDefaultLaborRate,
+    getDefaultLaborRate,
+    updatePermitFee,
+    addPermitFee,
+    deletePermitFee,
+    updateUnit,
+    addUnit,
+    deleteUnit,
+    calculateUnitTotalCost,
+    financingOptions,
+    updateFinancingOption,
+    addFinancingOption,
+    deleteFinancingOption,
+    getFinancingByType,
+    calculateMonthlyPayment,
+    updateSettings,
+    getCustomerFacingPriceWithCashMarkup,
+    getCustomerPrice,
+    getSystemCustomerPrice,
+  }), [
+    priceBook,
+    loading,
+    refreshPriceBook,
+    updateHVACSystem,
+    addHVACSystem,
+    deleteHVACSystem,
+    getSystemSalesPrice,
+    getSystemGrossProfit,
+    getSystemMarkupPercent,
+    getTierPrice,
+    updateAddOn,
+    addAddOn,
+    deleteAddOn,
+    getAddOnSalesPrice,
+    getAddOnGrossProfit,
+    getAddOnMarkupPercent,
+    updateMaterial,
+    addMaterial,
+    deleteMaterial,
+    updateLaborRate,
+    addLaborRate,
+    deleteLaborRate,
+    setDefaultLaborRate,
+    getDefaultLaborRate,
+    updatePermitFee,
+    addPermitFee,
+    deletePermitFee,
+    updateUnit,
+    addUnit,
+    deleteUnit,
+    calculateUnitTotalCost,
+    financingOptions,
+    updateFinancingOption,
+    addFinancingOption,
+    deleteFinancingOption,
+    getFinancingByType,
+    calculateMonthlyPayment,
+    updateSettings,
+    getCustomerFacingPriceWithCashMarkup,
+    getCustomerPrice,
+    getSystemCustomerPrice,
+  ])
 
   return (
-    <PriceBookContext.Provider
-      value={{
-        priceBook,
-        loading,
-        refreshPriceBook,
-        updateHVACSystem,
-        addHVACSystem,
-        deleteHVACSystem,
-        getSystemSalesPrice,
-        getSystemGrossProfit,
-        getSystemMarkupPercent,
-        getTierPrice,
-        updateAddOn,
-        addAddOn,
-        deleteAddOn,
-        getAddOnSalesPrice,
-        getAddOnGrossProfit,
-        getAddOnMarkupPercent,
-        updateMaterial,
-        addMaterial,
-        deleteMaterial,
-        updateLaborRate,
-        addLaborRate,
-        deleteLaborRate,
-        setDefaultLaborRate,
-        getDefaultLaborRate,
-        updatePermitFee,
-        addPermitFee,
-        deletePermitFee,
-        updateUnit,
-        addUnit,
-        deleteUnit,
-        calculateUnitTotalCost,
-        financingOptions: priceBook?.financingOptions || [],
-        updateFinancingOption,
-        addFinancingOption,
-        deleteFinancingOption,
-        getFinancingByType,
-        calculateMonthlyPayment,
-        updateSettings,
-        getCustomerFacingPriceWithCashMarkup,
-        getCustomerPrice,
-        getSystemCustomerPrice,
-      }}
-    >
+    <PriceBookContext.Provider value={contextValue}>
       {children}
     </PriceBookContext.Provider>
   )
