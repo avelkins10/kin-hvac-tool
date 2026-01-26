@@ -73,8 +73,9 @@ function AdminSettingsContent() {
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbPage>Admin Settings</BreadcrumbPage>
-          </BreadcrumbList>
-        </Breadcrumb>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
       {/* Header */}
       <div className="mb-8">
