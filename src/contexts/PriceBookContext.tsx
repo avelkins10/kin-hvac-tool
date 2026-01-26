@@ -910,27 +910,27 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
     await loadPriceBook()
   }
 
-  // Calculate system sales price
-  const getSystemSalesPrice = (system: HVACSystem): number => {
+  // Calculate system sales price - memoized to prevent re-renders
+  const getSystemSalesPrice = useCallback((system: HVACSystem): number => {
     if (system.marginType === "fixed") {
       return system.baseCost + system.marginAmount
     }
     return Math.round(system.baseCost * (1 + system.marginAmount / 100))
-  }
+  }, [])
 
-  // Calculate system gross profit
-  const getSystemGrossProfit = (system: HVACSystem): number => {
+  // Calculate system gross profit - memoized to prevent re-renders
+  const getSystemGrossProfit = useCallback((system: HVACSystem): number => {
     if (system.marginType === "fixed") {
       return system.marginAmount
     }
     return Math.round(system.baseCost * (system.marginAmount / 100))
-  }
+  }, [])
 
-  // Calculate system markup percent
-  const getSystemMarkupPercent = (system: HVACSystem): number => {
+  // Calculate system markup percent - memoized to prevent re-renders
+  const getSystemMarkupPercent = useCallback((system: HVACSystem): number => {
     const profit = getSystemGrossProfit(system)
     return Math.round((profit / system.baseCost) * 1000) / 10
-  }
+  }, [getSystemGrossProfit])
 
   // Calculate add-on sales price - memoized
   const getAddOnSalesPrice = useCallback((addon: AddOn): number => {
@@ -1361,7 +1361,7 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
       return getSystemSalesPrice(system)
     }
     return DEFAULT_TIER_PRICES[tier]
-  }, [priceBook?.hvacSystems])
+  }, [priceBook?.hvacSystems, getSystemSalesPrice])
 
   // Apply cash markup to sales price
   const getCustomerFacingPriceWithCashMarkup = useCallback((salesPrice: number, cashMarkupPercent: number): number => {
@@ -1432,45 +1432,6 @@ export function PriceBookProvider({ children }: { children: ReactNode }) {
   }), [
     priceBook,
     loading,
-    refreshPriceBook,
-    updateHVACSystem,
-    addHVACSystem,
-    deleteHVACSystem,
-    getSystemSalesPrice,
-    getSystemGrossProfit,
-    getSystemMarkupPercent,
-    getTierPrice,
-    updateAddOn,
-    addAddOn,
-    deleteAddOn,
-    getAddOnSalesPrice,
-    getAddOnGrossProfit,
-    getAddOnMarkupPercent,
-    updateMaterial,
-    addMaterial,
-    deleteMaterial,
-    updateLaborRate,
-    addLaborRate,
-    deleteLaborRate,
-    setDefaultLaborRate,
-    getDefaultLaborRate,
-    updatePermitFee,
-    addPermitFee,
-    deletePermitFee,
-    updateUnit,
-    addUnit,
-    deleteUnit,
-    calculateUnitTotalCost,
-    financingOptions,
-    updateFinancingOption,
-    addFinancingOption,
-    deleteFinancingOption,
-    getFinancingByType,
-    calculateMonthlyPayment,
-    updateSettings,
-    getCustomerFacingPriceWithCashMarkup,
-    getCustomerPrice,
-    getSystemCustomerPrice,
   ])
 
   return (
