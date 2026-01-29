@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { signNowClient } from '@/lib/integrations/signnow'
+import { uploadSignedDocument } from '@/lib/storage/supabase-storage'
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,13 +37,35 @@ export async function POST(request: NextRequest) {
       })
 
       if (signatureRequest) {
+        let signedDocumentUrl = data.document?.download_link || null
+
+        // Download signed document from SignNow and upload to Supabase Storage
+        try {
+          // Download the PDF from SignNow using the client
+          const pdfBuffer = await signNowClient.downloadSignedDocument(documentId)
+
+          // Upload to Supabase Storage
+          const { url: supabaseUrl } = await uploadSignedDocument(
+            pdfBuffer,
+            signatureRequest.proposalId,
+            signatureRequest.proposal.companyId
+          )
+
+          signedDocumentUrl = supabaseUrl
+          console.log(`Signed document uploaded to Supabase: ${supabaseUrl}`)
+        } catch (storageError) {
+          console.error('Failed to download/upload signed document:', storageError)
+          // Continue with external URL if storage fails
+          // signedDocumentUrl will remain as the SignNow download link
+        }
+
         // Update signature request status
         await prisma.signatureRequest.update({
           where: { id: signatureRequest.id },
           data: {
             status: 'COMPLETED',
             completedAt: new Date(),
-            signedDocumentUrl: data.document?.download_link || null,
+            signedDocumentUrl: signedDocumentUrl,
           },
         })
 

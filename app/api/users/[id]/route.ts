@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../auth/[...nextauth]/route'
+import { requireAuth, requireRole } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/db'
-import { hashPassword, validatePasswordStrength } from '@/lib/auth'
+import { validatePasswordStrength } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const session = await requireAuth()
 
     const user = await prisma.user.findUnique({
       where: { id: params.id },
@@ -46,15 +43,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Only admins can update users
-    if (session.user.role !== 'COMPANY_ADMIN' && session.user.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const session = await requireRole(['COMPANY_ADMIN', 'SUPER_ADMIN'])
 
     const body = await request.json()
     const { email, password, role } = body
@@ -80,7 +69,17 @@ export async function PATCH(
       if (!passwordValidation.valid) {
         return NextResponse.json({ error: passwordValidation.message }, { status: 400 })
       }
-      updateData.password = await hashPassword(password)
+      // Update password in Supabase Auth
+      const supabase = await createClient()
+      const { error: updateError } = await supabase.auth.admin.updateUserById(
+        existingUser.supabaseUserId || '',
+        { password: password.trim() }
+      )
+      if (updateError) {
+        console.error('Error updating password in Supabase Auth:', updateError)
+        return NextResponse.json({ error: 'Failed to update password' }, { status: 500 })
+      }
+      // Note: We don't store password in User table anymore (Supabase Auth handles it)
     }
 
     const user = await prisma.user.update({
@@ -106,15 +105,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Only admins can delete users
-    if (session.user.role !== 'COMPANY_ADMIN' && session.user.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const session = await requireRole(['COMPANY_ADMIN', 'SUPER_ADMIN'])
 
     const existingUser = await prisma.user.findUnique({
       where: { id: params.id },
@@ -134,6 +125,17 @@ export async function DELETE(
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
     }
 
+    // Delete from Supabase Auth first
+    if (existingUser.supabaseUserId) {
+      const supabase = await createClient()
+      const { error: deleteError } = await supabase.auth.admin.deleteUser(existingUser.supabaseUserId)
+      if (deleteError) {
+        console.error('Error deleting user from Supabase Auth:', deleteError)
+        // Continue with database deletion even if Supabase Auth deletion fails
+      }
+    }
+
+    // Delete User record from database
     await prisma.user.delete({
       where: { id: params.id },
     })

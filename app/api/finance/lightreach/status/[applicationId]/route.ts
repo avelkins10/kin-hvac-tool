@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../../auth/[...nextauth]/route'
+import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/db'
 import { FinanceProviderFactory } from '@/lib/integrations/finance-factory'
 import {
@@ -17,10 +16,7 @@ export async function GET(
   { params }: { params: Promise<{ applicationId: string }> | { applicationId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const session = await requireAuth()
 
     // Handle Next.js 15 async params
     const resolvedParams = await Promise.resolve(params)

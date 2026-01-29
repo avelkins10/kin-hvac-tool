@@ -1,6 +1,4 @@
 import { requireAuth } from '@/lib/auth-helpers'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { prisma } from '@/lib/db'
 import { MetricCard } from '@/components/dashboard/MetricCard'
 import { OutcomesSummary } from '@/components/dashboard/OutcomesSummary'
@@ -20,13 +18,9 @@ import {
   BreadcrumbPage,
 } from '@/components/ui/breadcrumb'
 
-async function getSession() {
-  return await getServerSession(authOptions)
-}
-
 async function getDashboardData() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user) {
+  const session = await requireAuth()
+  if (!session.user) {
     return {
       statusCounts: {},
       totalProposals: 0,

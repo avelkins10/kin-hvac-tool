@@ -1,6 +1,6 @@
 "use client"
 
-import { useSession, signOut } from 'next-auth/react'
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
@@ -33,11 +33,11 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { data: session } = useSession()
+  const { user: session, signOut } = useSupabaseAuth()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  const isAdmin = session?.user?.role === 'COMPANY_ADMIN' || session?.user?.role === 'SUPER_ADMIN'
+  const isAdmin = session?.role === 'COMPANY_ADMIN' || session?.role === 'SUPER_ADMIN'
   
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -141,7 +141,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     )}
                     <DropdownMenuItem
                       className="cursor-pointer text-red-600"
-                      onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+                      onClick={() => signOut()}
                     >
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>Log out</span>

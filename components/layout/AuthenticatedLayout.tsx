@@ -1,6 +1,6 @@
 "use client"
 
-import { useSession } from 'next-auth/react'
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { AppLayout } from './AppLayout'
@@ -11,16 +11,16 @@ interface AuthenticatedLayoutProps {
 }
 
 export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
-  const { data: session, status } = useSession()
+  const { user: session, loading } = useSupabaseAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
+    if (!loading && !session) {
       router.push('/auth/signin')
     }
-  }, [status, router])
+  }, [loading, session, router])
 
-  if (status === 'loading') {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Spinner className="w-8 h-8" />

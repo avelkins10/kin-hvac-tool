@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,21 +14,21 @@ export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      const result = await signIn('credentials', {
-        email: email.trim(),
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
         password: password.trim(),
-        redirect: false,
       })
 
-      if (result?.error) {
-        toast.error(result.error === 'CredentialsSignin' ? 'Invalid email or password' : result.error)
-      } else if (result?.ok) {
+      if (error) {
+        toast.error(error.message || 'Invalid email or password')
+      } else if (data.user) {
         toast.success('Logged in successfully')
         // Use window.location for a full page refresh to ensure session is loaded
         window.location.href = '/dashboard'
@@ -36,6 +36,7 @@ export function LoginForm() {
         toast.error('Login failed. Please try again.')
       }
     } catch (error) {
+      console.error('Login error:', error)
       toast.error('An error occurred during login')
     } finally {
       setIsLoading(false)

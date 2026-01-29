@@ -439,7 +439,7 @@ export class LightReachClient implements IFinanceProvider {
       const response = await this.makeRequest(url, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Bearer ${token}`,
         },
       })
 

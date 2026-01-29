@@ -1,7 +1,45 @@
-import { PrismaClient } from '@prisma/client'
-import { hashPassword } from '../lib/auth'
+// Load .env.local so DATABASE_URL and Supabase vars are set
+import { readFileSync, existsSync } from 'fs'
+import { resolve } from 'path'
+const envPath = resolve(process.cwd(), '.env.local')
+if (existsSync(envPath)) {
+  const content = readFileSync(envPath, 'utf8')
+  for (const line of content.split('\n')) {
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/)
+    if (m && !process.env[m[1]]) {
+      const val = m[2].replace(/^["']|["']$/g, '').trim()
+      process.env[m[1]] = val
+    }
+  }
+}
 
-const prisma = new PrismaClient()
+import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { Pool } from 'pg'
+import { createClient } from '@supabase/supabase-js'
+
+const databaseUrl = process.env.DATABASE_URL
+if (!databaseUrl) {
+  console.error('❌ DATABASE_URL must be set. Add it to .env.local or run: DATABASE_URL=... npm run create-admin')
+  process.exit(1)
+}
+
+const pool = new Pool({
+  connectionString: databaseUrl,
+  ssl: databaseUrl.includes('supabase') ? { rejectUnauthorized: false } : undefined,
+})
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) })
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('❌ SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY must be set in .env.local')
+  process.exit(1)
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+})
 
 async function createAdminUser() {
   const email = process.argv[2] || 'admin@example.com'
@@ -25,29 +63,82 @@ async function createAdminUser() {
       console.log(`Using existing company: ${company.name} (${company.id})`)
     }
 
-    // Check if user exists
+    // Check if user exists in database
     const existingUser = await prisma.user.findUnique({
       where: { email },
     })
 
     if (existingUser) {
-      console.log(`User ${email} already exists. Updating password...`)
-      const hashedPassword = await hashPassword(password)
+      console.log(`User ${email} already exists in database.`)
+      
+      // If user has supabaseUserId, update password in Supabase Auth
+      if (existingUser.supabaseUserId) {
+        console.log('Updating password in Supabase Auth...')
+        const { error: updateError } = await supabase.auth.admin.updateUserById(
+          existingUser.supabaseUserId,
+          { password: password.trim() }
+        )
+        if (updateError) {
+          console.error('Error updating password in Supabase Auth:', updateError)
+          throw updateError
+        }
+        console.log(`Updated password for Supabase Auth user: ${existingUser.supabaseUserId}`)
+      } else {
+        // User exists but no Supabase Auth user - create one
+        console.log('Creating Supabase Auth user for existing database user...')
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+          email: email.trim().toLowerCase(),
+          password: password.trim(),
+          email_confirm: true,
+        })
+        
+        if (authError || !authData.user) {
+          console.error('Error creating Supabase Auth user:', authError)
+          throw authError || new Error('Failed to create Supabase Auth user')
+        }
+        
+        // Link Supabase Auth user to database user
+        await prisma.user.update({
+          where: { email },
+          data: {
+            supabaseUserId: authData.user.id,
+            companyId: company.id,
+            role: 'COMPANY_ADMIN',
+          },
+        })
+        console.log(`Linked Supabase Auth user ${authData.user.id} to database user`)
+      }
+      
+      // Update company and role if needed
       await prisma.user.update({
         where: { email },
         data: {
-          password: hashedPassword,
           companyId: company.id,
           role: 'COMPANY_ADMIN',
         },
       })
       console.log(`Updated user: ${email}`)
     } else {
-      const hashedPassword = await hashPassword(password)
+      // Create new user in Supabase Auth first
+      console.log('Creating Supabase Auth user...')
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: email.trim().toLowerCase(),
+        password: password.trim(),
+        email_confirm: true, // Auto-confirm email
+      })
+
+      if (authError || !authData.user) {
+        console.error('Error creating Supabase Auth user:', authError)
+        throw authError || new Error('Failed to create Supabase Auth user')
+      }
+
+      console.log(`Created Supabase Auth user: ${authData.user.id}`)
+
+      // Create User record in database
       const user = await prisma.user.create({
         data: {
-          email,
-          password: hashedPassword,
+          email: email.trim().toLowerCase(),
+          supabaseUserId: authData.user.id,
           role: 'COMPANY_ADMIN',
           companyId: company.id,
         },
@@ -59,8 +150,17 @@ async function createAdminUser() {
     console.log(`Email: ${email}`)
     console.log(`Password: ${password}`)
     console.log(`Company: ${company.name}`)
-  } catch (error) {
-    console.error('Error creating admin user:', error)
+    console.log('\n📝 Note: User can now log in using Supabase Auth')
+  } catch (error: unknown) {
+    const prismaError = error as { code?: string; message?: string }
+    if (prismaError?.code === 'P2022' && prismaError?.message?.includes('column')) {
+      console.error('Error: User table schema does not match Prisma schema.')
+      console.error('Ensure DATABASE_URL in .env.local points to Supabase (not Neon), then run:')
+      console.error('  npx prisma migrate deploy')
+      console.error('Then run this script again.')
+    } else {
+      console.error('Error creating admin user:', error)
+    }
     process.exit(1)
   } finally {
     await prisma.$disconnect()

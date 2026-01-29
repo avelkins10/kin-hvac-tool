@@ -1,21 +1,43 @@
 /**
  * Seed Admin Defaults Script
- * 
- * This script copies all default data from PriceBookContext into the database.
- * Run this once to populate your database with the default configuration.
- * 
- * Usage:
- *   npx tsx scripts/seed-admin-defaults.ts
- * 
- * Or with ts-node:
- *   ts-node scripts/seed-admin-defaults.ts
+ *
+ * Populates the database with default HVAC systems, add-ons, price book, labor rates, permits, materials, financing.
+ * Run once after migrations. Uses DATABASE_URL from .env.local (Supabase).
+ *
+ * Usage: npx tsx scripts/seed-admin-defaults.ts
  */
 
+import { readFileSync, existsSync } from 'fs'
+import { resolve } from 'path'
+const envPath = resolve(process.cwd(), '.env.local')
+if (existsSync(envPath)) {
+  const content = readFileSync(envPath, 'utf8')
+  for (const line of content.split('\n')) {
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/)
+    if (m && !process.env[m[1]]) {
+      const val = m[2].replace(/^["']|["']$/g, '').trim()
+      process.env[m[1]] = val
+    }
+  }
+}
+
 import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { Pool } from 'pg'
 
-const prisma = new PrismaClient()
+const databaseUrl = process.env.DATABASE_URL
+if (!databaseUrl) {
+  console.error('❌ DATABASE_URL not set. Add it to .env.local (Supabase connection string).')
+  process.exit(1)
+}
 
-const COMPANY_ID = 'company-kinhome' // Your company ID from the database
+const pool = new Pool({
+  connectionString: databaseUrl,
+  ssl: databaseUrl.includes('supabase') ? { rejectUnauthorized: false } : undefined,
+})
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) })
+
+const COMPANY_ID = 'company-kinhome' // Your company ID from the database (create Company first or use existing)
 
 async function seedDefaults() {
   console.log('🌱 Seeding admin defaults into database...\n')

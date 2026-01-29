@@ -50,11 +50,19 @@ SMTP_FROM=your-email@gmail.com
 OPENAI_API_KEY=sk-your-openai-api-key
 ```
 
-### LightReach (Finance Integration)
+### LightReach/Palmetto Finance (Finance Integration)
 ```
-LIGHTREACH_API_KEY=your-lightreach-api-key
-LIGHTREACH_BASE_URL=https://api.lightreach.com/v1
+PALMETTO_FINANCE_ACCOUNT_EMAIL=scott@kinhome.com
+PALMETTO_FINANCE_ACCOUNT_PASSWORD=Lionhive1!
+PALMETTO_FINANCE_ENVIRONMENT=next
+PALMETTO_SALES_REP_NAME=Austin Elkins
+PALMETTO_SALES_REP_EMAIL=austin@kinhome.com
+PALMETTO_SALES_REP_PHONE=801-928-6369
 ```
+
+**Note:** 
+- `PALMETTO_FINANCE_ENVIRONMENT` should be `next` for staging/test or `prod` for production
+- The password is sensitive - add it in Vercel dashboard, never commit to git
 
 ## Generated NEXTAUTH_SECRET
 

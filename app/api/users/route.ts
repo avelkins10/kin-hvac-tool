@@ -1,20 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../auth/[...nextauth]/route'
+import { requireAuth, requireRole } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/db'
-import { hashPassword, validatePasswordStrength } from '@/lib/auth'
+import { validatePasswordStrength } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Company admins and super admins can list users
-    if (session.user.role !== 'COMPANY_ADMIN' && session.user.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const session = await requireRole(['COMPANY_ADMIN', 'SUPER_ADMIN'])
 
     const companyId = session.user.companyId
     if (!companyId) {
@@ -46,15 +38,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Only admins can create users
-    if (session.user.role !== 'COMPANY_ADMIN' && session.user.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const session = await requireRole(['COMPANY_ADMIN', 'SUPER_ADMIN'])
 
     const body = await request.json()
     const { email, password, role = 'SALES_REP' } = body
@@ -77,17 +61,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User already exists' }, { status: 409 })
     }
 
-    const hashedPassword = await hashPassword(password)
     const companyId = session.user.companyId
-
     if (!companyId) {
       return NextResponse.json({ error: 'No company associated' }, { status: 400 })
     }
 
+    // Create user in Supabase Auth first
+    const supabase = await createClient()
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: email.trim().toLowerCase(),
+      password: password.trim(),
+      email_confirm: true, // Auto-confirm email
+    })
+
+    if (authError || !authData.user) {
+      console.error('Error creating Supabase Auth user:', authError)
+      return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
+    }
+
+    // Create User record in database
     const user = await prisma.user.create({
       data: {
-        email,
-        password: hashedPassword,
+        email: email.trim().toLowerCase(),
+        supabaseUserId: authData.user.id,
         role,
         companyId,
       },

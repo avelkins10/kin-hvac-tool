@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../auth/[...nextauth]/route'
+import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/db'
 import { emailClient } from '@/lib/email/email-client'
+import { generateProposalPDF } from '@/lib/templates/proposal-generator'
+import { uploadProposalPDF } from '@/lib/storage/supabase-storage'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const session = await requireAuth()
 
     const resolvedParams = await Promise.resolve(params)
     const proposalId = resolvedParams.id
@@ -35,12 +33,30 @@ export async function POST(
       return NextResponse.json({ error: 'Customer email is required' }, { status: 400 })
     }
 
-    // Generate proposal URL (public view)
-    const proposalUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/proposals/${proposalId}/view`
+    // Generate proposal PDF and upload to Supabase Storage
+    let proposalPdfUrl: string | null = null
+    try {
+      const pdfBuffer = await generateProposalPDF(proposal)
+      const { url, path } = await uploadProposalPDF(
+        pdfBuffer,
+        proposalId,
+        session.user.companyId || proposal.companyId
+      )
+      proposalPdfUrl = url
+      console.log(`Proposal PDF uploaded to Supabase: ${url}`)
+    } catch (pdfError) {
+      console.error('Failed to generate/upload proposal PDF:', pdfError)
+      // Continue with email even if PDF generation fails
+    }
 
-    // Send email
+    // Generate proposal URL (public view)
+    const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000'}/proposals/${proposalId}/view`
+
+    // Send email (optionally attach PDF if generated)
     try {
       await emailClient.sendProposalEmail(customerData.email, proposalId, proposalUrl)
+      // Note: Email attachments can be added later if needed
+      // For now, we just send the link and store the PDF in Supabase
     } catch (emailError) {
       console.error('Error sending email:', emailError)
       // Continue even if email fails

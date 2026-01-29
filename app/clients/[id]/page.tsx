@@ -1,6 +1,4 @@
 import { requireAuth } from '@/lib/auth-helpers'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { prisma } from '@/lib/db'
 import { ClientProposals } from '@/components/clients/ClientProposals'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,8 +8,8 @@ import Link from 'next/link'
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
 
 async function getClientData(id: string) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user) {
+  const session = await requireAuth()
+  if (!session.user) {
     return null
   }
 
