@@ -1,10 +1,11 @@
 #!/bin/bash
-# Script to migrate data from Neon to Supabase
+# One-time pg_dump/psql migration from Neon to Supabase (alternative to migrate-to-supabase.ts).
+# Preferred: use npm run migrate-db (scripts/migrate-to-supabase.ts) with .env.local set.
 # Usage: ./scripts/migrate-neon-to-supabase.sh
 
 set -e
 
-echo "🔄 Neon to Supabase Migration Script"
+echo "🔄 Neon to Supabase Migration Script (pg_dump/psql)"
 echo "======================================"
 echo ""
 

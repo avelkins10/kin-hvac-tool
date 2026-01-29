@@ -35,6 +35,8 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage Policies for nameplates bucket
+-- Note: These policies will work after Supabase Auth migration
+-- Initially, we'll use service_role key which bypasses RLS
 CREATE POLICY "Users can upload nameplates for their company"
 ON storage.objects FOR INSERT
 TO authenticated
@@ -43,7 +45,7 @@ WITH CHECK (
   AND (storage.foldername(name))[1] = (
     SELECT "companyId"::text 
     FROM "User" 
-    WHERE id = auth.uid()::text
+    WHERE "supabaseUserId" = auth.uid()::text
   )
 );
 
@@ -55,7 +57,7 @@ USING (
   AND (storage.foldername(name))[1] = (
     SELECT "companyId"::text 
     FROM "User" 
-    WHERE id = auth.uid()::text
+    WHERE "supabaseUserId" = auth.uid()::text
   )
 );
 
@@ -67,7 +69,7 @@ USING (
   AND (storage.foldername(name))[1] = (
     SELECT "companyId"::text 
     FROM "User" 
-    WHERE id = auth.uid()::text
+    WHERE "supabaseUserId" = auth.uid()::text
   )
 );
 
@@ -80,7 +82,7 @@ WITH CHECK (
   AND (storage.foldername(name))[1] = (
     SELECT "companyId"::text 
     FROM "User" 
-    WHERE id = auth.uid()::text
+    WHERE "supabaseUserId" = auth.uid()::text
   )
 );
 
@@ -92,7 +94,7 @@ USING (
   AND (storage.foldername(name))[1] = (
     SELECT "companyId"::text 
     FROM "User" 
-    WHERE id = auth.uid()::text
+    WHERE "supabaseUserId" = auth.uid()::text
   )
 );
 
@@ -105,7 +107,7 @@ WITH CHECK (
   AND (storage.foldername(name))[1] = (
     SELECT "companyId"::text 
     FROM "User" 
-    WHERE id = auth.uid()::text
+    WHERE "supabaseUserId" = auth.uid()::text
   )
 );
 
@@ -117,7 +119,7 @@ USING (
   AND (storage.foldername(name))[1] = (
     SELECT "companyId"::text 
     FROM "User" 
-    WHERE id = auth.uid()::text
+    WHERE "supabaseUserId" = auth.uid()::text
   )
 );
 
@@ -130,7 +132,7 @@ WITH CHECK (
   AND (storage.foldername(name))[1] = (
     SELECT "companyId"::text 
     FROM "User" 
-    WHERE id = auth.uid()::text
+    WHERE "supabaseUserId" = auth.uid()::text
   )
 );
 
@@ -142,20 +144,20 @@ USING (
   AND (storage.foldername(name))[1] = (
     SELECT "companyId"::text 
     FROM "User" 
-    WHERE id = auth.uid()::text
+    WHERE "supabaseUserId" = auth.uid()::text
   )
 );
 
--- Note: Since we're using NextAuth (not Supabase Auth), we'll use service_role key
--- for file operations. The policies above won't work with NextAuth.
--- Instead, we'll use the service_role key in code which bypasses RLS.
+-- Note: These RLS policies use Supabase Auth (auth.uid()).
+-- 
+-- Migration phases:
+-- 1. Initially: Use service_role key in code (bypasses RLS) - safe because we validate companyId in app code
+-- 2. After Auth Migration: Update code to use authenticated Supabase client - RLS will automatically work
+--
+-- The policies above join User table on supabaseUserId to get companyId
+-- This ensures users can only access files from their own company
 
--- For NextAuth compatibility, we can either:
--- 1. Disable RLS on storage.objects (not recommended for security)
--- 2. Use service_role key in code (recommended - we'll handle auth in application code)
--- 3. Create a custom function that validates companyId from NextAuth session
-
--- Option: Create a function to check company access (for future use)
+-- Helper function for company access validation
 CREATE OR REPLACE FUNCTION check_company_access(file_path text, user_company_id text)
 RETURNS boolean AS $$
 BEGIN
@@ -163,6 +165,3 @@ BEGIN
   RETURN (string_to_array(file_path, '/'))[1] = user_company_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- For now, we'll use service_role key in code which bypasses RLS
--- This is safe because we validate companyId in our application code

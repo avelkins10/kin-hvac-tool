@@ -134,7 +134,8 @@ interface HVACData {
   ductworkAge: number
   climateZone: string
   // Added fields for AI analysis
-  nameplatePhoto?: string
+  nameplatePhoto?: string // Base64 or URL (for backward compatibility)
+  nameplatePhotoUrl?: string // Supabase Storage URL (preferred)
   coolingType?: string
   tonnage?: string
 }
@@ -1259,29 +1260,56 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
         )
 
       case "hvac":
-        // CHANGE: handleNameplateUpload function updated with new fetch call and error handling
+        // Updated: Upload to Supabase Storage, then analyze
         const handleNameplateUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
           const originalFile = event.target.files?.[0]
           if (!originalFile) return
+
+          if (!proposalId) {
+            toast.error("Please save the proposal first before uploading a nameplate photo")
+            return
+          }
 
           setAnalyzingNameplate(true)
           setNameplateAnalysis(null)
 
           try {
-            // Resize/compress the image to avoid payload size issues
+            // Resize/compress the image
             const file = await resizeImageToJpeg(originalFile, 1600)
 
-            // Read the compressed file as base64
+            // Show preview immediately
+            const previewUrl = URL.createObjectURL(file)
+            setHvacData({ ...hvacData, nameplatePhoto: previewUrl })
+
+            // Upload to Supabase Storage
+            const formData = new FormData()
+            formData.append('file', file)
+            formData.append('proposalId', proposalId)
+
+            const uploadResponse = await fetch("/api/nameplate/upload", {
+              method: "POST",
+              body: formData,
+            })
+
+            if (!uploadResponse.ok) {
+              const uploadError = await uploadResponse.json()
+              throw new Error(uploadError.error || "Failed to upload photo")
+            }
+
+            const uploadData = await uploadResponse.json()
+            const photoUrl = uploadData.url
+
+            // Update hvacData with Supabase URL
+            setHvacData({ ...hvacData, nameplatePhoto: photoUrl, nameplatePhotoUrl: photoUrl })
+
+            // Read file as base64 for AI analysis
             const arrayBuffer = await file.arrayBuffer()
             const base64Data = btoa(
               new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ""),
             )
 
-            // Show preview
-            const previewUrl = `data:${file.type};base64,${base64Data}`
-            setHvacData({ ...hvacData, nameplatePhoto: previewUrl })
-
-            const response = await fetch("/api/analyze-nameplate", {
+            // Analyze with OpenAI
+            const analysisResponse = await fetch("/api/analyze-nameplate", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -1295,25 +1323,28 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
               }),
             })
 
-            const data = await response.json()
+            const analysisData = await analysisResponse.json()
 
-            if (!response.ok) {
-              throw new Error(data.error || data.detail || `HTTP ${response.status}`)
+            if (!analysisResponse.ok) {
+              throw new Error(analysisData.error || analysisData.detail || `HTTP ${analysisResponse.status}`)
             }
 
-            if (data.success && data.data) {
-              setNameplateAnalysis(data.data)
+            if (analysisData.success && analysisData.data) {
+              setNameplateAnalysis(analysisData.data)
               setHvacData((prev) => ({
                 ...prev,
-                tonnage: data.data.tonnage ? String(data.data.tonnage) : prev.tonnage,
-                coolingType: data.data.unitType || prev.coolingType,
+                tonnage: analysisData.data.tonnage ? String(analysisData.data.tonnage) : prev.tonnage,
+                coolingType: analysisData.data.unitType || prev.coolingType,
+                nameplatePhoto: photoUrl,
+                nameplatePhotoUrl: photoUrl,
               }))
             } else {
-              setNameplateAnalysis({ parseError: true, rawText: data.rawResponse })
+              setNameplateAnalysis({ parseError: true, rawText: analysisData.rawResponse })
             }
           } catch (error: unknown) {
-            console.error("AI Nameplate Analysis Failed:", error)
+            console.error("Nameplate Upload/Analysis Failed:", error)
             const errorMessage = error instanceof Error ? error.message : "Unknown error"
+            toast.error(`Failed to upload nameplate: ${errorMessage}`)
 
             if (errorMessage === "Load failed" || errorMessage === "Failed to fetch") {
               setNameplateAnalysis({
@@ -1348,10 +1379,10 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
                   className="flex-1"
                 />
               </div>
-              {hvacData.nameplatePhoto && (
+              {(hvacData.nameplatePhoto || hvacData.nameplatePhotoUrl) && (
                 <div className="mt-2 space-y-3">
                   <img
-                    src={hvacData.nameplatePhoto || "/placeholder.svg"}
+                    src={hvacData.nameplatePhotoUrl || hvacData.nameplatePhoto || "/placeholder.svg"}
                     alt="HVAC Nameplate"
                     className="max-w-full h-32 object-contain rounded border"
                   />

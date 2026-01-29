@@ -1,10 +1,10 @@
-# Creating Your First Admin User
+# Creating Your First Admin User (Supabase Auth)
 
-If you're getting a 401 Unauthorized error when trying to log in, it means no user exists in the database yet, or the password is incorrect.
+If you get 401 Unauthorized when logging in, no Supabase Auth user exists yet or the password is wrong.
 
 ## Option 1: Using the Script (Recommended)
 
-Run this command locally (make sure your `.env.local` has the correct `DATABASE_URL`):
+Ensure `.env.local` has `DATABASE_URL` pointing to **Supabase** (same as your pooler URL), `SUPABASE_URL` (or `NEXT_PUBLIC_SUPABASE_URL`), and `SUPABASE_SERVICE_ROLE_KEY`. The script loads `.env.local` automatically. Then run:
 
 ```bash
 npm run create-admin <email> <password> <company-name>
@@ -15,67 +15,33 @@ Example:
 npm run create-admin austin@kinhome.com MyPassword123! "Kin Home"
 ```
 
-If you don't provide arguments, it will use defaults:
+Defaults if you omit arguments:
 - Email: `admin@example.com`
 - Password: `Admin123!`
 - Company: `Default Company`
 
-## Option 2: Using Prisma Studio
+The script creates (or links) a Supabase Auth user and a `User` row in your database with `supabaseUserId` and `COMPANY_ADMIN` role.
 
-1. Run `npx prisma studio`
-2. Navigate to the `Company` table and create a company
-3. Copy the company ID
-4. Navigate to the `User` table and create a user with:
-   - Email: your email
-   - Password: **must be hashed with bcrypt** (see below)
-   - Role: `COMPANY_ADMIN`
-   - CompanyId: the company ID you copied
+## Option 2: Supabase Dashboard + Prisma
 
-## Option 3: Direct Database Query
+1. In Supabase: **Authentication → Users → Add user** (email + password).
+2. Copy the new user’s UUID.
+3. In Prisma Studio (with `DATABASE_URL` pointing to Supabase), create or update a `User` with that email, `supabaseUserId` = the UUID, `role` = `COMPANY_ADMIN`, and a valid `companyId`.
 
-You can run SQL directly in your database. First, hash your password:
+## Option 3: Existing DB user, no Auth user
 
-```javascript
-// In Node.js REPL or a script
-const bcrypt = require('bcryptjs');
-const hash = await bcrypt.hash('YourPassword123!', 12);
-console.log(hash);
-```
+If you migrated from Neon and have `User` rows with `supabaseUserId` = NULL:
 
-Then insert into your database:
-
-```sql
--- Create company first
-INSERT INTO "Company" (id, name, "createdAt", "updatedAt")
-VALUES (gen_random_uuid()::text, 'Your Company Name', NOW(), NOW());
-
--- Get the company ID, then create user
-INSERT INTO "User" (id, email, password, role, "companyId", "createdAt", "updatedAt")
-VALUES (
-  gen_random_uuid()::text,
-  'your-email@example.com',
-  '$2a$12$YOUR_HASHED_PASSWORD_HERE',
-  'COMPANY_ADMIN',
-  'YOUR_COMPANY_ID_HERE',
-  NOW(),
-  NOW()
-);
-```
-
-## Option 4: Using Vercel Environment Variables + API
-
-If you have access to create users via API (requires an existing admin), you can use the `/api/users` endpoint, but this requires authentication first.
+1. Run the create-admin script with the same email as the existing user and the desired password. It will create the Supabase Auth user and link it.
+2. Or create the user in Supabase Auth (step 1 of Option 2), then set that user’s `supabaseUserId` on the existing `User` row in the database.
 
 ## Troubleshooting
 
-- **401 Error**: User doesn't exist or password is wrong
-- **Database Connection Error**: Check your `DATABASE_URL` environment variable
-- **Password Hash Mismatch**: Make sure you're using bcrypt with 12 salt rounds
+- **401**: No Supabase Auth user for that email, or wrong password.
+- **Database connection**: Check `DATABASE_URL` (Supabase connection string).
+- **Script fails**: Ensure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set (service role required for `createUser` / `updateUserById`).
 
-## For Production (Vercel)
+## Production (Vercel)
 
-You'll need to:
-1. Connect to your production database
-2. Run the create-admin script with your production DATABASE_URL
-3. Or use Prisma Studio with production connection
-4. Or run SQL directly in your Neon/PostgreSQL dashboard
+1. Use production `DATABASE_URL` (Supabase) and Supabase env vars.
+2. Run the create-admin script locally with those env vars, or from a one-off script/CLI that has access to them.

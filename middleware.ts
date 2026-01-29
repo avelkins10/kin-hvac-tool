@@ -1,100 +1,76 @@
-import { withAuth } from 'next-auth/middleware'
-import { NextResponse } from 'next/server'
+import { updateSession } from '@/lib/supabase/middleware'
+import { NextResponse, type NextRequest } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/db'
 
-export default withAuth(
-  function middleware(req) {
-    const token = req.nextauth.token
-    const path = req.nextUrl.pathname
+export async function middleware(request: NextRequest) {
+  // Update Supabase session (refreshes tokens)
+  const response = await updateSession(request)
 
-    // Protect root route - redirect to signin if not authenticated
-    if (path === '/' && !token) {
-      return NextResponse.redirect(new URL('/auth/signin', req.url))
-    }
+  const path = request.nextUrl.pathname
 
-    // Protect admin routes
-    if (path.startsWith('/admin')) {
-      if (!token) {
-        return NextResponse.redirect(new URL('/auth/signin', req.url))
-      }
-      if (token.role !== 'COMPANY_ADMIN' && token.role !== 'SUPER_ADMIN') {
-        return NextResponse.redirect(new URL('/unauthorized', req.url))
-      }
-    }
-
-    // Protect proposals routes - allow public view routes (ending with /view)
-    if (path.startsWith('/proposals') && !path.endsWith('/view')) {
-      if (!token) {
-        return NextResponse.redirect(new URL('/api/auth/signin', req.url))
-      }
-    }
-
-    // Protect dashboard routes
-    if (path.startsWith('/dashboard')) {
-      if (!token) {
-        return NextResponse.redirect(new URL('/auth/signin', req.url))
-      }
-    }
-
-    // Protect clients routes
-    if (path.startsWith('/clients')) {
-      if (!token) {
-        return NextResponse.redirect(new URL('/auth/signin', req.url))
-      }
-    }
-
-    // Protect builder route
-    if (path.startsWith('/builder')) {
-      if (!token) {
-        return NextResponse.redirect(new URL('/auth/signin', req.url))
-      }
-    }
-
-    // Protect users route - only admins
-    if (path.startsWith('/users')) {
-      if (!token) {
-        return NextResponse.redirect(new URL('/auth/signin', req.url))
-      }
-      if (token.role !== 'COMPANY_ADMIN' && token.role !== 'SUPER_ADMIN') {
-        return NextResponse.redirect(new URL('/unauthorized', req.url))
-      }
-    }
-
-    return NextResponse.next()
-  },
-  {
-    callbacks: {
-      authorized: ({ token, req }) => {
-        const path = req.nextUrl.pathname
-
-        // Public routes
-        if (
-          path.startsWith('/api/auth') ||
-          (path.startsWith('/proposals/') && path.endsWith('/view')) ||
-          path === '/unauthorized' ||
-          path === '/auth/signin'
-        ) {
-          return true
-        }
-
-        // Protected routes require authentication
-        if (
-          path === '/' ||
-          path.startsWith('/admin') ||
-          path.startsWith('/dashboard') ||
-          path.startsWith('/clients') ||
-          path.startsWith('/builder') ||
-          path.startsWith('/users') ||
-          (path.startsWith('/proposals') && !path.endsWith('/view'))
-        ) {
-          return !!token
-        }
-
-        return true
-      },
-    },
+  // Public routes - allow access
+  if (
+    path.startsWith('/api/auth') ||
+    (path.startsWith('/proposals/') && path.endsWith('/view')) ||
+    path === '/unauthorized' ||
+    path === '/auth/signin' ||
+    path.startsWith('/_next') ||
+    path.startsWith('/api/webhooks')
+  ) {
+    return response
   }
-)
+
+  // Check authentication for protected routes
+  const supabase = await createClient()
+  const { data: { user: supabaseUser } } = await supabase.auth.getUser()
+
+  // If not authenticated, redirect to signin
+  if (!supabaseUser) {
+    if (
+      path === '/' ||
+      path.startsWith('/admin') ||
+      path.startsWith('/dashboard') ||
+      path.startsWith('/clients') ||
+      path.startsWith('/builder') ||
+      path.startsWith('/users') ||
+      (path.startsWith('/proposals') && !path.endsWith('/view'))
+    ) {
+      return NextResponse.redirect(new URL('/auth/signin', request.url))
+    }
+    return response
+  }
+
+  // Get User record to check role
+  const user = await prisma.user.findUnique({
+    where: { supabaseUserId: supabaseUser.id },
+    select: { role: true },
+  })
+
+  if (!user) {
+    // User exists in Supabase Auth but not in our User table
+    // Redirect to signin (shouldn't happen after migration)
+    return NextResponse.redirect(new URL('/auth/signin', request.url))
+  }
+
+  // Protect admin routes - require COMPANY_ADMIN or SUPER_ADMIN
+  if (path.startsWith('/admin') || path.startsWith('/users')) {
+    if (user.role !== 'COMPANY_ADMIN' && user.role !== 'SUPER_ADMIN') {
+      return NextResponse.redirect(new URL('/unauthorized', request.url))
+    }
+  }
+
+  return response
+}
 
 export const config = {
-  matcher: ['/', '/admin/:path*', '/proposals/:path*', '/dashboard/:path*', '/clients/:path*', '/builder/:path*', '/users/:path*'],
+  matcher: [
+    '/',
+    '/admin/:path*',
+    '/proposals/:path*',
+    '/dashboard/:path*',
+    '/clients/:path*',
+    '/builder/:path*',
+    '/users/:path*',
+  ],
 }

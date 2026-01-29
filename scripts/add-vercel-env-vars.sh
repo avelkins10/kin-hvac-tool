@@ -1,49 +1,28 @@
 #!/bin/bash
-# Script to add LightReach/Palmetto Finance environment variables to Vercel
+# Print Vercel environment variables to add (Supabase + optional Palmetto/Finance).
 # Usage: ./scripts/add-vercel-env-vars.sh
+# Add these in Vercel Dashboard → Project → Settings → Environment Variables (or use CLI).
 
-# Colors for output
+set -e
+cd "$(dirname "$0")/.."
+
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-echo -e "${GREEN}Adding LightReach/Palmetto Finance environment variables to Vercel...${NC}\n"
-
-# Check if vercel CLI is installed
-if ! command -v vercel &> /dev/null; then
-    echo -e "${YELLOW}Vercel CLI not found. Installing...${NC}"
-    npm install -g vercel
-fi
-
-# Required variables
-echo "Adding required environment variables..."
-
-vercel env add PALMETTO_FINANCE_ACCOUNT_EMAIL production <<< "scott@kinhome.com"
-vercel env add PALMETTO_FINANCE_ACCOUNT_EMAIL preview <<< "scott@kinhome.com"
-vercel env add PALMETTO_FINANCE_ACCOUNT_EMAIL development <<< "scott@kinhome.com"
-
-vercel env add PALMETTO_FINANCE_ACCOUNT_PASSWORD production <<< "Lionhive1!"
-vercel env add PALMETTO_FINANCE_ACCOUNT_PASSWORD preview <<< "Lionhive1!"
-vercel env add PALMETTO_FINANCE_ACCOUNT_PASSWORD development <<< "Lionhive1!"
-
-vercel env add PALMETTO_FINANCE_ENVIRONMENT production <<< "next"
-vercel env add PALMETTO_FINANCE_ENVIRONMENT preview <<< "next"
-vercel env add PALMETTO_FINANCE_ENVIRONMENT development <<< "next"
-
-# Recommended variables
-echo "Adding recommended environment variables..."
-
-vercel env add PALMETTO_SALES_REP_NAME production <<< "Austin Elkins"
-vercel env add PALMETTO_SALES_REP_NAME preview <<< "Austin Elkins"
-vercel env add PALMETTO_SALES_REP_NAME development <<< "Austin Elkins"
-
-vercel env add PALMETTO_SALES_REP_EMAIL production <<< "austin@kinhome.com"
-vercel env add PALMETTO_SALES_REP_EMAIL preview <<< "austin@kinhome.com"
-vercel env add PALMETTO_SALES_REP_EMAIL development <<< "austin@kinhome.com"
-
-vercel env add PALMETTO_SALES_REP_PHONE production <<< "801-928-6369"
-vercel env add PALMETTO_SALES_REP_PHONE preview <<< "801-928-6369"
-vercel env add PALMETTO_SALES_REP_PHONE development <<< "801-928-6369"
-
-echo -e "\n${GREEN}✅ Environment variables added successfully!${NC}"
-echo -e "${YELLOW}Note: You may need to redeploy your project for changes to take effect.${NC}"
+echo -e "${GREEN}Vercel environment variables for this project${NC}"
+echo "=============================================="
+echo ""
+echo "Required (Supabase):"
+echo "  NEXT_PUBLIC_SUPABASE_URL     – Supabase project URL"
+echo "  NEXT_PUBLIC_SUPABASE_ANON_KEY – Supabase anon/public key"
+echo "  SUPABASE_SERVICE_ROLE_KEY   – Supabase service_role key (secret)"
+echo "  DATABASE_URL                 – Supabase Postgres connection string (pooler recommended)"
+echo ""
+echo "To set DATABASE_URL from .env.local: ./scripts/update-vercel-database-url.sh"
+echo ""
+echo "Optional (LightReach / Palmetto Finance):"
+echo "  PALMETTO_FINANCE_ACCOUNT_EMAIL, PALMETTO_FINANCE_ACCOUNT_PASSWORD, PALMETTO_FINANCE_ENVIRONMENT"
+echo "  PALMETTO_SALES_REP_NAME, PALMETTO_SALES_REP_EMAIL, PALMETTO_SALES_REP_PHONE"
+echo ""
+echo -e "${YELLOW}Redeploy after adding variables.${NC}"

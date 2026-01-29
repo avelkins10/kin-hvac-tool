@@ -1,6 +1,6 @@
 "use client"
 
-import { useSession } from 'next-auth/react'
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -33,7 +33,7 @@ interface BuilderNavigationProps {
 }
 
 export function BuilderNavigation({ onSave, proposalId, isSaving = false }: BuilderNavigationProps) {
-  const { data: session } = useSession()
+  const { user: session } = useSupabaseAuth()
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 

@@ -1,18 +1,35 @@
 /**
  * Migrate Database from Neon to Supabase
- * 
- * This script uses Prisma to migrate the schema and then copies data
- * 
+ *
  * Usage:
- *   1. Set SUPABASE_DATABASE_URL in .env.local
- *   2. Run: npx tsx scripts/migrate-to-supabase.ts
+ *   1. In .env.local set DATABASE_URL (Neon source) and SUPABASE_DATABASE_URL (Supabase target).
+ *   2. Run: npm run migrate-db   or   npx tsx scripts/migrate-to-supabase.ts
+ *   Or: DATABASE_URL=... SUPABASE_DATABASE_URL=... npx tsx scripts/migrate-to-supabase.ts
  */
 
+import { readFileSync, existsSync } from 'fs'
+import { resolve } from 'path'
+const envPath = resolve(process.cwd(), '.env.local')
+if (existsSync(envPath)) {
+  const content = readFileSync(envPath, 'utf8')
+  for (const line of content.split('\n')) {
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/)
+    if (m && !process.env[m[1]]) {
+      const val = m[2].replace(/^["']|["']$/g, '').trim()
+      process.env[m[1]] = val
+    }
+  }
+}
+
 import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { Pool } from 'pg'
 import { execSync } from 'child_process'
 
-const SUPABASE_DATABASE_URL = process.env.SUPABASE_DATABASE_URL || 
-  'postgresql://postgres.cvhomuxlhinmviwfkkyh:@Mambamentality10@aws-0-us-east-1.pooler.supabase.com:6543/postgres'
+// Supabase: use Transaction pooler → SHARED POOLER (IPv4 compatible, works from Vercel)
+// Format: postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-1-us-east-2.pooler.supabase.com:6543/postgres
+// Set SUPABASE_DATABASE_URL in .env.local. If password contains @, encode as %40.
+const SUPABASE_DATABASE_URL = process.env.SUPABASE_DATABASE_URL
 
 const NEON_DATABASE_URL = process.env.DATABASE_URL
 
@@ -20,30 +37,60 @@ if (!NEON_DATABASE_URL) {
   console.error('❌ DATABASE_URL (Neon) not found in environment')
   process.exit(1)
 }
+if (!SUPABASE_DATABASE_URL) {
+  console.error('❌ SUPABASE_DATABASE_URL not found in .env.local.')
+  console.error('   Supabase Dashboard → Project Settings → Database → Connection string → Transaction pooler (port 6543).')
+  console.error('   Format: postgresql://postgres.[PROJECT_REF]:[PASSWORD]@[HOST].pooler.supabase.com:6543/postgres')
+  process.exit(1)
+}
+
+const SKIP_MIGRATE_DEPLOY = process.env.SKIP_MIGRATE_DEPLOY === 'true' || process.env.SKIP_MIGRATE_DEPLOY === '1'
 
 async function migrate() {
   console.log('🔄 Starting migration from Neon to Supabase...\n')
 
-  // Step 1: Run Prisma migrations on Supabase
-  console.log('📦 Step 1: Running Prisma migrations on Supabase...')
-  try {
-    process.env.DATABASE_URL = SUPABASE_DATABASE_URL
-    execSync('npx prisma migrate deploy', { stdio: 'inherit' })
-    console.log('✅ Schema migrated\n')
-  } catch (error) {
-    console.error('❌ Failed to run migrations:', error)
-    process.exit(1)
+  // Step 1: Run Prisma migrations on Supabase (skip if schema already applied: SKIP_MIGRATE_DEPLOY=1)
+  if (!SKIP_MIGRATE_DEPLOY) {
+    console.log('📦 Step 1: Running Prisma migrations on Supabase...')
+    try {
+      process.env.DATABASE_URL = SUPABASE_DATABASE_URL
+      execSync('npx prisma migrate deploy', { stdio: 'inherit' })
+      console.log('✅ Schema migrated\n')
+    } catch (error) {
+      console.error('❌ Failed to run migrations:', error)
+      console.error('   If schema is already applied on Supabase, run: SKIP_MIGRATE_DEPLOY=1 npm run migrate-db')
+      process.exit(1)
+    }
+  } else {
+    console.log('📦 Step 1: Skipping Prisma migrate deploy (SKIP_MIGRATE_DEPLOY=1)\n')
   }
 
-  // Step 2: Create Prisma clients for both databases
+  // Step 2: Create Prisma clients for both databases (Prisma 7.3 requires adapter per client)
   console.log('📦 Step 2: Connecting to databases...')
-  const neonPrisma = new PrismaClient({
-    datasources: { db: { url: NEON_DATABASE_URL } },
+  // Supabase pooler TLS: skip cert verification to avoid "self-signed certificate in certificate chain"
+  const supabaseUrlRaw = SUPABASE_DATABASE_URL.replace(/\?.*$/, '')
+  const neonPool = new Pool({ connectionString: NEON_DATABASE_URL })
+  const supabasePool = new Pool({
+    connectionString: supabaseUrlRaw,
+    ssl: { rejectUnauthorized: false },
   })
-
-  const supabasePrisma = new PrismaClient({
-    datasources: { db: { url: SUPABASE_DATABASE_URL } },
-  })
+  const neonPrisma = new PrismaClient({ adapter: new PrismaPg(neonPool) })
+  let supabasePrisma: PrismaClient
+  try {
+    supabasePrisma = new PrismaClient({ adapter: new PrismaPg(supabasePool) })
+    await supabasePrisma.$queryRaw`SELECT 1`
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('Authentication failed') || msg.includes('credentials') || (err as { code?: string })?.code === 'P1000') {
+      console.error('\n❌ Supabase authentication failed. Fix SUPABASE_DATABASE_URL in .env.local:')
+      console.error('   1. Supabase Dashboard → Project Settings → Database')
+      console.error('   2. Under "Connection string", choose Transaction pooler → SHARED POOLER (or Session pooler)')
+      console.error('   3. Copy the URI and replace [YOUR-PASSWORD] with your database password')
+      console.error('   4. If Transaction pooler (port 6543) fails, try Session pooler (port 5432)')
+      console.error('   5. Password = the one you set in Database Settings (reset if unsure)\n')
+    }
+    throw err
+  }
 
   try {
     // Step 3: Migrate data table by table
@@ -233,6 +280,30 @@ async function migrate() {
       })
     }
     console.log(`    ✅ Migrated ${signatures.length} signature requests`)
+
+    // Payment
+    console.log('  Migrating Payment...')
+    const payments = await neonPrisma.payment.findMany()
+    for (const payment of payments) {
+      await supabasePrisma.payment.upsert({
+        where: { id: payment.id },
+        update: payment,
+        create: payment,
+      })
+    }
+    console.log(`    ✅ Migrated ${payments.length} payments`)
+
+    // Notification
+    console.log('  Migrating Notification...')
+    const notifications = await neonPrisma.notification.findMany()
+    for (const notification of notifications) {
+      await supabasePrisma.notification.upsert({
+        where: { id: notification.id },
+        update: notification,
+        create: notification,
+      })
+    }
+    console.log(`    ✅ Migrated ${notifications.length} notifications`)
 
     console.log('\n✨ Migration complete!')
     console.log('\n📝 Next steps:')

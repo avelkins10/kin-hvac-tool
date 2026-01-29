@@ -4,15 +4,22 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Initialize Supabase client
+// Use service_role key for server-side operations (bypasses RLS)
+// This is safe because we validate companyId in our application code
 const supabaseUrl = process.env.SUPABASE_URL
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('[Supabase Storage] SUPABASE_URL and SUPABASE_ANON_KEY must be set')
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.warn('[Supabase Storage] SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set')
 }
 
-const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
+const supabase = supabaseUrl && supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
   : null
 
 // Storage bucket names

@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../auth/[...nextauth]/route'
+import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/db'
 import { signNowClient } from '@/lib/integrations/signnow'
 import { generateAgreementPDF } from '@/lib/templates/agreement-generator'
+import { uploadAgreementPDF } from '@/lib/storage/supabase-storage'
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const session = await requireAuth()
 
     const body = await request.json()
     const { proposalId, signers, emailSubject, emailBlurb } = body
@@ -38,6 +35,19 @@ export async function POST(request: NextRequest) {
     // Generate agreement PDF
     const pdfBuffer = await generateAgreementPDF(proposal)
     const documentBase64 = pdfBuffer.toString('base64')
+
+    // Upload agreement PDF to Supabase Storage before sending to SignNow
+    try {
+      const { url: agreementUrl, path: agreementPath } = await uploadAgreementPDF(
+        pdfBuffer,
+        proposalId,
+        session.user.companyId || proposal.companyId
+      )
+      console.log(`Agreement PDF uploaded to Supabase: ${agreementUrl}`)
+    } catch (storageError) {
+      console.error('Failed to upload agreement PDF to Supabase:', storageError)
+      // Continue with SignNow even if storage upload fails
+    }
 
     // Create SignNow document and send for signing
     const document = await signNowClient.createDocument({
