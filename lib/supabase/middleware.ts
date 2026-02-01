@@ -48,7 +48,13 @@ export async function updateSession(request: NextRequest) {
   )
 
   // Get user - this will also refresh tokens if needed
-  const { data: { user } } = await supabase.auth.getUser()
+  const allCookies = request.cookies.getAll()
+  const supabaseCookies = allCookies.filter(c => c.name.includes('sb-'))
+  console.log('[MIDDLEWARE] Path:', request.nextUrl.pathname)
+  console.log('[MIDDLEWARE] Supabase cookies:', supabaseCookies.map(c => ({ name: c.name, length: c.value.length })))
+
+  const { data: { user }, error } = await supabase.auth.getUser()
+  console.log('[MIDDLEWARE] User:', user?.email || 'null', 'Error:', error?.message || 'none')
 
   return { response: supabaseResponse, user }
 }

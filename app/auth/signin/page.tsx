@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { Building2 } from 'lucide-react'
 
@@ -23,7 +24,9 @@ export default function SignInPage() {
           </div>
 
           {/* Login Form */}
-          <LoginForm />
+          <Suspense fallback={<div className="h-32 flex items-center justify-center">Loading...</div>}>
+            <LoginForm />
+          </Suspense>
 
           <p className="text-center text-sm text-gray-500">
             <Link

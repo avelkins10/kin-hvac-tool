@@ -31,9 +31,10 @@ export async function POST(request: Request) {
       },
       setAll(cookiesToSet) {
         try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, { ...options, path: '/' })
-          )
+          cookiesToSet.forEach(({ name, value, options }) => {
+            console.log('[LOGIN] Setting cookie:', { name, hasValue: !!value, options })
+            cookieStore.set(name, value, options)
+          })
         } catch (error) {
           console.error('[LOGIN] Error setting cookies:', error)
         }
@@ -44,12 +45,17 @@ export async function POST(request: Request) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
+    console.error('[LOGIN] Auth error:', error.message)
     return redirectToSignin(request.url, error.message || 'Invalid email or password')
   }
 
   if (!data.session?.user) {
+    console.error('[LOGIN] No session or user in response')
     return redirectToSignin(request.url, 'Login failed. Please try again.')
   }
+
+  console.log('[LOGIN] Success for user:', data.user.email)
+  console.log('[LOGIN] Session expires at:', data.session.expires_at)
 
   // Return JSON response - cookies are automatically included by Next.js
   return NextResponse.json({ redirect: '/dashboard' }, { status: 200 })
