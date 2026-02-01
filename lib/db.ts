@@ -6,18 +6,19 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-// Normalize DATABASE_URL to use verify-full for SSL
+// On Vercel, use sslmode=require (no cert verification) to avoid
+// "self-signed certificate in certificate chain" with Supabase pooler.
+const sslMode = process.env.VERCEL === '1' ? 'require' : 'verify-full'
+
 function normalizeDatabaseUrl(url: string | undefined): string | undefined {
   if (!url) return undefined
-  
-  // If it already has sslmode, ensure it's verify-full
+
   if (url.includes('sslmode=')) {
-    return url.replace(/sslmode=[^&]+/, 'sslmode=verify-full')
+    return url.replace(/sslmode=[^&]+/, `sslmode=${sslMode}`)
   }
-  
-  // If it has no sslmode, add it
+
   const separator = url.includes('?') ? '&' : '?'
-  return `${url}${separator}sslmode=verify-full`
+  return `${url}${separator}sslmode=${sslMode}`
 }
 
 // Create a connection pool for Prisma 7
