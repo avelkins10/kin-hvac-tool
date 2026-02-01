@@ -14,6 +14,8 @@ export async function middleware(request: NextRequest) {
     path === '/unauthorized' ||
     path === '/auth/signin' ||
     path === '/auth/callback' ||
+    path === '/auth/forgot-password' ||
+    path === '/auth/set-password' ||
     path.startsWith('/_next') ||
     path.startsWith('/api/webhooks')
   ) {
@@ -46,6 +48,8 @@ export const config = {
   matcher: [
     '/',
     '/auth/callback',
+    '/auth/forgot-password',
+    '/auth/set-password',
     '/admin/:path*',
     '/proposals/:path*',
     '/dashboard/:path*',

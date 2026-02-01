@@ -1,10 +1,13 @@
 /**
  * POST /api/auth/login
- * Standard Supabase + Next.js: use shared server client (cookies from next/headers).
- * Form POST here sets session via cookieStore.set(); Next.js sends cookies with the redirect response.
+ * Server-side sign-in; session cookies are set on the redirect response so the
+ * browser receives Set-Cookie and then follows the redirect to /dashboard with cookies.
  */
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 export async function POST(request: Request) {
   const formData = await request.formData()
@@ -15,7 +18,27 @@ export async function POST(request: Request) {
     return redirectToSignin(request.url, 'Email and password are required')
   }
 
-  const supabase = await createClient()
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return redirectToSignin(request.url, 'Server misconfigured. Contact support.')
+  }
+
+  const url = new URL(request.url)
+  const dashboard = new URL('/dashboard', url.origin)
+  const redirectResponse = NextResponse.redirect(dashboard, 302)
+
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll()
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) =>
+          redirectResponse.cookies.set(name, value, options)
+        )
+      },
+    },
+  })
+
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
@@ -26,9 +49,7 @@ export async function POST(request: Request) {
     return redirectToSignin(request.url, 'Login failed. Please try again.')
   }
 
-  const url = new URL(request.url)
-  const dashboard = new URL('/dashboard', url.origin)
-  return NextResponse.redirect(dashboard, 302)
+  return redirectResponse
 }
 
 function redirectToSignin(originUrl: string, error: string) {
