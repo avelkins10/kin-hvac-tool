@@ -4,21 +4,22 @@ A full-stack transactional platform for creating, managing, and processing HVAC 
 
 ## Features
 
-- **Authentication & Authorization**: NextAuth.js with role-based access control (Super Admin, Company Admin, Sales Rep, Customer)
+- **Authentication & Authorization**: Supabase Auth with role-based access control (Super Admin, Company Admin, Sales Rep, Customer)
 - **Proposal Management**: Create, edit, duplicate, and track proposals with version history
 - **Company Configuration**: Admin portal for managing pricing, equipment, add-ons, materials, labor rates, and more
 - **Finance Integration**: LightReach API integration for financing applications
 - **E-Signature**: SignNow integration for digital agreement signing
 - **Email Notifications**: Automated emails for proposals, signatures, and finance approvals
 - **Customer Portal**: Public proposal viewing with secure access
-- **Database**: PostgreSQL with Prisma ORM (Neon PostgreSQL recommended)
+- **Database**: PostgreSQL with Prisma ORM (Supabase PostgreSQL)
 
 ## Tech Stack
 
 - **Framework**: Next.js 16 with App Router
-- **Database**: PostgreSQL (Neon)
+- **Database**: Supabase PostgreSQL
 - **ORM**: Prisma
-- **Authentication**: NextAuth.js
+- **Authentication**: Supabase Auth
+- **Storage**: Supabase Storage
 - **UI**: React 19, Tailwind CSS, Radix UI
 - **PDF Generation**: jsPDF
 - **Email**: Nodemailer
@@ -28,7 +29,7 @@ A full-stack transactional platform for creating, managing, and processing HVAC 
 ## Prerequisites
 
 - Node.js 18+ and npm/pnpm
-- PostgreSQL database (Neon PostgreSQL recommended)
+- PostgreSQL database (Supabase PostgreSQL)
 - Accounts for:
   - LightReach (finance API)
   - SignNow (e-signature)
@@ -42,12 +43,12 @@ A full-stack transactional platform for creating, managing, and processing HVAC 
 npm install
 ```
 
-### 2. Set Up Neon PostgreSQL Database
+### 2. Set Up Supabase
 
-1. Create a Neon account at https://console.neon.tech
+1. Create a Supabase account at https://supabase.com
 2. Create a new project
-3. Copy the connection string from the dashboard
-4. The connection string format: `postgresql://user:password@host.neon.tech/dbname?sslmode=verify-full`
+3. Get the **Transaction pooler** connection string from **Settings → Database** (port 6543)
+4. If migrating from Neon, see **SUPABASE_MIGRATION_EXECUTION_GUIDE.md** for the full step-by-step guide
 
 ### 3. Configure Environment Variables
 
@@ -58,15 +59,18 @@ cp .env.example .env.local
 ```
 
 Required environment variables:
-- `DATABASE_URL`: Your Neon PostgreSQL connection string
-- `NEXTAUTH_SECRET`: Generate with `openssl rand -base64 32`
-- `NEXTAUTH_URL`: Your application URL (http://localhost:3000 for local)
+- `DATABASE_URL`: Your Supabase PostgreSQL connection string (Transaction pooler recommended)
+- `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anon/public key
+- `SUPABASE_SERVICE_ROLE_KEY`: Supabase service_role key
 - `OPENAI_API_KEY`: For nameplate analysis
 - `PALMETTO_FINANCE_ACCOUNT_EMAIL`: Palmetto Finance service account email
 - `PALMETTO_FINANCE_ACCOUNT_PASSWORD`: Palmetto Finance service account password
 - `PALMETTO_FINANCE_ENVIRONMENT`: Environment ('next' for staging, 'prod' for production)
 - `SIGNNOW_*`: SignNow API credentials (SIGNNOW_API_HOST, SIGNNOW_BASIC_TOKEN, SIGNNOW_USERNAME, SIGNNOW_PASSWORD, SIGNNOW_FROM_EMAIL)
 - `SMTP_*`: Email service configuration
+
+If your database password contains special characters (e.g. `@`), URL-encode them in the connection string (e.g. `@` → `%40`). See **GET_SUPABASE_CONNECTION_STRING.md** for details.
 
 ### 4. Set Up Database Schema
 
@@ -75,7 +79,7 @@ Required environment variables:
 npx prisma generate
 
 # Run migrations
-npx prisma migrate dev --name init
+npx prisma migrate deploy
 
 # (Optional) Open Prisma Studio to view data
 npx prisma studio
@@ -83,32 +87,13 @@ npx prisma studio
 
 ### 5. Create Initial Admin User
 
-You'll need to create the first admin user and company. You can do this via:
+Create the first Supabase Auth user and link it to a company:
 
-1. Prisma Studio: `npx prisma studio`
-2. Database seed script (create one if needed)
-3. Direct database insert
-
-Example SQL to create initial company and admin:
-
-```sql
--- Create company
-INSERT INTO "Company" (id, name, "createdAt", "updatedAt")
-VALUES ('company-1', 'Your Company Name', NOW(), NOW());
-
--- Create admin user (password: Admin123!)
--- Note: Password should be hashed with bcrypt
-INSERT INTO "User" (id, email, password, role, "companyId", "createdAt", "updatedAt")
-VALUES ('user-1', 'admin@example.com', '$2a$12$hashedpasswordhere', 'COMPANY_ADMIN', 'company-1', NOW(), NOW());
+```bash
+npm run create-admin -- your-email@example.com 'YourPassword123!' 'Your Company Name'
 ```
 
-To hash a password, use Node.js:
-
-```javascript
-const bcrypt = require('bcryptjs');
-const hash = await bcrypt.hash('YourPassword123!', 12);
-console.log(hash);
-```
+This creates a user in Supabase Auth and a corresponding `User` record in the database. See **SUPABASE_MIGRATION_EXECUTION_GUIDE.md** for migration from Neon and storage bucket setup.
 
 ### 6. Run Development Server
 
@@ -123,7 +108,7 @@ Visit http://localhost:3000 and sign in with your admin credentials.
 ```
 ├── app/
 │   ├── api/
-│   │   ├── auth/[...nextauth]/     # NextAuth configuration
+│   │   ├── auth/user/               # Current user (Supabase Auth)
 │   │   ├── proposals/               # Proposal CRUD APIs
 │   │   ├── company/                 # Company configuration APIs
 │   │   ├── finance/                 # Finance integration APIs
@@ -164,8 +149,8 @@ The application uses the following main entities:
 ## API Routes
 
 ### Authentication
-- `POST /api/auth/signin` - Sign in
-- `GET /api/auth/session` - Get current session
+- Sign in via Supabase Auth (client-side); session is managed by Supabase
+- `GET /api/auth/user` - Get current user (role, companyId) for authenticated session
 
 ### Proposals
 - `GET /api/proposals` - List proposals (with filters)
@@ -203,13 +188,11 @@ The application uses the following main entities:
 
 1. Push code to GitHub
 2. Import project in Vercel
-3. Configure environment variables in Vercel dashboard
-4. Connect Neon database
-5. Deploy
+3. Configure environment variables in Vercel dashboard (see **SUPABASE_MIGRATION_EXECUTION_GUIDE.md** for required Supabase and `DATABASE_URL` values)
+4. Deploy
 
 Vercel will automatically:
-- Run `prisma generate` during build
-- Run `prisma migrate deploy` (add to build command if needed)
+- Run `prisma generate` and `prisma migrate deploy` during build (see `package.json` build script)
 
 ### Database Migrations in Production
 
@@ -221,27 +204,25 @@ npx prisma migrate deploy
 # prisma migrate deploy && next build
 ```
 
-### Neon Branching Strategy
+### Environment Strategy
 
-1. **Production**: Main branch with production connection string
-2. **Staging**: Staging branch for testing
-3. **Development**: Dev branch with auto-reset feature
+1. **Production**: Main branch with production Supabase connection string and API keys
+2. **Preview**: Preview deployments can use the same or a separate Supabase project
+3. **Development**: Local `.env.local` with Supabase credentials
 
-Each environment should have its own Neon branch and connection string.
+Use the Transaction pooler connection string (port 6543) for `DATABASE_URL` in all environments.
 
 ## Development Notes
 
-### NextAuth Compatibility
+### Supabase Auth
 
-The project uses NextAuth v5 beta. If you encounter adapter issues, you may need to:
-- Use NextAuth v4 instead
-- Or update the Prisma adapter configuration
+The project uses Supabase Auth for sign-in and session management. The middleware refreshes the Supabase session and protects routes. User records are stored in the database and linked via `supabaseUserId`.
 
 ### Local Development
 
-1. Use Neon's development branch for local development
-2. Enable auto-reset on dev branch for clean testing
-3. Use separate connection strings for each environment
+1. Use `.env.local` with Supabase URL, anon key, service_role key, and `DATABASE_URL` (Transaction pooler)
+2. Run `npm run verify-migration-env` to confirm env vars before migration
+3. See **SUPABASE_MIGRATION_EXECUTION_GUIDE.md** for full migration and verification steps
 
 ### Testing
 
@@ -252,9 +233,10 @@ The project uses NextAuth v5 beta. If you encounter adapter issues, you may need
 ## Support
 
 For issues or questions, please refer to:
+- **SUPABASE_MIGRATION_EXECUTION_GUIDE.md** – step-by-step migration and troubleshooting
+- **GET_SUPABASE_CONNECTION_STRING.md** – connection string and password encoding
 - Prisma documentation: https://www.prisma.io/docs
-- NextAuth documentation: https://next-auth.js.org
-- Neon documentation: https://neon.tech/docs
+- Supabase documentation: https://supabase.com/docs
 
 ## License
 

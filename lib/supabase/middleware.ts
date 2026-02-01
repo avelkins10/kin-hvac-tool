@@ -39,3 +39,26 @@ export async function updateSession(request: NextRequest) {
 
   return supabaseResponse
 }
+
+/**
+ * Get the current user in Edge middleware (no Prisma/Node APIs).
+ * Use for auth redirects only; role/company checks belong in requireAuth/requireRole.
+ */
+export async function getMiddlewareUser(request: NextRequest) {
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll() {
+          // No-op in middleware when only reading user
+        },
+      },
+    }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+}

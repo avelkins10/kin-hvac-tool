@@ -44,15 +44,15 @@ export async function POST(request: NextRequest) {
           // Download the PDF from SignNow using the client
           const pdfBuffer = await signNowClient.downloadSignedDocument(documentId)
 
-          // Upload to Supabase Storage
-          const { url: supabaseUrl } = await uploadSignedDocument(
+          // Upload to Supabase Storage (path only; callers use getSignedUrl when serving)
+          const { path } = await uploadSignedDocument(
             pdfBuffer,
             signatureRequest.proposalId,
             signatureRequest.proposal.companyId
           )
 
-          signedDocumentUrl = supabaseUrl
-          console.log(`Signed document uploaded to Supabase: ${supabaseUrl}`)
+          signedDocumentUrl = path
+          console.log(`Signed document uploaded to Supabase: ${path}`)
         } catch (storageError) {
           console.error('Failed to download/upload signed document:', storageError)
           // Continue with external URL if storage fails

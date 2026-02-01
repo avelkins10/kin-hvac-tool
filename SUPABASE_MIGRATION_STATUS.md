@@ -54,12 +54,9 @@
 ## ⏳ Pending (Requires User Action)
 
 ### Database Migration
-- ⏳ **BLOCKED**: Need correct Supabase connection string from dashboard
-  - Issue: "Tenant or user not found" error
-  - See `GET_SUPABASE_CONNECTION_STRING.md` for instructions
-- ⏳ Run Prisma migrations on Supabase (after connection string is verified)
-- ⏳ Execute data migration script (`scripts/migrate-to-supabase.ts`)
-- ⏳ Verify all tables, relationships, and data migrated correctly
+- ✅ **COMPLETED**: Prisma migrations applied on Supabase (init, user_supabase_auth)
+- ✅ Data migration completed: tables populated (User: 3, Company: 1, Proposal: 4, PriceBookUnit: 16, etc.)
+- Connection string verified via `pnpm run test-supabase-connection`
 
 ### Storage Setup
 - ⏳ Run `scripts/setup-supabase-storage.sql` in Supabase SQL Editor

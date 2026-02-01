@@ -135,7 +135,8 @@ interface HVACData {
   climateZone: string
   // Added fields for AI analysis
   nameplatePhoto?: string // Base64 or URL (for backward compatibility)
-  nameplatePhotoUrl?: string // Supabase Storage URL (preferred)
+  nameplatePhotoUrl?: string // Legacy; prefer nameplatePhotoPath + signed URL when serving
+  nameplatePhotoPath?: string // Storage path; request signed URL when serving from private bucket
   coolingType?: string
   tonnage?: string
 }
@@ -438,6 +439,7 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
 
   // AI Analysis State
   const [analyzingNameplate, setAnalyzingNameplate] = useState(false)
+  const [nameplateSignedUrl, setNameplateSignedUrl] = useState<string | null>(null)
   const [nameplateAnalysis, setNameplateAnalysis] = useState<{
     brand?: string | null
     modelNumber?: string | null
@@ -510,6 +512,28 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
       }
     }
   }, [paymentMethod, financingOptions, selectedFinancingOption])
+
+  // Fetch signed URL when we have a storage path (private bucket); use when serving nameplate image
+  useEffect(() => {
+    const path = hvacData.nameplatePhotoPath
+    if (!path) {
+      setNameplateSignedUrl(null)
+      return
+    }
+    let cancelled = false
+    const params = new URLSearchParams({ bucket: "nameplates", path })
+    fetch(`/api/storage/signed-url?${params}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Failed to get signed URL"))))
+      .then((data) => {
+        if (!cancelled && data?.url) setNameplateSignedUrl(data.url)
+      })
+      .catch(() => {
+        if (!cancelled) setNameplateSignedUrl(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [hvacData.nameplatePhotoPath])
 
   // Mark section complete
   const markComplete = (section: HotspotType) => {
@@ -1310,10 +1334,10 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
             }
 
             const uploadData = await uploadResponse.json()
-            const photoUrl = uploadData.url
+            const path = uploadData.path
 
-            // Update hvacData with Supabase URL
-            setHvacData({ ...hvacData, nameplatePhoto: photoUrl, nameplatePhotoUrl: photoUrl })
+            // Update hvacData with storage path (signed URL fetched in effect for display)
+            setHvacData({ ...hvacData, nameplatePhotoPath: path })
 
             // Read file as base64 for AI analysis
             const arrayBuffer = await file.arrayBuffer()
@@ -1348,8 +1372,7 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
                 ...prev,
                 tonnage: analysisData.data.tonnage ? String(analysisData.data.tonnage) : prev.tonnage,
                 coolingType: analysisData.data.unitType || prev.coolingType,
-                nameplatePhoto: photoUrl,
-                nameplatePhotoUrl: photoUrl,
+                nameplatePhotoPath: path,
               }))
             } else {
               setNameplateAnalysis({ parseError: true, rawText: analysisData.rawResponse })
@@ -1392,10 +1415,14 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
                   className="flex-1"
                 />
               </div>
-              {(hvacData.nameplatePhoto || hvacData.nameplatePhotoUrl) && (
+              {(hvacData.nameplatePhoto || hvacData.nameplatePhotoUrl || hvacData.nameplatePhotoPath) && (
                 <div className="mt-2 space-y-3">
                   <img
-                    src={hvacData.nameplatePhotoUrl || hvacData.nameplatePhoto || "/placeholder.svg"}
+                    src={
+                      hvacData.nameplatePhotoPath
+                        ? (nameplateSignedUrl || "/placeholder.svg")
+                        : (hvacData.nameplatePhotoUrl || hvacData.nameplatePhoto || "/placeholder.svg")
+                    }
                     alt="HVAC Nameplate"
                     className="max-w-full h-32 object-contain rounded border"
                   />

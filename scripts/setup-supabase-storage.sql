@@ -98,6 +98,18 @@ USING (
   )
 );
 
+CREATE POLICY "Users can delete proposals from their company"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (
+  bucket_id = 'proposals'
+  AND (storage.foldername(name))[1] = (
+    SELECT "companyId"::text 
+    FROM "User" 
+    WHERE "supabaseUserId" = auth.uid()::text
+  )
+);
+
 -- Storage Policies for signed-docs bucket
 CREATE POLICY "Users can upload signed docs for their company"
 ON storage.objects FOR INSERT
@@ -123,6 +135,18 @@ USING (
   )
 );
 
+CREATE POLICY "Users can delete signed docs from their company"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (
+  bucket_id = 'signed-docs'
+  AND (storage.foldername(name))[1] = (
+    SELECT "companyId"::text 
+    FROM "User" 
+    WHERE "supabaseUserId" = auth.uid()::text
+  )
+);
+
 -- Storage Policies for agreements bucket
 CREATE POLICY "Users can upload agreements for their company"
 ON storage.objects FOR INSERT
@@ -138,6 +162,18 @@ WITH CHECK (
 
 CREATE POLICY "Users can read agreements from their company"
 ON storage.objects FOR SELECT
+TO authenticated
+USING (
+  bucket_id = 'agreements'
+  AND (storage.foldername(name))[1] = (
+    SELECT "companyId"::text 
+    FROM "User" 
+    WHERE "supabaseUserId" = auth.uid()::text
+  )
+);
+
+CREATE POLICY "Users can delete agreements from their company"
+ON storage.objects FOR DELETE
 TO authenticated
 USING (
   bucket_id = 'agreements'

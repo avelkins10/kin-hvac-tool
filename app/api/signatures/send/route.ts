@@ -36,14 +36,14 @@ export async function POST(request: NextRequest) {
     const pdfBuffer = await generateAgreementPDF(proposal)
     const documentBase64 = pdfBuffer.toString('base64')
 
-    // Upload agreement PDF to Supabase Storage before sending to SignNow
+    // Upload agreement PDF to Supabase Storage before sending to SignNow (path only; use signed URL when serving)
     try {
-      const { url: agreementUrl, path: agreementPath } = await uploadAgreementPDF(
+      const { path: agreementPath } = await uploadAgreementPDF(
         pdfBuffer,
         proposalId,
         session.user.companyId || proposal.companyId
       )
-      console.log(`Agreement PDF uploaded to Supabase: ${agreementUrl}`)
+      console.log(`Agreement PDF uploaded to Supabase: ${agreementPath}`)
     } catch (storageError) {
       console.error('Failed to upload agreement PDF to Supabase:', storageError)
       // Continue with SignNow even if storage upload fails

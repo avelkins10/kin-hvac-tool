@@ -33,24 +33,25 @@ export async function POST(
       return NextResponse.json({ error: 'Customer email is required' }, { status: 400 })
     }
 
-    // Generate proposal PDF and upload to Supabase Storage
-    let proposalPdfUrl: string | null = null
+    // Generate proposal PDF and upload to Supabase Storage (path only; use signed URL when serving)
     try {
       const pdfBuffer = await generateProposalPDF(proposal)
-      const { url, path } = await uploadProposalPDF(
+      const { path } = await uploadProposalPDF(
         pdfBuffer,
         proposalId,
         session.user.companyId || proposal.companyId
       )
-      proposalPdfUrl = url
-      console.log(`Proposal PDF uploaded to Supabase: ${url}`)
+      console.log(`Proposal PDF uploaded to Supabase: ${path}`)
     } catch (pdfError) {
       console.error('Failed to generate/upload proposal PDF:', pdfError)
       // Continue with email even if PDF generation fails
     }
 
-    // Generate proposal URL (public view)
-    const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000'}/proposals/${proposalId}/view`
+    // Generate proposal URL (public view) — ensure absolute URL with protocol
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'http://localhost:3000')
+    const proposalUrl = `${baseUrl}/proposals/${proposalId}/view`
 
     // Send email (optionally attach PDF if generated)
     try {

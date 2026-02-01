@@ -1,6 +1,8 @@
 import { LoginForm } from '@/components/auth/LoginForm'
 import { Building2 } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 export default function SignInPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-slate-50">

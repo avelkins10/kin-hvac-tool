@@ -29,6 +29,12 @@ if ! command -v vercel &> /dev/null; then
   exit 1
 fi
 
+if [[ ! -d .vercel ]]; then
+  echo "Project not linked to Vercel. Run from project root: vercel link"
+  echo "Then run this script again: ./scripts/update-vercel-database-url.sh"
+  exit 1
+fi
+
 echo "Updating DATABASE_URL in Vercel (production, preview, development)..."
 for env in production preview development; do
   echo "$URL" | vercel env rm DATABASE_URL "$env" -y 2>/dev/null || true

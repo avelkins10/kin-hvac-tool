@@ -119,26 +119,40 @@ async function createAdminUser() {
       })
       console.log(`Updated user: ${email}`)
     } else {
-      // Create new user in Supabase Auth first
+      // Create new user in Supabase Auth first (or use existing Auth user)
       console.log('Creating Supabase Auth user...')
+      let authUserId: string
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: email.trim().toLowerCase(),
         password: password.trim(),
         email_confirm: true, // Auto-confirm email
       })
 
-      if (authError || !authData.user) {
+      if (authError?.code === 'email_exists' || authError?.message?.toLowerCase().includes('already been registered')) {
+        // Auth user exists – list users by email and link
+        const { data: listData } = await supabase.auth.admin.listUsers()
+        const existingAuth = listData?.users?.find((u) => u.email?.toLowerCase() === email.trim().toLowerCase())
+        if (!existingAuth) {
+          console.error('Error: Email exists in Auth but user not found in list.')
+          throw authError
+        }
+        authUserId = existingAuth.id
+        console.log(`Using existing Supabase Auth user: ${authUserId}`)
+        // Optionally update password
+        await supabase.auth.admin.updateUserById(authUserId, { password: password.trim() })
+      } else if (authError || !authData?.user) {
         console.error('Error creating Supabase Auth user:', authError)
         throw authError || new Error('Failed to create Supabase Auth user')
+      } else {
+        authUserId = authData.user.id
+        console.log(`Created Supabase Auth user: ${authUserId}`)
       }
-
-      console.log(`Created Supabase Auth user: ${authData.user.id}`)
 
       // Create User record in database
       const user = await prisma.user.create({
         data: {
           email: email.trim().toLowerCase(),
-          supabaseUserId: authData.user.id,
+          supabaseUserId: authUserId,
           role: 'COMPANY_ADMIN',
           companyId: company.id,
         },

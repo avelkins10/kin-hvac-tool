@@ -37,13 +37,13 @@ export type StorageBucket = typeof STORAGE_BUCKETS[keyof typeof STORAGE_BUCKETS]
  * @param file - File object or base64 string
  * @param proposalId - Proposal ID
  * @param companyId - Company ID for folder structure
- * @returns Public URL of uploaded file
+ * @returns Storage path; use getSignedUrl(bucket, path) when serving from private bucket
  */
 export async function uploadNameplatePhoto(
   file: File | string,
   proposalId: string,
   companyId: string
-): Promise<{ url: string; path: string }> {
+): Promise<{ path: string }> {
   if (!supabase) {
     throw new Error('Supabase not configured')
   }
@@ -72,15 +72,7 @@ export async function uploadNameplatePhoto(
     throw new Error(`Failed to upload nameplate photo: ${error.message}`)
   }
 
-  // Get public URL
-  const { data: urlData } = supabase.storage
-    .from(STORAGE_BUCKETS.NAMEPLATES)
-    .getPublicUrl(filePath)
-
-  return {
-    url: urlData.publicUrl,
-    path: filePath,
-  }
+  return { path: filePath }
 }
 
 /**
@@ -88,13 +80,13 @@ export async function uploadNameplatePhoto(
  * @param pdfBuffer - PDF as Buffer
  * @param proposalId - Proposal ID
  * @param companyId - Company ID for folder structure
- * @returns Public URL of uploaded file
+ * @returns Storage path; use getSignedUrl(bucket, path) when serving from private bucket
  */
 export async function uploadProposalPDF(
   pdfBuffer: Buffer,
   proposalId: string,
   companyId: string
-): Promise<{ url: string; path: string }> {
+): Promise<{ path: string }> {
   if (!supabase) {
     throw new Error('Supabase not configured')
   }
@@ -113,15 +105,7 @@ export async function uploadProposalPDF(
     throw new Error(`Failed to upload proposal PDF: ${error.message}`)
   }
 
-  // Get public URL
-  const { data: urlData } = supabase.storage
-    .from(STORAGE_BUCKETS.PROPOSALS)
-    .getPublicUrl(filePath)
-
-  return {
-    url: urlData.publicUrl,
-    path: filePath,
-  }
+  return { path: filePath }
 }
 
 /**
@@ -129,13 +113,13 @@ export async function uploadProposalPDF(
  * @param pdfBuffer - PDF as Buffer
  * @param proposalId - Proposal ID
  * @param companyId - Company ID for folder structure
- * @returns Public URL of uploaded file
+ * @returns Storage path; use getSignedUrl(bucket, path) when serving from private bucket
  */
 export async function uploadSignedDocument(
   pdfBuffer: Buffer,
   proposalId: string,
   companyId: string
-): Promise<{ url: string; path: string }> {
+): Promise<{ path: string }> {
   if (!supabase) {
     throw new Error('Supabase not configured')
   }
@@ -154,15 +138,7 @@ export async function uploadSignedDocument(
     throw new Error(`Failed to upload signed document: ${error.message}`)
   }
 
-  // Get public URL
-  const { data: urlData } = supabase.storage
-    .from(STORAGE_BUCKETS.SIGNED_DOCS)
-    .getPublicUrl(filePath)
-
-  return {
-    url: urlData.publicUrl,
-    path: filePath,
-  }
+  return { path: filePath }
 }
 
 /**
@@ -170,13 +146,13 @@ export async function uploadSignedDocument(
  * @param pdfBuffer - PDF as Buffer
  * @param proposalId - Proposal ID
  * @param companyId - Company ID for folder structure
- * @returns Public URL of uploaded file
+ * @returns Storage path; use getSignedUrl(bucket, path) when serving from private bucket
  */
 export async function uploadAgreementPDF(
   pdfBuffer: Buffer,
   proposalId: string,
   companyId: string
-): Promise<{ url: string; path: string }> {
+): Promise<{ path: string }> {
   if (!supabase) {
     throw new Error('Supabase not configured')
   }
@@ -195,15 +171,7 @@ export async function uploadAgreementPDF(
     throw new Error(`Failed to upload agreement PDF: ${error.message}`)
   }
 
-  // Get public URL
-  const { data: urlData } = supabase.storage
-    .from(STORAGE_BUCKETS.AGREEMENTS)
-    .getPublicUrl(filePath)
-
-  return {
-    url: urlData.publicUrl,
-    path: filePath,
-  }
+  return { path: filePath }
 }
 
 /**

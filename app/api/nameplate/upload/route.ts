@@ -41,27 +41,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Upload to Supabase Storage
-    const { url, path } = await uploadNameplatePhoto(
+    // Upload to Supabase Storage (returns path only; use signed URL when serving)
+    const { path } = await uploadNameplatePhoto(
       file,
       proposalId,
       session.user.companyId
     )
 
-    // Update proposal with nameplate photo URL
+    // Update proposal with nameplate photo path (callers request signed URL when serving)
     const hvacData = (proposal.hvacData as any) || {}
     await prisma.proposal.update({
       where: { id: proposalId },
       data: {
         hvacData: {
           ...hvacData,
-          nameplatePhotoUrl: url,
+          nameplatePhotoUrl: null,
           nameplatePhotoPath: path,
         },
       },
     })
 
-    return NextResponse.json({ url, path })
+    return NextResponse.json({ path })
   } catch (error) {
     console.error('Error uploading nameplate photo:', error)
     return NextResponse.json(

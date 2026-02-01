@@ -1,7 +1,5 @@
-import { updateSession } from '@/lib/supabase/middleware'
+import { updateSession, getMiddlewareUser } from '@/lib/supabase/middleware'
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { prisma } from '@/lib/db'
 
 export async function middleware(request: NextRequest) {
   // Update Supabase session (refreshes tokens)
@@ -21,11 +19,9 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // Check authentication for protected routes
-  const supabase = await createClient()
-  const { data: { user: supabaseUser } } = await supabase.auth.getUser()
+  // Check authentication for protected routes (Edge-safe; no Prisma)
+  const supabaseUser = await getMiddlewareUser(request)
 
-  // If not authenticated, redirect to signin
   if (!supabaseUser) {
     if (
       path === '/' ||
@@ -41,25 +37,7 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // Get User record to check role
-  const user = await prisma.user.findUnique({
-    where: { supabaseUserId: supabaseUser.id },
-    select: { role: true },
-  })
-
-  if (!user) {
-    // User exists in Supabase Auth but not in our User table
-    // Redirect to signin (shouldn't happen after migration)
-    return NextResponse.redirect(new URL('/auth/signin', request.url))
-  }
-
-  // Protect admin routes - require COMPANY_ADMIN or SUPER_ADMIN
-  if (path.startsWith('/admin') || path.startsWith('/users')) {
-    if (user.role !== 'COMPANY_ADMIN' && user.role !== 'SUPER_ADMIN') {
-      return NextResponse.redirect(new URL('/unauthorized', request.url))
-    }
-  }
-
+  // Role/company checks are done server-side via requireAuth/requireRole on protected pages and API routes
   return response
 }
 
