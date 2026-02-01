@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,22 +9,10 @@ import { Spinner } from '@/components/ui/spinner'
 import { toast } from 'sonner'
 
 export function LoginForm() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [checkingAuth, setCheckingAuth] = useState(true)
   const supabase = createClient()
-
-  // If already logged in, redirect to dashboard (e.g. back button or stale state)
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setCheckingAuth(false)
-      if (session?.user) {
-        router.replace('/dashboard')
-      }
-    })
-  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,14 +40,6 @@ export function LoginForm() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  if (checkingAuth) {
-    return (
-      <div className="flex justify-center py-8">
-        <Spinner className="h-8 w-8 text-blue-600" />
-      </div>
-    )
   }
 
   return (
