@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,18 @@ export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const supabase = createClient()
+
+  // If already logged in, redirect to dashboard (e.g. back button or stale state)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCheckingAuth(false)
+      if (session?.user) {
+        router.replace('/dashboard')
+      }
+    })
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,9 +39,10 @@ export function LoginForm() {
 
       if (error) {
         toast.error(error.message || 'Invalid email or password')
-      } else if (data.user) {
+      } else if (data.session?.user) {
         toast.success('Logged in successfully')
-        // Use window.location for a full page refresh to ensure session is loaded
+        // Give Supabase client time to persist session to cookies before full-page redirect
+        await new Promise((r) => setTimeout(r, 200))
         window.location.href = '/dashboard'
       } else {
         toast.error('Login failed. Please try again.')
@@ -41,6 +53,14 @@ export function LoginForm() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (checkingAuth) {
+    return (
+      <div className="flex justify-center py-8">
+        <Spinner className="h-8 w-8 text-blue-600" />
+      </div>
+    )
   }
 
   return (
