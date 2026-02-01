@@ -2,35 +2,59 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
 
 /**
- * Plain form POST to /api/auth/login so the browser does a full page submit.
- * Server sets session cookies and returns 302 → browser follows with cookies.
- * No RSC/fetch — most reliable login flow.
+ * Standard Supabase flow: client-side signInWithPassword with createBrowserClient.
+ * Session is stored in cookies by @supabase/ssr; then full-page redirect so server sees cookies.
  */
 export function LoginForm() {
   const searchParams = useSearchParams()
   const errorFromUrl = searchParams.get('error')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState(errorFromUrl ?? null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(errorFromUrl)
 
   useEffect(() => {
     setError(errorFromUrl)
   }, [errorFromUrl])
 
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setError(null)
+    setIsLoading(true)
+
+    const supabase = createClient()
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password: password.trim(),
+    })
+
+    if (signInError) {
+      setError(signInError.message || 'Invalid email or password')
+      setIsLoading(false)
+      return
+    }
+
+    if (!data.session?.user) {
+      setError('Login failed. Please try again.')
+      setIsLoading(false)
+      return
+    }
+
+    // Supabase browser client persists session to cookies; brief delay then full-page nav
+    // so the next request (dashboard) includes the session cookies.
+    await new Promise((r) => setTimeout(r, 100))
+    window.location.href = '/dashboard'
+  }
+
   return (
-    <form
-      action="/api/auth/login"
-      method="POST"
-      className="space-y-6 w-full"
-      onSubmit={() => setIsSubmitting(true)}
-    >
+    <form onSubmit={handleSubmit} className="space-y-6 w-full">
       <div className="space-y-2">
         <Label htmlFor="email" className="text-sm font-medium text-gray-700">
           Email Address
@@ -46,7 +70,7 @@ export function LoginForm() {
             if (error) setError(null)
           }}
           required
-          disabled={isSubmitting}
+          disabled={isLoading}
           placeholder="you@example.com"
           className="h-11 transition-all focus:ring-2 focus:ring-blue-500"
         />
@@ -66,7 +90,7 @@ export function LoginForm() {
             if (error) setError(null)
           }}
           required
-          disabled={isSubmitting}
+          disabled={isLoading}
           placeholder="Enter your password"
           className="h-11 transition-all focus:ring-2 focus:ring-blue-500"
         />
@@ -74,9 +98,9 @@ export function LoginForm() {
       <Button
         type="submit"
         className="w-full h-11 text-base font-semibold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md transition-all"
-        disabled={isSubmitting}
+        disabled={isLoading}
       >
-        {isSubmitting ? (
+        {isLoading ? (
           <span className="flex items-center justify-center">
             <Spinner className="mr-2 h-5 w-5 text-white" />
             Logging in...

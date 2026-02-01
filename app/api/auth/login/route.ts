@@ -1,7 +1,7 @@
 /**
  * POST /api/auth/login
- * Full-page form POST: sign in on server, set cookies on response, 302 to dashboard.
- * Browser follows redirect with cookies — no RSC/fetch, so login always works.
+ * Standard Supabase + Next.js: use shared server client (cookies from next/headers).
+ * Form POST here sets session via cookieStore.set(); Next.js sends cookies with the redirect response.
  */
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
