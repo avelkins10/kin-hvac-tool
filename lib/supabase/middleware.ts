@@ -7,10 +7,20 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { type CookieOptions } from '@supabase/ssr'
 
+function hasSupabaseEnv(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  return Boolean(url && key)
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
+
+  if (!hasSupabaseEnv()) {
+    return supabaseResponse
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
@@ -45,6 +55,9 @@ export async function updateSession(request: NextRequest) {
  * Use for auth redirects only; role/company checks belong in requireAuth/requireRole.
  */
 export async function getMiddlewareUser(request: NextRequest) {
+  if (!hasSupabaseEnv()) {
+    return null
+  }
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

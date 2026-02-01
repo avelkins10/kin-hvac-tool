@@ -8,6 +8,20 @@ Add each variable below. Make sure to select **Production**, **Preview**, and **
 
 ---
 
+## Required for this app (Supabase auth + Postgres)
+
+If you see "Application error: a server-side exception has occurred", the app is missing one of these in Vercel:
+
+| Variable | Where to get it |
+|----------|-----------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase Dashboard → Project Settings → API → Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase Dashboard → Project Settings → API → anon public |
+| `DATABASE_URL` | Supabase Dashboard → Project Settings → Database → Connection string (use **Transaction** pooler, port 6543) |
+
+Add all three. Redeploy after saving.
+
+---
+
 ## Required Variables
 
 ### 1. DATABASE_URL

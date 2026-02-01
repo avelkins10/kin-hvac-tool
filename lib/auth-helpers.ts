@@ -25,28 +25,37 @@ export async function requireAuth(): Promise<Session> {
     redirect('/auth/signin')
   }
 
-  // Get User record from database to get role and companyId
-  const user = await prisma.user.findUnique({
-    where: { supabaseUserId: supabaseUser.id },
-    select: {
-      id: true,
-      email: true,
-      role: true,
-      companyId: true,
-    },
-  })
+  try {
+    // Get User record from database to get role and companyId
+    const user = await prisma.user.findUnique({
+      where: { supabaseUserId: supabaseUser.id },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        companyId: true,
+      },
+    })
 
-  if (!user) {
-    redirect('/auth/signin')
-  }
+    if (!user) {
+      redirect('/auth/signin')
+    }
 
-  return {
-    user: {
-      id: user.id,
-      email: user.email,
-      role: user.role as UserRole,
-      companyId: user.companyId,
-    },
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role as UserRole,
+        companyId: user.companyId,
+      },
+    }
+  } catch (err) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error(
+        'Missing DATABASE_URL. Set it in Vercel → Project → Settings → Environment Variables (use your Supabase pooler connection string).'
+      )
+    }
+    throw err
   }
 }
 
