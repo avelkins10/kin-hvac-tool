@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) =>
-          redirectResponse.cookies.set(name, value, options)
+          redirectResponse.cookies.set(name, value, { ...options, path: '/' })
         )
       },
     },
