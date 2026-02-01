@@ -1,9 +1,9 @@
 /**
  * POST /api/auth/login
- * Sign-in then return 200 + Set-Cookie (no redirect). Client navigates to /dashboard
- * so cookies are sent on that request. Avoids redirect responses not sending cookies on some runtimes.
+ * Sign-in using Supabase Auth with proper cookie handling via next/headers
  */
 import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
@@ -22,18 +22,21 @@ export async function POST(request: Request) {
     return redirectToSignin(request.url, 'Server misconfigured. Contact support.')
   }
 
-  const url = new URL(request.url)
-  const jsonResponse = NextResponse.json({ redirect: '/dashboard' }, { status: 200 })
+  const cookieStore = await cookies()
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
-        return request.cookies.getAll()
+        return cookieStore.getAll()
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) =>
-          jsonResponse.cookies.set(name, value, { ...options, path: '/' })
-        )
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, { ...options, path: '/' })
+          )
+        } catch (error) {
+          console.error('[LOGIN] Error setting cookies:', error)
+        }
       },
     },
   })
@@ -48,7 +51,8 @@ export async function POST(request: Request) {
     return redirectToSignin(request.url, 'Login failed. Please try again.')
   }
 
-  return jsonResponse
+  // Return JSON response - cookies are automatically included by Next.js
+  return NextResponse.json({ redirect: '/dashboard' }, { status: 200 })
 }
 
 function redirectToSignin(originUrl: string, error: string) {

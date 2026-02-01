@@ -1,15 +1,13 @@
-import { updateSession, getMiddlewareUser } from '@/lib/supabase/middleware'
+import { updateSession } from '@/lib/supabase/middleware'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  // Update Supabase session (refreshes tokens)
-  const response = await updateSession(request)
-
   const path = request.nextUrl.pathname
 
-  // Public routes - allow access
+  // Public routes - allow access without auth check
   if (
     path.startsWith('/api/auth') ||
+    path.startsWith('/api/debug') ||
     (path.startsWith('/proposals/') && path.endsWith('/view')) ||
     path === '/unauthorized' ||
     path === '/auth/signin' ||
@@ -19,13 +17,14 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/_next') ||
     path.startsWith('/api/webhooks')
   ) {
-    return response
+    return NextResponse.next()
   }
 
-  // Check authentication for protected routes (Edge-safe; no Prisma)
-  const supabaseUser = await getMiddlewareUser(request)
+  // Update Supabase session and get user (single operation)
+  const { response, user } = await updateSession(request)
 
-  if (!supabaseUser) {
+  // Check authentication for protected routes
+  if (!user) {
     if (
       path === '/' ||
       path.startsWith('/admin') ||
