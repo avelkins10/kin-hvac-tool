@@ -181,8 +181,7 @@ async function getDashboardData() {
 }
 
 export default async function DashboardPage() {
-  await requireAuth()
-  const session = await getSession()
+  const session = await requireAuth()
   const data = await getDashboardData()
 
   return (
