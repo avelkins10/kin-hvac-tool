@@ -23,8 +23,9 @@ export async function POST(request: Request) {
   }
 
   const url = new URL(request.url)
-  const dashboard = new URL('/dashboard', url.origin)
-  const redirectResponse = NextResponse.redirect(dashboard, 302)
+  const signedIn = new URL('/auth/signed-in', url.origin)
+  signedIn.searchParams.set('next', '/dashboard')
+  const redirectResponse = NextResponse.redirect(signedIn, 302)
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {

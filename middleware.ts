@@ -50,6 +50,7 @@ export const config = {
     '/auth/callback',
     '/auth/forgot-password',
     '/auth/set-password',
+    '/auth/signed-in',
     '/admin/:path*',
     '/proposals/:path*',
     '/dashboard/:path*',
