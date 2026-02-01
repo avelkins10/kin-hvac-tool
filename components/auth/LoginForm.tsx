@@ -14,6 +14,7 @@ import { Spinner } from '@/components/ui/spinner'
 export function LoginForm() {
   const searchParams = useSearchParams()
   const errorFromUrl = searchParams.get('error')
+  const debug = searchParams.get('debug') === '1'
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(errorFromUrl)
 
@@ -34,6 +35,7 @@ export function LoginForm() {
       onSubmit={handleSubmit}
       className="space-y-6 w-full"
     >
+      {debug && <input type="hidden" name="debug" value="1" />}
       <div className="space-y-2">
         <Label htmlFor="email" className="text-sm font-medium text-gray-700">
           Email Address

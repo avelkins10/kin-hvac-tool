@@ -23,10 +23,9 @@ export async function POST(request: Request) {
   }
 
   const url = new URL(request.url)
-  const signedIn = new URL('/auth/signed-in', url.origin)
-  signedIn.searchParams.set('next', '/dashboard')
-  const redirectResponse = NextResponse.redirect(signedIn, 302)
+  const redirectResponse = NextResponse.redirect(new URL('/dashboard', url.origin), 302)
 
+  // Force path='/' so session cookies are sent to /dashboard and all routes (not just /api/auth/login).
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
