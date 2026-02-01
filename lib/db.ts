@@ -6,19 +6,27 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-// On Vercel, use sslmode=require (no cert verification) to avoid
-// "self-signed certificate in certificate chain" with Supabase pooler.
-const sslMode = process.env.VERCEL === '1' ? 'require' : 'verify-full'
-
+// On Vercel, use libpq-compat sslmode=require (SSL, no cert verification) so
+// Supabase pooler works despite "self-signed certificate in certificate chain".
+// See: pg-connection-string treats require as verify-full unless uselibpqcompat=true
 function normalizeDatabaseUrl(url: string | undefined): string | undefined {
   if (!url) return undefined
 
-  if (url.includes('sslmode=')) {
-    return url.replace(/sslmode=[^&]+/, `sslmode=${sslMode}`)
+  const isVercel = process.env.VERCEL === '1'
+  const separator = url.includes('?') ? '&' : '?'
+
+  if (isVercel) {
+    // Strip existing sslmode/params so we can add libpq-compat params
+    let u = url.replace(/[?&]sslmode=[^&]+/g, '').replace(/[?&]uselibpqcompat=[^&]+/g, '')
+    u = u.replace(/\?&+/, '?').replace(/\?$/, '')
+    const sep = u.includes('?') ? '&' : '?'
+    return `${u}${sep}uselibpqcompat=true&sslmode=require`
   }
 
-  const separator = url.includes('?') ? '&' : '?'
-  return `${url}${separator}sslmode=${sslMode}`
+  if (url.includes('sslmode=')) {
+    return url.replace(/sslmode=[^&]+/, 'sslmode=verify-full')
+  }
+  return `${url}${separator}sslmode=verify-full`
 }
 
 // Create a connection pool for Prisma 7
