@@ -13,6 +13,7 @@ export async function middleware(request: NextRequest) {
     (path.startsWith('/proposals/') && path.endsWith('/view')) ||
     path === '/unauthorized' ||
     path === '/auth/signin' ||
+    path === '/auth/callback' ||
     path.startsWith('/_next') ||
     path.startsWith('/api/webhooks')
   ) {

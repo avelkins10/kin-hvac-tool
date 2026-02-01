@@ -28,9 +28,9 @@ export function LoginForm() {
         toast.error(error.message || 'Invalid email or password')
       } else if (data.session?.user) {
         toast.success('Logged in successfully')
-        // Give Supabase client time to persist session to cookies before full-page redirect
-        await new Promise((r) => setTimeout(r, 200))
-        window.location.href = '/dashboard'
+        // Redirect to server callback so the server reads session from cookies, then redirects to dashboard
+        await new Promise((r) => setTimeout(r, 150))
+        window.location.href = '/auth/callback?next=/dashboard'
       } else {
         toast.error('Login failed. Please try again.')
       }
