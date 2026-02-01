@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useActionState } from 'react'
 import { signInAction } from '@/app/auth/signin/actions'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,13 @@ export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [state, formAction, isPending] = useActionState(signInAction, null)
+
+  // Full page navigation so browser loads dashboard with session cookies (avoids RSC staying on signin)
+  useEffect(() => {
+    if (state && 'redirect' in state && state.redirect) {
+      window.location.href = state.redirect
+    }
+  }, [state])
 
   return (
     <form action={formAction} className="space-y-6 w-full">

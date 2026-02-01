@@ -1,14 +1,13 @@
 'use server'
 
-import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
-export type SignInState = { error: string } | null
+export type SignInState = { error: string } | { redirect: string } | null
 
 /**
  * Server-side login: signs in with Supabase on the server and sets session cookies
- * on the response, then redirects. No client-side cookie timing issues.
- * Signature supports useActionState(prevState, formData).
+ * on the response. Returns { redirect } so the client can do a full page navigation
+ * (Server Action redirect() keeps the client on signin when form is submitted via fetch).
  */
 export async function signInAction(
   _prevState: SignInState,
@@ -32,5 +31,5 @@ export async function signInAction(
     return { error: 'Login failed. Please try again.' }
   }
 
-  redirect('/dashboard')
+  return { redirect: '/dashboard' }
 }
