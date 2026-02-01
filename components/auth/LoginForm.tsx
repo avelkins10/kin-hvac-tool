@@ -8,13 +8,12 @@ import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
 
 /**
- * Form POSTs to /api/auth/login. Server signs in, sets session cookies on the
- * redirect response, and redirects to /dashboard so the next request has cookies.
+ * Submits via fetch so browser stores Set-Cookie from 200 response, then we
+ * navigate to /dashboard so the next request includes cookies.
  */
 export function LoginForm() {
   const searchParams = useSearchParams()
   const errorFromUrl = searchParams.get('error')
-  const debug = searchParams.get('debug') === '1'
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(errorFromUrl)
 
@@ -22,20 +21,41 @@ export function LoginForm() {
     setError(errorFromUrl)
   }, [errorFromUrl])
 
-  function handleSubmit() {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
     setError(null)
     setIsLoading(true)
-    // Form submits normally; no preventDefault. Server redirects with Set-Cookie.
+    const form = e.currentTarget
+    const formData = new FormData(form)
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      })
+      if (res.redirected) {
+        window.location.href = res.url
+        return
+      }
+      if (!res.ok) {
+        const text = await res.text()
+        setError(text || 'Login failed')
+        setIsLoading(false)
+        return
+      }
+      const data = (await res.json()) as { redirect?: string }
+      window.location.href = data.redirect ?? '/dashboard'
+    } catch {
+      setError('Network error. Try again.')
+      setIsLoading(false)
+    }
   }
 
   return (
     <form
-      action="/api/auth/login"
-      method="POST"
       onSubmit={handleSubmit}
       className="space-y-6 w-full"
     >
-      {debug && <input type="hidden" name="debug" value="1" />}
       <div className="space-y-2">
         <Label htmlFor="email" className="text-sm font-medium text-gray-700">
           Email Address

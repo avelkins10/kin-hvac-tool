@@ -1,7 +1,7 @@
 /**
  * POST /api/auth/login
- * Server-side sign-in; session cookies are set on the redirect response so the
- * browser receives Set-Cookie and then follows the redirect to /dashboard with cookies.
+ * Sign-in then return 200 + Set-Cookie (no redirect). Client navigates to /dashboard
+ * so cookies are sent on that request. Avoids redirect responses not sending cookies on some runtimes.
  */
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
@@ -23,9 +23,8 @@ export async function POST(request: Request) {
   }
 
   const url = new URL(request.url)
-  const redirectResponse = NextResponse.redirect(new URL('/dashboard', url.origin), 302)
+  const jsonResponse = NextResponse.json({ redirect: '/dashboard' }, { status: 200 })
 
-  // Force path='/' so session cookies are sent to /dashboard and all routes (not just /api/auth/login).
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
@@ -33,7 +32,7 @@ export async function POST(request: Request) {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) =>
-          redirectResponse.cookies.set(name, value, { ...options, path: '/' })
+          jsonResponse.cookies.set(name, value, { ...options, path: '/' })
         )
       },
     },
@@ -49,7 +48,7 @@ export async function POST(request: Request) {
     return redirectToSignin(request.url, 'Login failed. Please try again.')
   }
 
-  return redirectResponse
+  return jsonResponse
 }
 
 function redirectToSignin(originUrl: string, error: string) {
