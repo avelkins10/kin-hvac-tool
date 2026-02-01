@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { toast } from 'sonner'
 
 export function LoginForm() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -28,8 +30,9 @@ export function LoginForm() {
         toast.error(error.message || 'Invalid email or password')
       } else if (data.session?.user) {
         toast.success('Logged in successfully')
-        // Redirect to server callback so the server reads session from cookies, then redirects to dashboard
-        await new Promise((r) => setTimeout(r, 150))
+        // Revalidate so server sees new session, then redirect to callback for server-side redirect to dashboard
+        router.refresh()
+        await new Promise((r) => setTimeout(r, 400))
         window.location.href = '/auth/callback?next=/dashboard'
       } else {
         toast.error('Login failed. Please try again.')
