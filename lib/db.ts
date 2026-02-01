@@ -21,9 +21,15 @@ function normalizeDatabaseUrl(url: string | undefined): string | undefined {
 }
 
 // Create a connection pool for Prisma 7
+// On Vercel, TLS often fails with "self-signed certificate in certificate chain"
+// unless we allow the Supabase pooler cert (rejectUnauthorized: false).
 const pool = process.env.DATABASE_URL
   ? new Pool({
       connectionString: normalizeDatabaseUrl(process.env.DATABASE_URL),
+      ssl:
+        process.env.VERCEL === '1'
+          ? { rejectUnauthorized: false }
+          : undefined,
     })
   : null
 
