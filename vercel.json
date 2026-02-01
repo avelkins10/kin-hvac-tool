@@ -1,5 +1,5 @@
 {
-  "buildCommand": "(npx prisma migrate deploy || echo 'Migrations skipped') && next build",
+  "buildCommand": "next build",
   "framework": "nextjs",
   "installCommand": "pnpm install",
   "env": {
