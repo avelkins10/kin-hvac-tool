@@ -33,6 +33,9 @@ local-packages/
 # macOS
 .DS_Store
 
+# Cursor IDE
+.cursor/
+
 # npm lock file (using pnpm)
 package-lock.json
 .env*.local
