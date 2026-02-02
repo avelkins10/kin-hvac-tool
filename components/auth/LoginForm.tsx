@@ -8,9 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
 
 /**
- * Submits via fetch. API returns 302 to /dashboard with Set-Cookie so the
- * browser stores session cookies; we then use res.url for full page load.
- * Also supports JSON { redirect } for compatibility.
+ * Native form POST to /api/auth/login so the browser receives 302 + Set-Cookie
+ * and follows the redirect in the same navigation; cookies are then sent to /dashboard.
  */
 export function LoginForm() {
   const searchParams = useSearchParams()
@@ -22,49 +21,15 @@ export function LoginForm() {
     setError(errorFromUrl)
   }, [errorFromUrl])
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
+  function handleSubmit() {
     setError(null)
     setIsLoading(true)
-    const form = e.currentTarget
-    const formData = new FormData(form)
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-        redirect: 'manual',
-      })
-      // 302 / manual redirect: browser has stored Set-Cookie; navigate so cookies are sent
-      if (res.type === 'opaqueredirect' || res.status === 302) {
-        const location = res.headers.get('Location')
-        const target =
-          location && location.startsWith('/')
-            ? new URL(location, window.location.origin).href
-            : location || new URL('/dashboard', window.location.origin).href
-        window.location.href = target
-        return
-      }
-      if (res.redirected) {
-        window.location.href = res.url
-        return
-      }
-      if (!res.ok) {
-        const text = await res.text()
-        setError(text || 'Login failed')
-        setIsLoading(false)
-        return
-      }
-      const data = (await res.json()) as { redirect?: string }
-      window.location.href = data.redirect ?? '/dashboard'
-    } catch {
-      setError('Network error. Try again.')
-      setIsLoading(false)
-    }
   }
 
   return (
     <form
+      action="/api/auth/login"
+      method="POST"
       onSubmit={handleSubmit}
       className="space-y-6 w-full"
     >
