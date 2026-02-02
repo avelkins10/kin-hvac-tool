@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Plus, AlertTriangle, FileText, Send, Eye, Users, UserCog, Workflow } from 'lucide-react'
 import Link from 'next/link'
+import { getProposalCustomerDisplay } from '@/lib/utils'
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
 import {
   Breadcrumb,
@@ -273,7 +274,7 @@ export default async function DashboardPage() {
                 <CardContent>
                   <div className="space-y-3">
                     {data.expiringSoon.map((proposal) => {
-                      const customer = proposal.customerData as { name?: string; email?: string } | null
+                      const customer = getProposalCustomerDisplay(proposal.customerData)
                       const expiresAt = proposal.expiresAt ? new Date(proposal.expiresAt) : null
                       const daysUntilExpiry = expiresAt 
                         ? Math.ceil((expiresAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
@@ -288,7 +289,7 @@ export default async function DashboardPage() {
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 min-w-0">
                               <h3 className="font-semibold text-gray-900 group-hover:text-amber-700 transition-colors">
-                                {customer?.name || 'Unnamed Customer'}
+                                {customer.name}
                               </h3>
                               <p className="text-sm text-gray-600 mt-1">
                                 {expiresAt 

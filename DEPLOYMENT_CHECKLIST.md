@@ -63,7 +63,7 @@ vercel
 In Vercel Dashboard → Project Settings → Environment Variables, add:
 
 **Required:**
-- `DATABASE_URL` - Your Neon PostgreSQL connection string
+- `DATABASE_URL` - Your Supabase PostgreSQL pooler connection string (or Neon if still using it)
 - `NEXTAUTH_SECRET` - Generate with `openssl rand -base64 32`
 - `NEXTAUTH_URL` - Your Vercel deployment URL (e.g., `https://your-app.vercel.app`)
 
@@ -77,11 +77,11 @@ In Vercel Dashboard → Project Settings → Environment Variables, add:
 - `SIGNNOW_FROM_EMAIL` - Email address to send signature requests from
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` - For email
 
-### 6. Database Setup
+### 6. Build and database
 
-Vercel will automatically run migrations during build (configured in `package.json` build script):
-- `prisma generate` - Generates Prisma Client
-- `prisma migrate deploy` - Runs database migrations
+- **Build command:** `vercel.json` uses `pnpm run build`, which runs `prisma generate`, then `prisma migrate deploy`, then `next build`. Ensure `DATABASE_URL` is set in Vercel so migrations can run.
+- **Local build check:** Run `pnpm run build` locally to verify the Next.js build completes. If `prisma migrate deploy` times out locally, that’s okay; on Vercel it typically succeeds.
+- **Single dev server:** For local dev, run only one dev server. If you see ENOENT/500 errors, kill any process on port 3000 (`lsof -i :3000` then `kill <PID>`) and use `rm -rf .next && pnpm dev`. See `DEV_SERVER_TROUBLESHOOTING.md`.
 
 ### 7. Post-Deployment
 

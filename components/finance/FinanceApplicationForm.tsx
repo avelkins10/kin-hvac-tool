@@ -7,10 +7,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
-import { TEST_SCENARIOS, type TestDataScenario } from '@/lib/test-data'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { ChevronDown, TestTube } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 
 interface FinanceApplicationFormProps {
   proposalId: string
@@ -46,10 +42,8 @@ export function FinanceApplicationForm({
     city: initialData?.city || '',
     state: initialData?.state || '',
     zip: initialData?.zip || '',
-    ssn: '', // For testing purposes
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [showTestData, setShowTestData] = useState(false)
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
@@ -72,6 +66,11 @@ export function FinanceApplicationForm({
       newErrors.phone = 'Phone number is required'
     } else if (!/^[\d\s\-\(\)\+]+$/.test(formData.phone)) {
       newErrors.phone = 'Invalid phone format'
+    } else {
+      const digitsOnly = formData.phone.replace(/\D/g, '')
+      if (digitsOnly.length < 10) {
+        newErrors.phone = 'Phone number must be at least 10 digits'
+      }
     }
 
     if (!formData.address.trim()) {
@@ -126,8 +125,6 @@ export function FinanceApplicationForm({
             state: formData.state,
             zip: formData.zip,
             systemPrice,
-            // Include SSN if provided (for testing)
-            ...(formData.ssn && { ssn: formData.ssn }),
           },
         }),
       })
@@ -164,92 +161,15 @@ export function FinanceApplicationForm({
     }
   }
 
-  const fillTestData = (scenario: TestDataScenario) => {
-    setFormData({
-      firstName: scenario.data.firstName,
-      lastName: scenario.data.lastName,
-      email: scenario.data.email,
-      phone: scenario.data.phone,
-      address: scenario.data.address,
-      city: scenario.data.city,
-      state: scenario.data.state,
-      zip: scenario.data.zip,
-      ssn: scenario.data.ssn || '',
-    })
-    setErrors({})
-    toast.success(`Filled test data: ${scenario.name}`)
-  }
-
-  const isTestData = TEST_SCENARIOS.some(
-    (s) =>
-      formData.firstName === s.data.firstName &&
-      formData.lastName === s.data.lastName &&
-      formData.ssn === s.data.ssn
-  )
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          Finance Application
-          {isTestData && (
-            <Badge variant="outline" className="text-xs">
-              <TestTube className="size-3 mr-1" />
-              Test Data
-            </Badge>
-          )}
-        </CardTitle>
+        <CardTitle>Finance Application</CardTitle>
         <CardDescription>
           Submit your finance application for this proposal. System price: ${systemPrice.toLocaleString()}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {/* Test Data Helper */}
-        <Collapsible open={showTestData} onOpenChange={setShowTestData}>
-          <CollapsibleTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full mb-4"
-              onClick={() => setShowTestData(!showTestData)}
-            >
-              <TestTube className="size-4 mr-2" />
-              Test Data Helper
-              <ChevronDown className={`size-4 ml-auto transition-transform ${showTestData ? 'rotate-180' : ''}`} />
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="mb-4 p-4 border rounded-lg bg-muted/50">
-              <p className="text-sm text-muted-foreground mb-3">
-                Quick-fill test data for testing different finance application scenarios. Click a scenario to auto-fill the form.
-                <span className="block mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                  ⚠️ Test mode: Using mock responses when API credentials are not configured
-                </span>
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {TEST_SCENARIOS.map((scenario) => (
-                  <Button
-                    key={scenario.name}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="justify-start text-left h-auto py-2"
-                    onClick={() => fillTestData(scenario)}
-                  >
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">{scenario.name}</div>
-                      <div className="text-xs text-muted-foreground">{scenario.description}</div>
-                      <Badge variant="secondary" className="mt-1 text-xs">
-                        {scenario.expectedStatus}
-                      </Badge>
-                    </div>
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -394,24 +314,6 @@ export function FinanceApplicationForm({
                 <p className="text-sm text-destructive">{errors.zip}</p>
               )}
             </div>
-          </div>
-
-          {/* SSN Field (for testing) */}
-          <div className="space-y-2">
-            <Label htmlFor="ssn">
-              Social Security Number (SSN) <span className="text-muted-foreground text-xs">(for testing only)</span>
-            </Label>
-            <Input
-              id="ssn"
-              value={formData.ssn}
-              onChange={(e) => handleChange('ssn', e.target.value)}
-              disabled={isSubmitting}
-              placeholder="123-45-6789 (test scenarios)"
-              className="font-mono"
-            />
-            <p className="text-xs text-muted-foreground">
-              Use test SSNs from the test data helper above to trigger specific credit check responses.
-            </p>
           </div>
 
           <div className="flex gap-2 pt-4">

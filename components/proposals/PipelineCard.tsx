@@ -5,6 +5,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Card, CardContent } from '@/components/ui/card'
 import { format } from 'date-fns'
 import Link from 'next/link'
+import { getProposalCustomerDisplay } from '@/lib/utils'
 
 interface Proposal {
   id: string
@@ -39,7 +40,7 @@ export function PipelineCard({ proposal }: PipelineCardProps) {
     opacity: isDragging ? 0.5 : 1,
   }
 
-  const customer = proposal.customerData as any
+  const customer = getProposalCustomerDisplay(proposal.customerData)
   const totals = proposal.totals as any
 
   return (
@@ -49,7 +50,7 @@ export function PipelineCard({ proposal }: PipelineCardProps) {
           <CardContent className="p-4">
             <div className="space-y-2">
               <h3 className="font-semibold text-sm">
-                {customer?.name || 'Unnamed Customer'}
+                {customer.name}
               </h3>
               {totals?.total && (
                 <p className="text-lg font-bold text-blue-600">

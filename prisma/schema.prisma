@@ -3,6 +3,8 @@
 
 generator client {
   provider = "prisma-client-js"
+  // Force output into project node_modules so Next.js/Turbopack resolves the same client
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -22,6 +24,10 @@ model User {
   emailVerified DateTime?
   name          String?
   image         String?
+  // LightReach finance: sales rep info shown on applications (optional; falls back to env)
+  lightreachSalesRepName   String?
+  lightreachSalesRepEmail  String?
+  lightreachSalesRepPhone  String?
 
   proposals     Proposal[]
 

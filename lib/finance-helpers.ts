@@ -114,3 +114,51 @@ export function getSystemPriceFromProposal(proposal: Proposal): number {
   }
   return 0
 }
+
+/**
+ * Build Palmetto HVAC systemDesign from proposal for more accurate pricing.
+ * Used when fetching payment schedule / pricing so Palmetto can return pricing based on equipment.
+ * See LightReach API: POST /api/v2/accounts/{accountId}/pricing/hvac
+ */
+export function buildSystemDesignFromProposal(proposal: {
+  homeData?: any
+  selectedEquipment?: any
+}): Record<string, unknown> | undefined {
+  const homeData = proposal?.homeData as { squareFootage?: number } | undefined
+  const equipment = proposal?.selectedEquipment as {
+    tier?: string
+    seer?: number
+    tonnage?: number
+    name?: string
+  } | undefined
+
+  const conditionedArea = homeData?.squareFootage
+  if (!conditionedArea || conditionedArea <= 0) return undefined
+
+  const tonnageValue =
+    equipment?.tonnage ?? (conditionedArea <= 1500 ? 2.5 : conditionedArea <= 2500 ? 3.5 : 4)
+  const seerValue = equipment?.seer ?? 16
+  const systemCategory =
+    equipment?.tier === 'best' ? 'Heat Pump Split System' : 'Conventional Ducted Split System'
+
+  return {
+    isPreliminary: true,
+    systems: [
+      {
+        systemCategory,
+        conditionedArea: Number(conditionedArea),
+        name: equipment?.name,
+        equipment: {
+          items: [
+            {
+              type: 'airConditioner',
+              quantity: 1,
+              size: { unit: 'ton', value: String(tonnageValue) },
+              efficiencies: [{ unit: 'SEER', value: String(seerValue) }],
+            },
+          ],
+        },
+      },
+    ],
+  } as Record<string, unknown>
+}

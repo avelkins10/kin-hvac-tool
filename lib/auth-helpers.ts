@@ -27,7 +27,7 @@ export async function requireAuth(): Promise<Session> {
 
   try {
     // Get User record from database to get role and companyId
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { supabaseUserId: supabaseUser.id },
       select: {
         id: true,
@@ -36,6 +36,40 @@ export async function requireAuth(): Promise<Session> {
         companyId: true,
       },
     })
+
+    // Auto-provision: Supabase user exists but no User row (e.g. first login or user created in Auth only)
+    if (!user) {
+      const email = supabaseUser.email ?? `${supabaseUser.id}@supabase.user`
+      try {
+        user = await prisma.user.create({
+          data: {
+            email,
+            supabaseUserId: supabaseUser.id,
+            role: 'SALES_REP',
+          },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            companyId: true,
+          },
+        })
+      } catch (createErr: unknown) {
+        const code = createErr && typeof createErr === 'object' && 'code' in createErr ? (createErr as { code: string }).code : ''
+        if (code === 'P2002') {
+          // Email already exists (e.g. user created via script); link this Supabase user if row has no link yet
+          await prisma.user.updateMany({
+            where: { email, supabaseUserId: null },
+            data: { supabaseUserId: supabaseUser.id },
+          })
+          user = await prisma.user.findUnique({
+            where: { supabaseUserId: supabaseUser.id },
+            select: { id: true, email: true, role: true, companyId: true },
+          })
+        }
+        if (!user) redirect('/auth/signin')
+      }
+    }
 
     if (!user) {
       redirect('/auth/signin')

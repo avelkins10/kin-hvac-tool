@@ -8,10 +8,27 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Search, Filter, FileText } from 'lucide-react'
+import { Plus, Search, Filter, FileText, MoreVertical, Trash2, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useDebounce } from '@/hooks/use-debounce'
+import { getProposalCustomerDisplay } from '@/lib/utils'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface CustomerData {
   name?: string
@@ -41,9 +58,34 @@ export function ProposalList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [page, setPage] = useState(1)
-  
+  const [proposalToDelete, setProposalToDelete] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const isAdmin =
+    session?.role === 'COMPANY_ADMIN' || session?.role === 'SUPER_ADMIN'
+
   // Debounce search term to avoid excessive filtering
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
+
+  const handleConfirmDelete = async () => {
+    if (!proposalToDelete) return
+    setDeleting(true)
+    try {
+      const response = await fetch(`/api/proposals/${proposalToDelete}`, { method: 'DELETE' })
+      if (response.status === 204 || response.ok) {
+        toast.success('Proposal deleted')
+        setProposalToDelete(null)
+        fetchProposals()
+      } else {
+        const data = await response.json().catch(() => ({}))
+        toast.error(data.error || 'Failed to delete proposal')
+      }
+    } catch {
+      toast.error('Failed to delete proposal')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const fetchProposals = useCallback(async () => {
     try {
@@ -75,11 +117,11 @@ export function ProposalList() {
 
   const filteredProposals = proposals.filter((proposal) => {
     if (!debouncedSearchTerm) return true
-    const customer = proposal.customerData
+    const customer = getProposalCustomerDisplay(proposal.customerData)
     const searchLower = debouncedSearchTerm.toLowerCase()
     return (
-      customer?.name?.toLowerCase().includes(searchLower) ||
-      customer?.email?.toLowerCase().includes(searchLower) ||
+      customer.name.toLowerCase().includes(searchLower) ||
+      customer.email.toLowerCase().includes(searchLower) ||
       proposal.id.toLowerCase().includes(searchLower)
     )
   })
@@ -184,28 +226,65 @@ export function ProposalList() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredProposals.map((proposal) => {
-          const customer = proposal.customerData
           const totals = proposal.totals
+          const customerDisplay = getProposalCustomerDisplay(proposal.customerData)
 
           return (
-            <Link key={proposal.id} href={`/proposals/${proposal.id}`}>
-              <Card className="hover:shadow-xl transition-all duration-300 cursor-pointer border-2 hover:border-blue-200 hover:scale-[1.02] group">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
-                        {customer?.name || 'Unnamed Customer'}
-                      </CardTitle>
-                      <CardDescription className="mt-1 truncate">
-                        {customer?.email || 'No email'}
-                      </CardDescription>
-                    </div>
-                    <Badge className={cn("shrink-0 font-medium", getStatusColor(proposal.status))}>
+            <Card
+              key={proposal.id}
+              className="hover:shadow-xl transition-all duration-300 border-2 hover:border-blue-200 hover:scale-[1.02] group"
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <Link
+                    href={`/proposals/${proposal.id}`}
+                    className="flex-1 min-w-0 cursor-pointer"
+                  >
+                    <CardTitle className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
+                      {customerDisplay.name}
+                    </CardTitle>
+                    <CardDescription className="mt-1 truncate">
+                      {customerDisplay.email || 'No email'}
+                    </CardDescription>
+                  </Link>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge className={cn("font-medium", getStatusColor(proposal.status))}>
                       {proposal.status}
                     </Badge>
+                    {isAdmin && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label="Proposal actions"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/proposals/${proposal.id}/view`}>
+                              <ExternalLink className="mr-2 h-4 w-4" />
+                              View
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600"
+                            onSelect={() => setProposalToDelete(proposal.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
-                </CardHeader>
-                <CardContent className="pt-0">
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Link href={`/proposals/${proposal.id}`} className="block">
                   <div className="space-y-3">
                     {totals?.total && (
                       <div>
@@ -217,10 +296,10 @@ export function ProposalList() {
                     )}
                     <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t">
                       <span>
-                        {new Date(proposal.createdAt).toLocaleDateString('en-US', { 
-                          month: 'short', 
-                          day: 'numeric', 
-                          year: 'numeric' 
+                        {new Date(proposal.createdAt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
                         })}
                       </span>
                       <span className="truncate ml-2">
@@ -228,12 +307,36 @@ export function ProposalList() {
                       </span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
+                </Link>
+              </CardContent>
+            </Card>
           )
         })}
       </div>
+
+      <AlertDialog open={!!proposalToDelete} onOpenChange={(open) => !open && setProposalToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this proposal?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This cannot be undone. The proposal and all related data will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleConfirmDelete()
+              }}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {filteredProposals.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 px-4">

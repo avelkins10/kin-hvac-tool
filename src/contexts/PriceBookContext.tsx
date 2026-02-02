@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useMemo, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from "react"
 
 export const DEFAULT_TIER_PRICES = {
   good: 12499,
@@ -767,9 +767,21 @@ interface PriceBookContextType {
 
 const PriceBookContext = createContext<PriceBookContextType | undefined>(undefined)
 
+// #region agent log
+const LOG_ENDPOINT = 'http://127.0.0.1:7243/ingest/a83938d5-3a77-4ab6-916c-dbc5e276a756'
+function logPriceBook(location: string, message: string, data: Record<string, unknown>, hypothesisId: string) {
+  fetch(LOG_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location, message, data, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId }) }).catch(() => {})
+}
+// #endregion
+
 export function PriceBookProvider({ children }: { children: ReactNode }) {
   const [priceBook, setPriceBook] = useState<PriceBook>(defaultPriceBook)
   const [loading, setLoading] = useState(true)
+  // #region agent log
+  const priceBookRenderCountRef = useRef(0)
+  priceBookRenderCountRef.current += 1
+  logPriceBook('PriceBookContext.tsx:render', 'PriceBookProvider render', { renderCount: priceBookRenderCountRef.current, loading }, 'C')
+  // #endregion
 
   // Load from API
   const loadPriceBook = async () => {

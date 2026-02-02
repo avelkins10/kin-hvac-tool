@@ -16,6 +16,9 @@ interface AuthUser {
   email: string
   role: string
   companyId: string | null
+  lightreachSalesRepName?: string
+  lightreachSalesRepEmail?: string
+  lightreachSalesRepPhone?: string
 }
 
 interface UseSupabaseAuthReturn {

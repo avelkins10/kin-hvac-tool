@@ -7,6 +7,7 @@ import {
   formatFinanceError,
   logFinanceError,
 } from '@/lib/integrations/finance-errors'
+import { buildSystemDesignFromProposal } from '@/lib/finance-helpers'
 
 export async function GET(
   request: NextRequest,
@@ -61,7 +62,10 @@ export async function GET(
     }
 
     const provider = FinanceProviderFactory.createProvider(application.lenderId)
-    const paymentSchedule = await provider.getPaymentSchedule(application.externalApplicationId)
+    const systemDesign = buildSystemDesignFromProposal(application.proposal)
+    const paymentSchedule = await provider.getPaymentSchedule(application.externalApplicationId, {
+      ...(systemDesign && { systemDesign }),
+    })
 
     // Update response data with payment schedule
     await prisma.financeApplication.update({

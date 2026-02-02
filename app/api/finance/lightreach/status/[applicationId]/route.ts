@@ -7,6 +7,7 @@ import {
   formatFinanceError,
   logFinanceError,
 } from '@/lib/integrations/finance-errors'
+import { buildSystemDesignFromProposal } from '@/lib/finance-helpers'
 
 // Cache duration: 5 minutes (300000 ms)
 const CACHE_DURATION_MS = 5 * 60 * 1000
@@ -98,12 +99,13 @@ export async function GET(
       )
     }
 
-    // Check if we're in test mode (no credentials configured)
-    const isTestMode = !process.env.PALMETTO_FINANCE_ACCOUNT_EMAIL || !process.env.PALMETTO_FINANCE_ACCOUNT_PASSWORD
-    
-    // If test mode and we have cached data, return it without API call
-    if (isTestMode && application.responseData) {
-      const cachedData = application.responseData as any
+    // Only skip API call for test-mode applications (no external ID) when we have cached data.
+    // If credentials are set, always try the real API for applications with externalApplicationId.
+    const hasCredentials =
+      !!process.env.PALMETTO_FINANCE_ACCOUNT_EMAIL && !!process.env.PALMETTO_FINANCE_ACCOUNT_PASSWORD
+    const isTestApplication = application.externalApplicationId?.startsWith('test_')
+
+    if (isTestApplication && application.responseData) {
       return NextResponse.json({
         ...application,
         cached: true,
@@ -120,9 +122,13 @@ export async function GET(
       const status = await provider.getApplicationStatus(application.externalApplicationId)
 
       // Try to get payment schedule (may not be available for all statuses)
+      // Pass systemDesign from proposal for more accurate HVAC pricing when available
       if (status.status === 'approved' || status.status === 'conditional') {
         try {
-          paymentSchedule = await provider.getPaymentSchedule(application.externalApplicationId)
+          const systemDesign = buildSystemDesignFromProposal(application.proposal)
+          paymentSchedule = await provider.getPaymentSchedule(application.externalApplicationId, {
+            ...(systemDesign && { systemDesign }),
+          })
         } catch (scheduleError) {
           // Payment schedule not available is not a critical error
           console.warn('[Finance] Could not fetch payment schedule:', scheduleError)

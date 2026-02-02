@@ -28,6 +28,7 @@ Based on the official API reference documentation.
   - `externalReferenceIds`: Array of `{ type, id }` objects
   - `address`: Property address (separate from applicant address)
   - `friendlyName`: Human-readable account name
+  - `systemDesign`: HVAC system design (home size, conditioned area, equipment) so the LightReach portal System Design tab is pre-populated; built from proposal `homeData` and `selectedEquipment` when submitting from the app
 
 ### Get Account Status
 - **Endpoint**: `GET /api/accounts/{accountId}`

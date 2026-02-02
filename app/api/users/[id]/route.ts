@@ -6,19 +6,24 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await requireAuth()
 
     const user = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         email: true,
         role: true,
+        companyId: true,
         createdAt: true,
         updatedAt: true,
+        lightreachSalesRepName: true,
+        lightreachSalesRepEmail: true,
+        lightreachSalesRepPhone: true,
       },
     })
 
@@ -40,56 +45,78 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireRole(['COMPANY_ADMIN', 'SUPER_ADMIN'])
+    const { id } = await params
+    const session = await requireAuth()
 
     const body = await request.json()
-    const { email, password, role } = body
+    const {
+      email,
+      password,
+      role,
+      lightreachSalesRepName,
+      lightreachSalesRepEmail,
+      lightreachSalesRepPhone,
+    } = body
 
     const existingUser = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!existingUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Users can only update users in their company
-    if (session.user.companyId !== existingUser.companyId && session.user.role !== 'SUPER_ADMIN') {
+    const isSelf = session.user.id === id
+    const isAdmin = session.user.role === 'COMPANY_ADMIN' || session.user.role === 'SUPER_ADMIN'
+    const canEditOther = isAdmin && (session.user.companyId === existingUser.companyId || session.user.role === 'SUPER_ADMIN')
+
+    // Self can update own LightReach fields only; admins can update others (email, role, password) and LightReach
+    if (!isSelf && !canEditOther) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const updateData: any = {}
-    if (email) updateData.email = email
-    if (role) updateData.role = role
-    if (password) {
-      const passwordValidation = validatePasswordStrength(password)
-      if (!passwordValidation.valid) {
-        return NextResponse.json({ error: passwordValidation.message }, { status: 400 })
+    const updateData: Record<string, unknown> = {}
+
+    // LightReach sales rep (self or admin)
+    if (lightreachSalesRepName !== undefined) updateData.lightreachSalesRepName = lightreachSalesRepName === '' ? null : lightreachSalesRepName
+    if (lightreachSalesRepEmail !== undefined) updateData.lightreachSalesRepEmail = lightreachSalesRepEmail === '' ? null : lightreachSalesRepEmail
+    if (lightreachSalesRepPhone !== undefined) updateData.lightreachSalesRepPhone = lightreachSalesRepPhone === '' ? null : lightreachSalesRepPhone
+
+    // Admin editing another user: allow email, role, password
+    if (!isSelf && canEditOther) {
+      if (email) updateData.email = email
+      if (role) updateData.role = role
+      if (password) {
+        const passwordValidation = validatePasswordStrength(password)
+        if (!passwordValidation.valid) {
+          return NextResponse.json({ error: passwordValidation.message }, { status: 400 })
+        }
+        const supabase = await createClient()
+        const { error: updateError } = await supabase.auth.admin.updateUserById(
+          existingUser.supabaseUserId || '',
+          { password: password.trim() }
+        )
+        if (updateError) {
+          console.error('Error updating password in Supabase Auth:', updateError)
+          return NextResponse.json({ error: 'Failed to update password' }, { status: 500 })
+        }
       }
-      // Update password in Supabase Auth
-      const supabase = await createClient()
-      const { error: updateError } = await supabase.auth.admin.updateUserById(
-        existingUser.supabaseUserId || '',
-        { password: password.trim() }
-      )
-      if (updateError) {
-        console.error('Error updating password in Supabase Auth:', updateError)
-        return NextResponse.json({ error: 'Failed to update password' }, { status: 500 })
-      }
-      // Note: We don't store password in User table anymore (Supabase Auth handles it)
     }
 
     const user = await prisma.user.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       select: {
         id: true,
         email: true,
         role: true,
         updatedAt: true,
+        lightreachSalesRepName: true,
+        lightreachSalesRepEmail: true,
+        lightreachSalesRepPhone: true,
       },
     })
 
@@ -102,13 +129,14 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await requireRole(['COMPANY_ADMIN', 'SUPER_ADMIN'])
 
     const existingUser = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!existingUser) {
@@ -121,7 +149,7 @@ export async function DELETE(
     }
 
     // Prevent self-deletion
-    if (session.user.id === params.id) {
+    if (session.user.id === id) {
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
     }
 
@@ -137,7 +165,7 @@ export async function DELETE(
 
     // Delete User record from database
     await prisma.user.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ message: 'User deleted successfully' })

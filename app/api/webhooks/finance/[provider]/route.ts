@@ -233,16 +233,19 @@ export async function POST(
     }
 
     const previousStatus = application.status
+    const existingResponseData = (application.responseData as any) || {}
 
     // Map LightReach event to application status
     let newStatus = previousStatus
     let shouldSendEmail = false
     let emailStatus = ''
 
+    // Extra responseData to merge (account updates, milestones, quote, stipulations, etc.)
+    let mergeResponseData: Record<string, unknown> = {}
+
     if (provider.toLowerCase() === 'lightreach') {
       switch (event) {
         case 'applicationStatus':
-          // Map LightReach application status to our status
           const statusMap: Record<string, 'PENDING' | 'SUBMITTED' | 'APPROVED' | 'DENIED' | 'CONDITIONAL' | 'CANCELLED'> = {
             approved: 'APPROVED',
             approvedWithStipulations: 'CONDITIONAL',
@@ -254,35 +257,71 @@ export async function POST(
           shouldSendEmail = true
           emailStatus = status?.toLowerCase() || ''
           break
+        case 'accountUpdated':
+          // Merge Palmetto account updates into our stored data so we stay in sync
+          if (body.updates && typeof body.updates === 'object') {
+            mergeResponseData.accountUpdates = body.updates
+            mergeResponseData.accountUpdatedAt = new Date().toISOString()
+          }
+          break
         case 'milestoneAchieved':
-          // Milestone achieved doesn't change application status, but we should log it
+          mergeResponseData.milestones = Array.isArray(existingResponseData.milestones)
+            ? [...existingResponseData.milestones, { milestone: otherData.newMilestone, at: new Date().toISOString() }]
+            : [{ milestone: otherData.newMilestone, at: new Date().toISOString() }]
           console.log('[Webhook] Milestone achieved:', otherData.newMilestone)
           break
+        case 'milestonePackage':
+          mergeResponseData.milestonePackages = Array.isArray(existingResponseData.milestonePackages)
+            ? [...existingResponseData.milestonePackages, { ...otherData, at: new Date().toISOString() }]
+            : [{ ...otherData, at: new Date().toISOString() }]
+          console.log('[Webhook] Milestone package:', otherData.type, otherData.status)
+          break
         case 'quoteVoided':
-          // Quote voided might indicate cancellation
           newStatus = 'CANCELLED'
           break
+        case 'quoteCreated':
+          if (otherData.quoteId) mergeResponseData.quoteId = otherData.quoteId
+          if (otherData.quoteReference) mergeResponseData.quoteReference = otherData.quoteReference
+          break
         case 'contractSent':
-          // Contract sent doesn't change application status, but we track it
-          // Status remains as APPROVED or CONDITIONAL
-          shouldSendEmail = false // Don't send email for contract sent (Palmetto handles this)
+          shouldSendEmail = false
           break
         case 'contractSigned':
         case 'contractApproved':
-          // Contract signed/approved means application is fully approved
           newStatus = 'APPROVED'
           shouldSendEmail = true
           emailStatus = 'approved'
           break
         case 'contractVoided':
-          // Contract voided might indicate cancellation
           newStatus = 'CANCELLED'
           shouldSendEmail = true
           emailStatus = 'cancelled'
           break
+        case 'contractReinstated':
+          newStatus = 'APPROVED'
+          mergeResponseData.contractReinstatedAt = new Date().toISOString()
+          break
+        case 'stipulationAdded':
+        case 'stipulationCleared':
+        case 'allStipulationsCleared':
+          mergeResponseData.stipulationsUpdatedAt = new Date().toISOString()
+          break
+        case 'requirementCompleted':
+          mergeResponseData.requirementCompletedAt = new Date().toISOString()
+          mergeResponseData.requirementCompleted = otherData
+          break
+        case 'termsAndConditionsAccepted':
+          mergeResponseData.termsAndConditionsAcceptedAt = otherData.dateAccepted || new Date().toISOString()
+          break
+        case 'activeQuoteExceedsMonthlyPaymentCaps':
+          mergeResponseData.quoteExceedsPaymentCap = true
+          mergeResponseData.quoteExceedsPaymentCapAt = new Date().toISOString()
+          mergeResponseData.monthlyPaymentCap = otherData.monthlyPaymentCap
+          break
         default:
-          // For other events, just log them
           console.log('[Webhook] Received event:', event, 'for account:', accountId)
+          mergeResponseData.lastWebhookEvent = event
+          mergeResponseData.lastWebhookPayload = otherData
       }
     } else {
       // Legacy format
@@ -292,7 +331,6 @@ export async function POST(
     }
 
     // Track contract events with timestamps
-    const existingResponseData = (application.responseData as any) || {}
     const contractStatus: any = { ...existingResponseData.contractStatus }
     
     if (event === 'contractSent') {
@@ -304,9 +342,13 @@ export async function POST(
     } else if (event === 'contractApproved') {
       contractStatus.approvedAt = new Date().toISOString()
       contractStatus.approved = true
-    } else if (event === 'contractVoided') {
+    } else     if (event === 'contractVoided') {
       contractStatus.voidedAt = new Date().toISOString()
       contractStatus.voided = true
+    }
+    if (event === 'contractReinstated') {
+      contractStatus.reinstatedAt = new Date().toISOString()
+      contractStatus.reinstated = true
     }
 
     // Update application status
@@ -316,6 +358,8 @@ export async function POST(
         status: newStatus,
         responseData: {
           ...existingResponseData,
+          ...(body.updates && event === 'accountUpdated' ? body.updates : {}),
+          ...mergeResponseData,
           ...otherData,
           event,
           accountId,

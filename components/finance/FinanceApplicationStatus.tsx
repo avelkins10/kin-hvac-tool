@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
-import { RefreshCw, CheckCircle2, XCircle, Clock, AlertCircle, FileText, Mail, CheckCircle } from 'lucide-react'
+import { RefreshCw, CheckCircle2, XCircle, Clock, AlertCircle, FileText, Mail, CheckCircle, ExternalLink, ListChecks, Flag } from 'lucide-react'
 
 interface FinanceApplicationStatusProps {
   applicationId: string
@@ -91,6 +91,9 @@ export function FinanceApplicationStatus({
   const [application, setApplication] = useState<ApplicationData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [stipulations, setStipulations] = useState<any[] | null>(null)
+  const [stipulationsLoading, setStipulationsLoading] = useState(false)
+  const [signingLinkLoading, setSigningLinkLoading] = useState(false)
 
   const fetchStatus = async (forceRefresh = false) => {
     try {
@@ -124,9 +127,47 @@ export function FinanceApplicationStatus({
     }
   }, [applicationId, autoRefresh, refreshInterval])
 
+  // Fetch stipulations when LightReach and status is conditional/approved
+  useEffect(() => {
+    if (!application?.externalApplicationId || application.externalApplicationId.startsWith('test_')) return
+    if (application.lenderId !== 'lightreach') return
+    const s = application.status?.toUpperCase()
+    if (s !== 'CONDITIONAL' && s !== 'APPROVED') return
+
+    let cancelled = false
+    setStipulationsLoading(true)
+    fetch(`/api/finance/lightreach/stipulations/${applicationId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) setStipulations(data)
+        else if (!cancelled && data && Array.isArray(data.stipulations)) setStipulations(data.stipulations)
+        else if (!cancelled) setStipulations(null)
+      })
+      .catch(() => { if (!cancelled) setStipulations(null) })
+      .finally(() => { if (!cancelled) setStipulationsLoading(false) })
+
+    return () => { cancelled = true }
+  }, [applicationId, application?.externalApplicationId, application?.lenderId, application?.status])
+
   const handleRefresh = () => {
     setIsRefreshing(true)
     fetchStatus(true)
+  }
+
+  const handleSignContract = async () => {
+    if (!applicationId) return
+    setSigningLinkLoading(true)
+    try {
+      const res = await fetch(`/api/finance/lightreach/signing-link/${applicationId}`)
+      const data = await res.json()
+      const url = data?.url ?? data?.signingLink
+      if (url) window.open(url, '_blank', 'noopener,noreferrer')
+      else toast.error('No signing link available')
+    } catch {
+      toast.error('Failed to get signing link')
+    } finally {
+      setSigningLinkLoading(false)
+    }
   }
 
   if (isLoading) {
@@ -361,7 +402,111 @@ export function FinanceApplicationStatus({
                   </span>
                 </div>
               )}
+
+              {/* Contract Reinstated */}
+              {responseData.contractStatus.reinstated && (
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="size-4 text-green-600" />
+                  <span className="text-sm text-green-600">
+                    Contract reinstated
+                    {responseData.contractStatus.reinstatedAt && (
+                      <span className="text-muted-foreground ml-2">
+                        {new Date(responseData.contractStatus.reinstatedAt).toLocaleString()}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
             </div>
+          </div>
+        )}
+
+        {/* Sign contract button - LightReach when approved/conditional and contract ready */}
+        {application.lenderId === 'lightreach' &&
+          application.externalApplicationId &&
+          !application.externalApplicationId.startsWith('test_') &&
+          (status === 'APPROVED' || status === 'CONDITIONAL') && (
+          <div className="rounded-lg border p-4">
+            <Button
+              onClick={handleSignContract}
+              disabled={signingLinkLoading}
+              className="w-full sm:w-auto"
+            >
+              {signingLinkLoading ? (
+                <Spinner className="size-4 mr-2" />
+              ) : (
+                <ExternalLink className="size-4 mr-2" />
+              )}
+              Sign contract
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">
+              Opens the Palmetto contract signing page in a new tab.
+            </p>
+          </div>
+        )}
+
+        {/* Stipulations - LightReach conditional approval requirements */}
+        {application.lenderId === 'lightreach' && (status === 'CONDITIONAL' || status === 'APPROVED') && (
+          <div className="rounded-lg border p-4 space-y-3">
+            <p className="text-sm font-medium flex items-center gap-2">
+              <ListChecks className="size-4" />
+              Stipulations
+            </p>
+            {stipulationsLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Spinner className="size-4" />
+                Loading stipulations...
+              </div>
+            ) : Array.isArray(stipulations) && stipulations.length > 0 ? (
+              <ul className="space-y-2">
+                {stipulations.map((s: any, i: number) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <AlertCircle className="size-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <span>{typeof s === 'object' ? (s.description ?? s.type ?? s.name ?? JSON.stringify(s)) : String(s)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">No stipulations or all cleared.</p>
+            )}
+          </div>
+        )}
+
+        {/* Milestones - from webhooks */}
+        {(responseData.milestones?.length > 0 || responseData.milestonePackages?.length > 0) && (
+          <div className="rounded-lg border p-4 space-y-3">
+            <p className="text-sm font-medium flex items-center gap-2">
+              <Flag className="size-4" />
+              Milestones
+            </p>
+            <div className="space-y-2">
+              {responseData.milestones?.map((m: any, i: number) => (
+                <div key={i} className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="size-4 text-green-600" />
+                  <span>{m.milestone ?? m}</span>
+                  {m.at && (
+                    <span className="text-muted-foreground text-xs">{new Date(m.at).toLocaleString()}</span>
+                  )}
+                </div>
+              ))}
+              {responseData.milestonePackages?.map((p: any, i: number) => (
+                <div key={`pkg-${i}`} className="flex items-center gap-2 text-sm">
+                  <Clock className="size-4 text-muted-foreground" />
+                  <span>{p.type ?? 'Package'}: {p.status ?? '—'}</span>
+                  {p.at && (
+                    <span className="text-muted-foreground text-xs">{new Date(p.at).toLocaleString()}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {responseData.quoteExceedsPaymentCap && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-4">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+              This quote exceeds the monthly payment cap. Review with the customer.
+            </p>
           </div>
         )}
 

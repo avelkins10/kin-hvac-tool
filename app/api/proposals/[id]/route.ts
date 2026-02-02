@@ -82,41 +82,35 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const {
-      customerData,
-      homeData,
-      hvacData,
-      solarData,
-      electricalData,
-      preferencesData,
-      selectedEquipment,
-      addOns,
-      maintenancePlan,
-      incentives,
-      paymentMethod,
-      financingOption,
-      totals,
-      nameplateAnalysis,
-    } = body
+
+    // Only update fields that are present in the body so we don't overwrite
+    // e.g. customerData with null when the client sends a partial payload
+    const jsonFields = [
+      'customerData',
+      'homeData',
+      'hvacData',
+      'solarData',
+      'electricalData',
+      'preferencesData',
+      'selectedEquipment',
+      'addOns',
+      'maintenancePlan',
+      'incentives',
+      'paymentMethod',
+      'financingOption',
+      'totals',
+      'nameplateAnalysis',
+    ] as const
+    const data: Record<string, unknown> = {}
+    for (const key of jsonFields) {
+      if (key in body) {
+        data[key] = body[key] ?? null
+      }
+    }
 
     const proposal = await prisma.proposal.update({
       where: { id: proposalId },
-      data: {
-        customerData: customerData || null,
-        homeData: homeData || null,
-        hvacData: hvacData || null,
-        solarData: solarData || null,
-        electricalData: electricalData || null,
-        preferencesData: preferencesData || null,
-        selectedEquipment: selectedEquipment || null,
-        addOns: addOns || null,
-        maintenancePlan: maintenancePlan || null,
-        incentives: incentives || null,
-        paymentMethod: paymentMethod || null,
-        financingOption: financingOption || null,
-        totals: totals || null,
-        nameplateAnalysis: nameplateAnalysis || null,
-      },
+      data,
       include: {
         user: {
           select: {
@@ -146,6 +140,45 @@ export async function PATCH(
     return NextResponse.json(proposal)
   } catch (error) {
     console.error('Error updating proposal:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  try {
+    const session = await requireAuth()
+
+    // Only COMPANY_ADMIN and SUPER_ADMIN can delete proposals
+    if (session.user.role !== 'COMPANY_ADMIN' && session.user.role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Forbidden. Only admins can delete proposals.' }, { status: 403 })
+    }
+
+    const resolvedParams = await Promise.resolve(params)
+    const proposalId = resolvedParams.id
+
+    const existing = await prisma.proposal.findUnique({
+      where: { id: proposalId },
+    })
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Proposal not found' }, { status: 404 })
+    }
+
+    // COMPANY_ADMIN can only delete proposals in their company
+    if (session.user.role === 'COMPANY_ADMIN' && existing.companyId !== session.user.companyId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    await prisma.proposal.delete({
+      where: { id: proposalId },
+    })
+
+    return new NextResponse(null, { status: 204 })
+  } catch (error) {
+    console.error('Error deleting proposal:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

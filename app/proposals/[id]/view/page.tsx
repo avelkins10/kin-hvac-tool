@@ -1,26 +1,38 @@
 import { notFound } from 'next/navigation'
+import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/db'
+import { getProposalCustomerDisplay } from '@/lib/utils'
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
 import { ProposalFinanceSection } from '@/components/finance/ProposalFinanceSection'
 import { EditableCustomerInfo } from '@/components/proposals/EditableCustomerInfo'
 import { EditableEquipmentSection } from '@/components/proposals/EditableEquipmentSection'
+import { DeleteProposalButton } from '@/components/proposals/DeleteProposalButton'
 
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
 export default async function ProposalViewPage({ params }: PageProps) {
+  const session = await requireAuth()
   const { id } = await params
-  
+
   if (!id) {
     notFound()
   }
-  
+
   const proposal = await prisma.proposal.findUnique({
     where: { id },
   })
 
   if (!proposal) {
+    notFound()
+  }
+
+  // Enforce access: company isolation and sales-rep ownership
+  if (session.user.role !== 'SUPER_ADMIN' && proposal.companyId !== session.user.companyId) {
+    notFound()
+  }
+  if (session.user.role === 'SALES_REP' && proposal.userId !== session.user.id) {
     notFound()
   }
 
@@ -31,23 +43,29 @@ export default async function ProposalViewPage({ params }: PageProps) {
   // Check if proposal can be edited (not finalized)
   const finalizedStatuses = ['ACCEPTED', 'REJECTED', 'EXPIRED']
   const canEdit = !finalizedStatuses.includes(proposal.status)
+  const isAdmin = session.user.role === 'COMPANY_ADMIN' || session.user.role === 'SUPER_ADMIN'
 
   return (
     <AuthenticatedLayout>
       <div className="bg-gray-50 p-8">
         <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
           <h1 className="text-3xl font-bold">HVAC Proposal</h1>
-          {canEdit && (
-            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-              Editable
-            </span>
-          )}
-          {!canEdit && (
-            <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium">
-              Finalized
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {canEdit && (
+              <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                Editable
+              </span>
+            )}
+            {!canEdit && (
+              <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium">
+                Finalized
+              </span>
+            )}
+            {isAdmin && (
+              <DeleteProposalButton proposalId={proposal.id} />
+            )}
+          </div>
         </div>
 
         {canEdit ? (
@@ -63,17 +81,17 @@ export default async function ProposalViewPage({ params }: PageProps) {
           </>
         ) : (
           <>
-            {customerData && (
+            {(customerData != null || proposal.customerData != null) && (
               <div className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">Customer Information</h2>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-500">Name</p>
-                    <p className="font-medium">{customerData.name || '—'}</p>
+                    <p className="font-medium">{getProposalCustomerDisplay(proposal.customerData).name || '—'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Email</p>
-                    <p className="font-medium">{customerData.email || '—'}</p>
+                    <p className="font-medium">{getProposalCustomerDisplay(proposal.customerData).email || '—'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Phone</p>

@@ -8,6 +8,7 @@ import {
   formatFinanceError,
   logFinanceError,
 } from '@/lib/integrations/finance-errors'
+import { buildSystemDesignFromProposal } from '@/lib/finance-helpers'
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,7 +27,6 @@ export async function POST(request: NextRequest) {
         { type: 'proposal', id: proposalId },
       ]
     }
-
     // Validate required fields
     if (!proposalId || typeof proposalId !== 'string' || proposalId.trim() === '') {
       return NextResponse.json(
@@ -65,9 +65,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Proposal not found' }, { status: 404 })
     }
 
+    // Friendly name for Palmetto dashboard (customer name)
+    const customerData = proposal.customerData as { name?: string } | undefined
+    if (!applicationData.friendlyName && customerData?.name) {
+      applicationData.friendlyName = customerData.name
+    }
+    if (!applicationData.friendlyName && applicationData.firstName != null && applicationData.lastName != null) {
+      applicationData.friendlyName = [applicationData.firstName, applicationData.lastName].filter(Boolean).join(' ')
+    }
+
     // Check access permissions
     if (session.user.role !== 'SUPER_ADMIN' && proposal.companyId !== session.user.companyId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    // Per-user sales rep info for LightReach (override env if set)
+    const submittingUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        lightreachSalesRepName: true,
+        lightreachSalesRepEmail: true,
+        lightreachSalesRepPhone: true,
+      },
+    })
+    if (submittingUser?.lightreachSalesRepName?.trim()) {
+      applicationData.salesRepName = submittingUser.lightreachSalesRepName.trim()
+    }
+    if (submittingUser?.lightreachSalesRepEmail?.trim()) {
+      applicationData.salesRepEmail = submittingUser.lightreachSalesRepEmail.trim()
+    }
+    if (submittingUser?.lightreachSalesRepPhone?.trim()) {
+      applicationData.salesRepPhoneNumber = submittingUser.lightreachSalesRepPhone.trim()
+    }
+
+    // Attach system design from proposal so LightReach portal shows home size, equipment, etc.
+    const systemDesign = buildSystemDesignFromProposal(proposal)
+    if (systemDesign) {
+      applicationData.systemDesign = systemDesign
+    } else {
+      // Require system design for Comfort Plan so LightReach portal is populated
+      return NextResponse.json(
+        {
+          error:
+            'Proposal must include home square footage and equipment selection before submitting a Comfort Plan application. Complete Home Details and select equipment in the proposal, then try again.',
+          code: 'SYSTEM_DESIGN_REQUIRED',
+        },
+        { status: 400 }
+      )
     }
 
     // Check for duplicate pending/submitted applications
@@ -98,9 +142,21 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     })
 
-    // Check if we're in test mode (no credentials configured)
-    const isTestMode = !process.env.PALMETTO_FINANCE_ACCOUNT_EMAIL || !process.env.PALMETTO_FINANCE_ACCOUNT_PASSWORD
-    const enableTestMode = process.env.ENABLE_FINANCE_TEST_MODE === 'true' || isTestMode
+    // Use real LightReach API unless test mode is explicitly enabled.
+    const hasCredentials =
+      !!process.env.PALMETTO_FINANCE_ACCOUNT_EMAIL && !!process.env.PALMETTO_FINANCE_ACCOUNT_PASSWORD
+    const enableTestMode = process.env.ENABLE_FINANCE_TEST_MODE === 'true'
+
+    if (!hasCredentials && !enableTestMode) {
+      return NextResponse.json(
+        {
+          error:
+            'LightReach credentials not configured. Set PALMETTO_FINANCE_ACCOUNT_EMAIL and PALMETTO_FINANCE_ACCOUNT_PASSWORD in your environment, or set ENABLE_FINANCE_TEST_MODE=true for mock testing. See LIGHTREACH_FULL_SETUP.md.',
+          code: 'CREDENTIALS_REQUIRED',
+        },
+        { status: 503 }
+      )
+    }
 
     let response: any
 

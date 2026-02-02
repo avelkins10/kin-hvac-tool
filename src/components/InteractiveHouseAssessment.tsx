@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, memo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -36,6 +36,7 @@ import {
   AlertTriangle,
   Edit,
   X,
+  ClipboardList,
 } from "lucide-react"
 import { usePriceBook, DEFAULT_TIER_PRICES, type FinancingOption } from "../contexts/PriceBookContext"
 import { useMaintenance } from "../contexts/MaintenanceContext"
@@ -293,15 +294,37 @@ interface Props {
   onProposalIdChange?: (id: string | null) => void
 }
 
-export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposalIdChange }: Props) {
+// #region agent log
+const LOG_ENDPOINT = 'http://127.0.0.1:7243/ingest/a83938d5-3a77-4ab6-916c-dbc5e276a756'
+function logAssessment(location: string, message: string, data: Record<string, unknown>, hypothesisId: string) {
+  fetch(LOG_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location, message, data, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId }) }).catch(() => {})
+}
+// #endregion
+
+function InteractiveHouseAssessmentInner({ onAdminAccess, onSaveRef, onProposalIdChange }: Props) {
+  // #region agent log
+  const assessmentRenderCountRef = useRef(0)
+  assessmentRenderCountRef.current += 1
+  // #endregion
   // View state
-  const [showPricing, setShowPricing] = useState(false)
+  const [showPricing, setShowPricingState] = useState(false)
+  const setShowPricing = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+    logAssessment('InteractiveHouseAssessment.tsx:setShowPricing', 'setShowPricing called', { renderCount: assessmentRenderCountRef.current }, 'A')
+    setShowPricingState((prev) => {
+      const next = typeof v === 'function' ? v(prev) : v
+      return next === prev ? prev : next
+    })
+  }, [])
   const [pricingStep, setPricingStep] = useState<
     "equipment" | "addons" | "maintenance" | "incentives" | "payment" | "review"
   >("equipment")
 
   // Modal state
-  const [activeModal, setActiveModal] = useState<HotspotType | null>(null)
+  const [activeModal, setActiveModalState] = useState<HotspotType | null>(null)
+  const setActiveModal = useCallback((v: HotspotType | null) => {
+    logAssessment('InteractiveHouseAssessment.tsx:setActiveModal', 'setActiveModal called', { renderCount: assessmentRenderCountRef.current, value: v }, 'A')
+    setActiveModalState((prev) => (prev === v ? prev : v))
+  }, [])
   const [completedSections, setCompletedSections] = useState<Set<HotspotType>>(new Set())
 
   // Data state
@@ -390,6 +413,8 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
   const [addOns, setAddOns] = useState<AddOn[]>(defaultAddOns)
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "financing" | "leasing">("leasing")
   const [selectedFinancingOption, setSelectedFinancingOption] = useState<FinancingOption | null>(null)
+  const hasSetDefaultFinancingRef = useRef(false)
+  const addOnsSyncedFromContextRef = useRef(false)
   const [showProposalActions, setShowProposalActions] = useState(false) // State to control proposal actions visibility
   const [proposalId, setProposalId] = useState<string | null>(null) // Store proposal ID for edits
   const [showFinanceForm, setShowFinanceForm] = useState(false) // State for finance application form
@@ -423,20 +448,6 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
     review: 1
   }
 
-  // Expose save function and proposalId to parent
-  useEffect(() => {
-    if (onSaveRef) {
-      onSaveRef(handleSendToKin)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onSaveRef])
-
-  useEffect(() => {
-    if (onProposalIdChange) {
-      onProposalIdChange(proposalId)
-    }
-  }, [proposalId, onProposalIdChange])
-
   // AI Analysis State
   const [analyzingNameplate, setAnalyzingNameplate] = useState(false)
   const [nameplateSignedUrl, setNameplateSignedUrl] = useState<string | null>(null)
@@ -465,53 +476,60 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
   const { plans, selectedPlan, setSelectedPlan, getPlanSalesPrice, getPlanMonthlyPrice } = useMaintenance()
   const { incentives, selectedIncentives, toggleIncentive, getTotalIncentives } = useIncentives()
 
-  // Load add-ons from database (via context) instead of using hardcoded defaults
+  // Load add-ons from database (via context) once when pricebook is ready - avoid re-running and re-setting state.
+  // Only run after pricebook has finished loading (avoids running with default data then again with Supabase data).
   useEffect(() => {
-    if (!priceBook?.addOns || !Array.isArray(priceBook.addOns) || priceBook.addOns.length === 0) {
-      return
-    }
-    
-    if (!getAddOnSalesPrice) {
-      return
-    }
+    // #region agent log
+    if (priceBookLoading) { logAssessment('InteractiveHouseAssessment.tsx:addOnsEffect', 'addOns effect early return priceBookLoading', { priceBookLoading }, 'D'); return }
+    if (!priceBook?.addOns || !Array.isArray(priceBook.addOns) || priceBook.addOns.length === 0) { logAssessment('InteractiveHouseAssessment.tsx:addOnsEffect', 'addOns effect early return no addOns', {}, 'D'); return }
+    if (!getAddOnSalesPrice) { logAssessment('InteractiveHouseAssessment.tsx:addOnsEffect', 'addOns effect early return no getAddOnSalesPrice', {}, 'D'); return }
+    if (addOnsSyncedFromContextRef.current) { logAssessment('InteractiveHouseAssessment.tsx:addOnsEffect', 'addOns effect early return already synced', {}, 'D'); return }
+    logAssessment('InteractiveHouseAssessment.tsx:addOnsEffect', 'addOns effect calling setAddOns', { addOnsCount: priceBook.addOns.length }, 'D')
+    // #endregion
+    addOnsSyncedFromContextRef.current = true
 
     const transformedAddOns = priceBook.addOns
       .filter(addon => addon.enabled)
       .map(addon => ({
         id: addon.id,
         name: addon.name,
-        price: getAddOnSalesPrice(addon), // Use sales price from context (baseCost + margin)
+        price: getAddOnSalesPrice(addon),
         description: addon.description,
         selected: false,
       }))
-    
-    // Only update if we have database add-ons, preserve selected state
+
     setAddOns(prev => {
       const newAddOns = transformedAddOns.map(newAddon => {
         const existing = prev.find(p => p.id === newAddon.id)
         return existing ? { ...newAddon, selected: existing.selected } : newAddon
       })
-      // Only update if the add-ons actually changed to prevent infinite loops
-      const hasChanged = newAddOns.length !== prev.length || 
+      const hasChanged = newAddOns.length !== prev.length ||
         newAddOns.some((newAddon, i) => {
           const old = prev[i]
           return !old || old.id !== newAddon.id || old.price !== newAddon.price
         })
       return hasChanged ? newAddOns : prev
     })
-  }, [priceBook?.addOns, getAddOnSalesPrice])
+  }, [priceBookLoading, priceBook?.addOns, getAddOnSalesPrice])
 
+  // Set default financing option once when leasing and options are available - avoid re-running on every context re-render.
+  // Only run after pricebook has finished loading so we don't run with default then real data.
   useEffect(() => {
-    if (paymentMethod === "leasing" && !selectedFinancingOption && financingOptions && Array.isArray(financingOptions)) {
-      const leasingOptions = financingOptions.filter((opt) => opt.type === "lease" && opt.available)
-      if (leasingOptions.length > 0) {
-        const defaultLightreach = leasingOptions.find(
-          (opt) => opt.provider === "Lightreach" && opt.termMonths === 144 && opt.name.includes("0.99%"),
-        )
-        setSelectedFinancingOption(defaultLightreach || leasingOptions[0])
-      }
-    }
-  }, [paymentMethod, financingOptions, selectedFinancingOption])
+    // #region agent log
+    if (priceBookLoading) { logAssessment('InteractiveHouseAssessment.tsx:financingEffect', 'financing effect early return priceBookLoading', {}, 'D'); return }
+    if (hasSetDefaultFinancingRef.current) { logAssessment('InteractiveHouseAssessment.tsx:financingEffect', 'financing effect early return already set', {}, 'D'); return }
+    if (paymentMethod !== "leasing" || selectedFinancingOption) { logAssessment('InteractiveHouseAssessment.tsx:financingEffect', 'financing effect early return payment/option', { paymentMethod, hasOption: !!selectedFinancingOption }, 'D'); return }
+    if (!financingOptions?.length) { logAssessment('InteractiveHouseAssessment.tsx:financingEffect', 'financing effect early return no options', {}, 'D'); return }
+    const leasingOptions = financingOptions.filter((opt) => opt.type === "lease" && opt.available)
+    if (leasingOptions.length === 0) { logAssessment('InteractiveHouseAssessment.tsx:financingEffect', 'financing effect early return no leasing', {}, 'D'); return }
+    logAssessment('InteractiveHouseAssessment.tsx:financingEffect', 'financing effect calling setSelectedFinancingOption', {}, 'D')
+    // #endregion
+    hasSetDefaultFinancingRef.current = true
+    const defaultLightreach = leasingOptions.find(
+      (opt) => opt.provider?.toLowerCase() === "lightreach" && opt.termMonths === 144 && opt.name?.includes("0.99%"),
+    )
+    setSelectedFinancingOption(defaultLightreach || leasingOptions[0])
+  }, [priceBookLoading, paymentMethod, financingOptions, selectedFinancingOption])
 
   // Fetch signed URL when we have a storage path (private bucket); use when serving nameplate image
   useEffect(() => {
@@ -535,8 +553,28 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
     }
   }, [hvacData.nameplatePhotoPath])
 
+  // System design is required for saving proposals and for Comfort Plan (LightReach) applications
+  const hasSystemDesignData = (): boolean => {
+    const sqft = homeData?.squareFootage ?? 0
+    return sqft > 0 && !!selectedEquipment
+  }
+
+  const systemDesignErrorMessage = (): string | null => {
+    const sqft = homeData?.squareFootage ?? 0
+    if (sqft <= 0) return 'Please enter home square footage in Home Details.'
+    if (!selectedEquipment) return 'Please select equipment before saving or submitting a Comfort Plan application.'
+    return null
+  }
+
   // Mark section complete
   const markComplete = (section: HotspotType) => {
+    if (section === 'home') {
+      const sqft = homeData?.squareFootage ?? 0
+      if (sqft <= 0) {
+        toast.error('Please set square footage (min 500 sq ft) before saving Home Details.')
+        return
+      }
+    }
     setCompletedSections((prev) => new Set([...prev, section]))
     setActiveModal(null)
   }
@@ -866,31 +904,32 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
     setShowProposalActions(false) // Hide proposal actions when starting over
   }
 
-  // Validation functions
-  const validateStep = (step: string): boolean => {
+  // Pure validation: returns errors without setting state (safe to call during render).
+  const getValidationErrors = (step: string): Record<string, string> => {
     const errors: Record<string, string> = {}
-    
     if (step === "equipment" && !selectedEquipment) {
       errors.equipment = "Please select an equipment option"
     }
-    
     if (step === "payment" && paymentMethod !== "cash" && !selectedFinancingOption) {
       errors.payment = "Please select a financing option"
     }
+    return errors
+  }
 
+  const validateStep = (step: string): boolean => {
+    const errors = getValidationErrors(step)
     setValidationErrors(errors)
     return Object.keys(errors).length === 0
   }
 
+  // Must not call setState (validateStep does). Use pure getValidationErrors for render.
   const canProceedToNextStep = (): boolean => {
-    return validateStep(pricingStep)
+    return Object.keys(getValidationErrors(pricingStep)).length === 0
   }
 
   // Step navigation functions
   const goToNextStep = () => {
-    if (!canProceedToNextStep()) {
-      return
-    }
+    if (!validateStep(pricingStep)) return
     const currentIndex = pricingSteps.indexOf(pricingStep)
     if (currentIndex < pricingSteps.length - 1) {
       setPricingStep(pricingSteps[currentIndex + 1])
@@ -1018,6 +1057,11 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
 
   // Handle send to Kin - Save proposal via API
   const handleSendToKin = async () => {
+    const msg = systemDesignErrorMessage()
+    if (msg) {
+      toast.error(msg)
+      return null
+    }
     const proposalData = {
       customerData,
       homeData,
@@ -1047,7 +1091,7 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
     try {
       setIsAutoSaving(true)
       setSaveError(null)
-      let savedProposal
+      let savedProposal: { id: string } | undefined
       if (proposalId) {
         // Update existing proposal
         const response = await fetch(`/api/proposals/${proposalId}`, {
@@ -1082,13 +1126,29 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
           throw new Error('Failed to create proposal')
         }
       }
+      return savedProposal?.id ?? proposalId ?? null
     } catch (error) {
       setSaveError("Failed to save proposal")
       toast.error("Failed to save proposal")
+      return null
     } finally {
       setIsAutoSaving(false)
     }
   }
+
+  // Keep latest save handler in a ref so we never need it as effect dep (avoids re-render loop)
+  const handleSendToKinRef = useRef(handleSendToKin)
+  handleSendToKinRef.current = handleSendToKin
+
+  // Expose save function to parent; pass stable wrapper so effect runs only when onSaveRef changes
+  useEffect(() => {
+    // #region agent log
+    logAssessment('InteractiveHouseAssessment.tsx:onSaveRefEffect', 'onSaveRef effect ran', { hasOnSaveRef: !!onSaveRef }, 'B')
+    // #endregion
+    if (onSaveRef) {
+      onSaveRef(() => handleSendToKinRef.current())
+    }
+  }, [onSaveRef])
 
   // Handle admin access
   const handleAdminClick = () => {
@@ -2274,10 +2334,18 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
           {tiers
             .filter((t) => shouldShowTier(t.tier))
             .map((tier) => (
-              <button
+              <div
                 key={tier.tier}
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelectedEquipment(tier)}
-                className={`p-4 md:p-6 rounded-xl border-2 text-left transition-all relative ${
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setSelectedEquipment(tier)
+                  }
+                }}
+                className={`p-4 md:p-6 rounded-xl border-2 text-left transition-all relative cursor-pointer ${
                   selectedEquipment?.tier === tier.tier
                     ? "border-primary bg-primary/5"
                     : tier.recommended
@@ -2319,7 +2387,9 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
                 {/* </CHANGE> */}
                 <div className="flex items-center gap-2 mb-3">
                   <p className="text-sm text-muted-foreground">{tier.seer} SEER Rating</p>
-                  <HelpTooltip content={`SEER (Seasonal Energy Efficiency Ratio) measures cooling efficiency. ${tier.seer} SEER means this system is ${tier.seer >= 18 ? 'highly' : tier.seer >= 16 ? 'moderately' : 'basically'} efficient. Higher SEER = lower energy bills.`} />
+                  <span onClick={(e) => e.stopPropagation()} role="presentation">
+                    <HelpTooltip content={`SEER (Seasonal Energy Efficiency Ratio) measures cooling efficiency. ${tier.seer} SEER means this system is ${tier.seer >= 18 ? 'highly' : tier.seer >= 16 ? 'moderately' : 'basically'} efficient. Higher SEER = lower energy bills.`} />
+                  </span>
                 </div>
 
                 <ul className="space-y-1">
@@ -2338,7 +2408,7 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
                     </p>
                   </div>
                 )}
-              </button>
+              </div>
             ))}
         </div>
 
@@ -2620,7 +2690,7 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
             </p>
             
             {/* Finance Application Section - Show if Comfort Plan selected and proposal saved */}
-            {proposalId && selectedFinancingOption?.provider === "Lightreach" && (
+            {proposalId && selectedFinancingOption?.provider?.toLowerCase() === "lightreach" && (
               <div className="mt-6 p-4 border-2 border-primary/20 rounded-lg bg-primary/5">
                 <h3 className="text-lg font-semibold mb-3">Comfort Plan Finance Application</h3>
                 {selectedFinanceApplicationId ? (
@@ -2637,7 +2707,16 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
                 ) : (
                   <FinanceApplicationList
                     proposalId={proposalId}
-                    onNewApplication={() => setShowFinanceForm(true)}
+                    onNewApplication={async () => {
+                      const msg = systemDesignErrorMessage()
+                      if (msg) {
+                        toast.error(msg)
+                        return
+                      }
+                      const id = proposalId ?? (await handleSendToKin()) ?? null
+                      if (id) setShowFinanceForm(true)
+                      else if (!proposalId) toast.error("Save the proposal first, then try again.")
+                    }}
                   />
                 )}
               </div>
@@ -3230,8 +3309,29 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
 
         {/* Footer Actions - Only show on review step */}
         {pricingStep === "review" && showProposalActions && (
-          <div className="p-3 md:p-4 bg-card/15 sticky bottom-0 backdrop-blur-sm border-t">
+          <div className="p-3 md:p-4 bg-card/15 sticky bottom-0 backdrop-blur-sm border-t z-10 relative">
             <div className="flex flex-col sm:flex-row gap-3 max-w-5xl mx-auto">
+              {paymentMethod === "leasing" && selectedFinancingOption?.provider?.toLowerCase() === "lightreach" && (
+                <Button
+                  variant="default"
+                  className="bg-primary"
+                  disabled={isAutoSaving || !hasSystemDesignData()}
+                  title={!hasSystemDesignData() ? systemDesignErrorMessage() ?? undefined : undefined}
+                  onClick={async () => {
+                    const msg = systemDesignErrorMessage()
+                    if (msg) {
+                      toast.error(msg)
+                      return
+                    }
+                    const id = proposalId ?? (await handleSendToKin()) ?? null
+                    if (id) setShowFinanceForm(true)
+                    else if (!proposalId) toast.error("Save the proposal first, then try again.")
+                  }}
+                >
+                  <ClipboardList className="w-4 h-4 mr-2" />
+                  {proposalId ? "Apply for Comfort Plan" : "Save & Apply for Comfort Plan"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={async () => {
@@ -3373,6 +3473,15 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
     setActiveModal(hotspotId as HotspotType)
   }
 
+  // #region agent log
+  logAssessment('InteractiveHouseAssessment.tsx:render', 'Assessment render', {
+    renderCount: assessmentRenderCountRef.current,
+    showPricing,
+    activeModal,
+    pricingStep,
+  }, 'A')
+  // #endregion
+
   // House view with hotspots
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -3434,6 +3543,10 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
           totalSections={hotspots.length}
           onContinue={() => {
             if (allHotspotsCompleted) {
+              if (!homeData?.squareFootage || homeData.squareFootage <= 0) {
+                toast.error('Please enter home square footage in Home Details before going to pricing.')
+                return
+              }
               setShowPricing(true)
               setShowProposalActions(true)
             }
@@ -3450,6 +3563,10 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
           disabled={!allHotspotsCompleted}
           onClick={() => {
             if (allHotspotsCompleted) {
+              if (!homeData?.squareFootage || homeData.squareFootage <= 0) {
+                toast.error('Please enter home square footage in Home Details before going to pricing.')
+                return
+              }
               setShowPricing(true)
               setShowProposalActions(true)
             }
@@ -3461,17 +3578,24 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
         </Button>
       </div>
 
-      {/* Hotspot modals - Mobile optimized */}
-      <Dialog open={activeModal !== null} onOpenChange={() => setActiveModal(null)}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
-          <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">{activeModal && getModalTitle(activeModal)}</DialogTitle>
-          </DialogHeader>
-          <div className="max-h-[calc(90vh-100px)] overflow-y-auto">
-            {renderModalContent()}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Hotspot modals - Mobile optimized. Only mount when open to avoid Radix calling onOpenChange during render (re-render loop). */}
+      {activeModal !== null && (
+        <Dialog
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setActiveModal(null)
+          }}
+        >
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
+            <DialogHeader>
+              <DialogTitle className="text-lg sm:text-xl">{getModalTitle(activeModal)}</DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[calc(90vh-100px)] overflow-y-auto">
+              {renderModalContent()}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Mobile-friendly section list (shown on small screens) */}
       <div className="md:hidden p-4 bg-card/95 backdrop-blur-sm border-t">
@@ -3507,9 +3631,9 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
         </div>
       </div>
 
-      {/* Finance Application Form Dialog */}
-      {proposalId && selectedFinancingOption?.provider === "Lightreach" && (
-        <Dialog open={showFinanceForm} onOpenChange={setShowFinanceForm}>
+      {/* Finance Application Form Dialog. Only mount when open to avoid Radix onOpenChange-during-render loop. */}
+      {proposalId && selectedFinancingOption?.provider?.toLowerCase() === "lightreach" && showFinanceForm && (
+        <Dialog open={true} onOpenChange={(open) => { if (!open) setShowFinanceForm(false) }}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Submit Comfort Plan Finance Application</DialogTitle>
@@ -3545,3 +3669,5 @@ export function InteractiveHouseAssessment({ onAdminAccess, onSaveRef, onProposa
     </div>
   )
 }
+
+export const InteractiveHouseAssessment = memo(InteractiveHouseAssessmentInner)

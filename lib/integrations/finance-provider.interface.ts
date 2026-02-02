@@ -16,6 +16,8 @@ export interface FinanceApplicationData {
   salesRepPhoneNumber?: string
   externalReference?: string // Link to proposal ID
   externalReferenceIds?: Array<{ type: string; id: string }>
+  friendlyName?: string // Human-readable name for Palmetto dashboard (e.g. customer name)
+  systemDesign?: Record<string, unknown> // HVAC system design for LightReach portal (home size, equipment, etc.)
   [key: string]: any // Allow additional lender-specific fields
 }
 
@@ -30,8 +32,12 @@ export interface FinanceApplicationResponse {
   [key: string]: any // Allow additional lender-specific fields
 }
 
+export interface GetPaymentScheduleOptions {
+  systemDesign?: Record<string, unknown>
+}
+
 export interface IFinanceProvider {
   createApplication(data: FinanceApplicationData): Promise<FinanceApplicationResponse>
   getApplicationStatus(applicationId: string): Promise<FinanceApplicationResponse>
-  getPaymentSchedule(applicationId: string): Promise<any>
+  getPaymentSchedule(applicationId: string, options?: GetPaymentScheduleOptions): Promise<any>
 }

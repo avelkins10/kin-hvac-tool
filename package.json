@@ -5,7 +5,10 @@
   "scripts": {
     "postinstall": "prisma generate",
     "build": "prisma generate && (npx prisma migrate deploy || echo 'Migrations skipped - may already be applied') && next build",
-    "dev": "prisma generate && next dev",
+    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 prisma generate && next dev --webpack -p 3000",
+    "dev:webpack": "NODE_TLS_REJECT_UNAUTHORIZED=0 prisma generate && next dev --webpack -p 3000",
+    "dev:clean": "(lsof -ti:3000; lsof -ti:3002) 2>/dev/null | xargs kill -9 2>/dev/null; rm -rf .next && pnpm run dev",
+    "dev:serve": "pnpm run build && next start -p 3000",
     "lint": "eslint .",
     "start": "next start",
     "db:generate": "prisma generate",

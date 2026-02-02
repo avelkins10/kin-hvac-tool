@@ -55,8 +55,10 @@ export function AppLayout({ children }: AppLayoutProps) {
     return pathname?.startsWith(href)
   }
 
-  const userInitials = session?.user?.email
-    ? session.user.email.substring(0, 2).toUpperCase()
+  // API returns flat user { id, email, role, ... }; support that or legacy session.user
+  const userObj = session?.user ?? session
+  const userInitials = userObj?.email
+    ? userObj.email.substring(0, 2).toUpperCase()
     : 'U'
 
   return (
@@ -102,7 +104,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             {/* Right side: User menu and mobile menu button */}
             <div className="flex items-center space-x-4">
               {/* User Menu */}
-              {session?.user && (
+              {userObj && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="relative h-10 w-10 rounded-full">
@@ -115,20 +117,26 @@ export function AppLayout({ children }: AppLayoutProps) {
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col space-y-1">
                         <p className="text-sm font-medium leading-none">
-                          {session.user.name || session.user.email}
+                          {(userObj as { name?: string }).name || userObj.email}
                         </p>
                         <p className="text-xs leading-none text-muted-foreground">
-                          {session.user.email}
+                          {userObj.email}
                         </p>
-                        {session.user.role && (
+                        {userObj.role && (
                           <p className="text-xs leading-none text-muted-foreground mt-1">
-                            Role: {session.user.role.replace('_', ' ')}
+                            Role: {userObj.role.replace('_', ' ')}
                           </p>
                         )}
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    {(session.user.role === 'COMPANY_ADMIN' || session.user.role === 'SUPER_ADMIN') && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile" className="cursor-pointer">
+                        <UserCog className="mr-2 h-4 w-4" />
+                        <span>Profile</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    {(userObj.role === 'COMPANY_ADMIN' || userObj.role === 'SUPER_ADMIN') && (
                       <>
                         <DropdownMenuItem asChild>
                           <Link href="/admin/settings" className="cursor-pointer">

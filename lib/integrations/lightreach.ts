@@ -176,10 +176,17 @@ export class LightReachClient implements IFinanceProvider {
       throw new FinanceValidationError('Invalid email format', 'email')
     }
 
-    // Validate phone format (basic validation)
+    // Validate phone format and length (at least 10 digits)
     const phoneRegex = /^[\d\s\-\(\)\+]+$/
     if (!phoneRegex.test(data.phone)) {
       throw new FinanceValidationError('Invalid phone format', 'phone')
+    }
+    const digitsOnly = data.phone.replace(/\D/g, '')
+    if (digitsOnly.length < 10) {
+      throw new FinanceValidationError(
+        'Phone number must be at least 10 digits',
+        'phone'
+      )
     }
 
     // Validate system price
@@ -289,6 +296,10 @@ export class LightReachClient implements IFinanceProvider {
       // External reference to link back to our proposal
       ...(data.externalReference && { externalReference: data.externalReference }),
       ...(data.externalReferenceIds && { externalReferenceIds: data.externalReferenceIds }),
+      // Human-readable name for Palmetto dashboard (e.g. customer name)
+      ...(data.friendlyName && data.friendlyName.trim() && { friendlyName: data.friendlyName.trim() }),
+      // System design (home size, equipment, systems) so LightReach portal shows account details
+      ...(data.systemDesign && typeof data.systemDesign === 'object' && Object.keys(data.systemDesign).length > 0 && { systemDesign: data.systemDesign }),
     }
 
     // Use v2 endpoint as recommended by API docs
@@ -552,9 +563,14 @@ export class LightReachClient implements IFinanceProvider {
 
   /**
    * Get pricing information for an account (includes monthly payment schedule)
-   * This uses the HVAC pricing endpoint which returns monthly payments by year
+   * This uses the HVAC pricing endpoint which returns monthly payments by year.
+   * Optional systemDesign (equipment type, SEER, tonnage, etc.) can improve pricing accuracy.
    */
-  async getPricing(accountId: string, totalFinancedAmount: number): Promise<any> {
+  async getPricing(
+    accountId: string,
+    totalFinancedAmount: number,
+    systemDesign?: Record<string, unknown>
+  ): Promise<any> {
     if (!accountId || accountId.trim() === '') {
       throw new FinanceValidationError('Account ID is required', 'accountId')
     }
@@ -564,10 +580,18 @@ export class LightReachClient implements IFinanceProvider {
 
     const url = `${this.baseUrl}/api/v2/accounts/${accountId}/pricing/hvac`
 
+    const body: { totalFinancedAmount: number; systemDesign?: Record<string, unknown> } = {
+      totalFinancedAmount,
+    }
+    if (systemDesign && Object.keys(systemDesign).length > 0) {
+      body.systemDesign = systemDesign
+    }
+
     console.log('[LightReach] Getting pricing:', {
       url,
       accountId,
       totalFinancedAmount,
+      hasSystemDesign: !!body.systemDesign,
       timestamp: new Date().toISOString(),
     })
 
@@ -578,9 +602,7 @@ export class LightReachClient implements IFinanceProvider {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          totalFinancedAmount,
-        }),
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) {
@@ -656,7 +678,67 @@ export class LightReachClient implements IFinanceProvider {
     }
   }
 
-  async getPaymentSchedule(applicationId: string): Promise<any> {
+  /**
+   * Get stipulations for an account (conditional approval requirements).
+   * GET /api/accounts/{accountId}/stipulations
+   */
+  async getStipulations(accountId: string): Promise<any> {
+    if (!accountId || accountId.trim() === '') {
+      throw new FinanceValidationError('Account ID is required', 'accountId')
+    }
+    const token = await this.getAccessToken()
+    const url = `${this.baseUrl}/api/accounts/${accountId}/stipulations`
+    const response = await this.makeRequest(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new FinanceAPIError(
+        (errorData as any)?.message || `Failed to get stipulations: ${response.status}`,
+        'lightreach',
+        response.status,
+        errorData
+      )
+    }
+    return response.json()
+  }
+
+  /**
+   * Get contract signing link for the current contract.
+   * POST /api/accounts/{accountId}/contracts/current/signing-link
+   */
+  async getSigningLink(accountId: string): Promise<{ url?: string; signingLink?: string }> {
+    if (!accountId || accountId.trim() === '') {
+      throw new FinanceValidationError('Account ID is required', 'accountId')
+    }
+    const token = await this.getAccessToken()
+    const url = `${this.baseUrl}/api/accounts/${accountId}/contracts/current/signing-link`
+    const response = await this.makeRequest(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({}),
+    })
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new FinanceAPIError(
+        (errorData as any)?.message || `Failed to get signing link: ${response.status}`,
+        'lightreach',
+        response.status,
+        errorData
+      )
+    }
+    const data = await response.json()
+    return { url: data.url ?? data.signingLink, signingLink: data.signingLink ?? data.url }
+  }
+
+  async getPaymentSchedule(
+    applicationId: string,
+    options?: { systemDesign?: Record<string, unknown> }
+  ): Promise<any> {
     if (!applicationId || applicationId.trim() === '') {
       throw new FinanceValidationError('Application ID is required', 'applicationId')
     }
@@ -676,9 +758,12 @@ export class LightReachClient implements IFinanceProvider {
       )
     }
 
-    // Use pricing endpoint to get payment schedule
-    // The pricing endpoint returns monthlyPayments array with year-by-year breakdown
-    const pricing = await this.getPricing(applicationId, totalCost)
+    // Use pricing endpoint to get payment schedule; optional systemDesign for more accurate pricing
+    const pricing = await this.getPricing(
+      applicationId,
+      totalCost,
+      options?.systemDesign
+    )
 
     // Extract payment schedule from pricing response
     // Pricing returns array of products, each with monthlyPayments array

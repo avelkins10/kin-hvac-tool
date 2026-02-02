@@ -6,50 +6,49 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-// On Vercel, use libpq-compat sslmode=require (SSL, no cert verification) so
-// Supabase pooler works despite "self-signed certificate in certificate chain".
-// See: pg-connection-string treats require as verify-full unless uselibpqcompat=true
+// Don't add sslmode to the URL — it can override the Pool's ssl config and cause
+// "self-signed certificate in certificate chain". SSL is controlled only by the
+// Pool's ssl: { rejectUnauthorized: false } below.
 function normalizeDatabaseUrl(url: string | undefined): string | undefined {
   if (!url) return undefined
-
   const isVercel = process.env.VERCEL === '1'
-  const separator = url.includes('?') ? '&' : '?'
-
-  if (isVercel) {
-    // Strip existing sslmode/params so we can add libpq-compat params
-    let u = url.replace(/[?&]sslmode=[^&]+/g, '').replace(/[?&]uselibpqcompat=[^&]+/g, '')
-    u = u.replace(/\?&+/, '?').replace(/\?$/, '')
-    const sep = u.includes('?') ? '&' : '?'
-    return `${u}${sep}uselibpqcompat=true&sslmode=require`
+  let u = url.replace(/[?&]sslmode=[^&]+/g, '').replace(/[?&]uselibpqcompat=[^&]+/g, '')
+  u = u.replace(/\?&+/, '?').replace(/\?$/, '')
+  if (!u) return url
+  const sep = u.includes('?') ? '&' : '?'
+  if (isVercel && !url.includes('uselibpqcompat')) {
+    return `${u}${sep}uselibpqcompat=true`
   }
-
-  if (url.includes('sslmode=')) {
-    return url.replace(/sslmode=[^&]+/, 'sslmode=verify-full')
-  }
-  return `${url}${separator}sslmode=verify-full`
+  return u
 }
 
 // Create a connection pool for Prisma 7
-// On Vercel, TLS often fails with "self-signed certificate in certificate chain"
-// unless we allow the Supabase pooler cert (rejectUnauthorized: false).
-const pool = process.env.DATABASE_URL
+// Supabase and pooled Postgres use a cert Node rejects as "self-signed
+// certificate in certificate chain". Always allow it when we have a DB URL.
+const hasDbUrl = Boolean(process.env.DATABASE_URL)
+const pool = hasDbUrl
   ? new Pool({
       connectionString: normalizeDatabaseUrl(process.env.DATABASE_URL),
-      ssl:
-        process.env.VERCEL === '1'
-          ? { rejectUnauthorized: false }
-          : undefined,
+      ssl: { rejectUnauthorized: false },
     })
   : null
 
 // Create adapter for Prisma 7
 const adapter = pool ? new PrismaPg(pool) : undefined
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    adapter: adapter || undefined,
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  })
+// When we have an adapter (our Pool with ssl), always create a fresh client so we
+// never reuse a cached client that was created without it (causes TLS error in RSC).
+const prisma = adapter
+  ? new PrismaClient({
+      adapter,
+      log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    })
+  : (globalForPrisma.prisma ??
+      new PrismaClient({
+        adapter: undefined,
+        log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+      }))
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+export { prisma }
+
+if (process.env.NODE_ENV !== 'production' && adapter) globalForPrisma.prisma = prisma

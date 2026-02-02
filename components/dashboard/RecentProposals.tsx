@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ArrowRight, AlertCircle, FileText } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, getProposalCustomerDisplay } from '@/lib/utils'
 
 interface CustomerData {
   name?: string
@@ -33,10 +33,11 @@ interface RecentProposalsProps {
 }
 
 function ProposalListItem({ proposal }: { proposal: Proposal }) {
-  const customer = proposal.customerData
+  const customer = getProposalCustomerDisplay(proposal.customerData)
   const totals = proposal.totals
-  
-  const initials = customer?.name
+  const hasCustomerInfo = customer.name !== 'Unnamed Customer' || !!customer.email
+
+  const initials = hasCustomerInfo
     ? customer.name
         .split(' ')
         .map(n => n[0])
@@ -70,7 +71,7 @@ function ProposalListItem({ proposal }: { proposal: Proposal }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="font-medium text-gray-900 truncate">
-            {customer?.name || 'Unnamed Customer'}
+            {customer.name}
           </span>
           <span className={cn(
             "px-2 py-0.5 text-xs font-medium rounded-full",
@@ -80,13 +81,15 @@ function ProposalListItem({ proposal }: { proposal: Proposal }) {
           </span>
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-500">
-          {customer?.email ? (
+          {customer.email ? (
             <span className="truncate">{customer.email}</span>
-          ) : (
+          ) : hasCustomerInfo ? (
             <span className="flex items-center gap-1 text-amber-600">
               <AlertCircle className="w-3 h-3" />
               No email
             </span>
+          ) : (
+            <span className="text-blue-600 font-medium">Add customer info →</span>
           )}
           <span>•</span>
           <span>{format(new Date(proposal.createdAt), 'MMM d, yyyy')}</span>

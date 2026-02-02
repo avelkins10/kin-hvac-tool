@@ -57,23 +57,15 @@ export async function POST(request: Request) {
     return redirectToSignin(request.url, 'Login failed. Please try again.')
   }
 
-  console.log('[LOGIN] Success for user:', data.user.email)
-
-  // 200 + Set-Cookie + HTML that redirects so browser stores cookies before navigating.
-  // (Some runtimes/browsers drop Set-Cookie on 302; 200 avoids that.)
-  const origin = new URL(request.url).origin
-  const isSecure = origin.startsWith('https')
-  const html = `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=${origin}/dashboard"/><script>window.location.replace("${origin}/dashboard");</script></head><body>Redirecting...</body></html>`
-  const res = new NextResponse(html, {
-    status: 200,
-    headers: { 'Content-Type': 'text/html; charset=utf-8' },
-  })
+  const dashboardUrl = new URL('/dashboard', request.url)
+  const res = NextResponse.redirect(dashboardUrl, 302)
+  const isSecure = dashboardUrl.origin.startsWith('https')
   capturedCookies.forEach(({ name, value, options }) => {
     res.cookies.set(name, value, {
+      ...options,
       path: '/',
       sameSite: 'lax',
       secure: isSecure,
-      ...options,
     })
   })
   return res
