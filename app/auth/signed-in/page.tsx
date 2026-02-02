@@ -22,7 +22,9 @@ function SignedInRedirect() {
       next.startsWith('/') && !next.startsWith('//') && !next.includes('://')
         ? next
         : '/dashboard'
-    window.location.replace(safe)
+    // Short delay so the browser commits Set-Cookie before we navigate to dashboard
+    const t = setTimeout(() => window.location.replace(safe), 200)
+    return () => clearTimeout(t)
   }, [next, debug])
 
   useEffect(() => {

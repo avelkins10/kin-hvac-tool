@@ -11,6 +11,7 @@ export async function proxy(request: NextRequest) {
     (path.startsWith('/proposals/') && path.endsWith('/view')) ||
     path === '/unauthorized' ||
     path === '/auth/signin' ||
+    path === '/auth/signed-in' ||
     path === '/auth/callback' ||
     path === '/auth/forgot-password' ||
     path === '/auth/set-password' ||

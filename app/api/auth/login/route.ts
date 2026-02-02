@@ -57,9 +57,11 @@ export async function POST(request: Request) {
     return redirectToSignin(request.url, 'Login failed. Please try again.')
   }
 
-  const dashboardUrl = new URL('/dashboard', request.url)
-  const res = NextResponse.redirect(dashboardUrl, 302)
-  const isSecure = dashboardUrl.origin.startsWith('https')
+  // Redirect to intermediate page so browser commits Set-Cookie before /dashboard
+  const signedInUrl = new URL('/auth/signed-in', request.url)
+  signedInUrl.searchParams.set('next', '/dashboard')
+  const res = NextResponse.redirect(signedInUrl, 302)
+  const isSecure = signedInUrl.origin.startsWith('https')
   capturedCookies.forEach(({ name, value, options }) => {
     res.cookies.set(name, value, {
       ...options,

@@ -26,7 +26,7 @@ export async function requireAuth(): Promise<Session> {
   }
 
   try {
-    // Get User record from database to get role and companyId
+    // Get User record f rom database to get role and companyId
     let user = await prisma.user.findUnique({
       where: { supabaseUserId: supabaseUser.id },
       select: {
