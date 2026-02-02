@@ -33,7 +33,18 @@ export function LoginForm() {
         method: 'POST',
         body: formData,
         credentials: 'include',
+        redirect: 'manual',
       })
+      // 302 / manual redirect: browser has stored Set-Cookie; navigate so cookies are sent
+      if (res.type === 'opaqueredirect' || res.status === 302) {
+        const location = res.headers.get('Location')
+        const target =
+          location && location.startsWith('/')
+            ? new URL(location, window.location.origin).href
+            : location || new URL('/dashboard', window.location.origin).href
+        window.location.href = target
+        return
+      }
       if (res.redirected) {
         window.location.href = res.url
         return
