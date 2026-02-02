@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
 
 /**
- * Native form POST to /api/auth/login so the browser receives 302 + Set-Cookie
- * and follows the redirect in the same navigation; cookies are then sent to /dashboard.
+ * POST via fetch; API returns 200 + Set-Cookie + { redirect }. We then navigate
+ * so the next full-page load (GET /dashboard) sends the stored cookies.
  */
 export function LoginForm() {
   const searchParams = useSearchParams()
@@ -21,15 +21,34 @@ export function LoginForm() {
     setError(errorFromUrl)
   }, [errorFromUrl])
 
-  function handleSubmit() {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
     setError(null)
     setIsLoading(true)
+    const form = e.currentTarget
+    const formData = new FormData(form)
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        setError(text || 'Login failed')
+        setIsLoading(false)
+        return
+      }
+      const data = (await res.json()) as { redirect?: string }
+      window.location.href = data.redirect ?? '/dashboard'
+    } catch {
+      setError('Network error. Try again.')
+      setIsLoading(false)
+    }
   }
 
   return (
     <form
-      action="/api/auth/login"
-      method="POST"
       onSubmit={handleSubmit}
       className="space-y-6 w-full"
     >
