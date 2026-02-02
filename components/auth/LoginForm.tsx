@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
 
 /**
- * POST via fetch; API returns 200 + Set-Cookie + { redirect }. We then navigate
- * so the next full-page load (GET /dashboard) sends the stored cookies.
+ * Native form POST to /api/auth/login so browser gets 302 + Set-Cookie
+ * and follows to /dashboard in the same navigation (no fetch).
  */
 export function LoginForm() {
   const searchParams = useSearchParams()
@@ -21,36 +21,15 @@ export function LoginForm() {
     setError(errorFromUrl)
   }, [errorFromUrl])
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
+  function handleSubmit() {
     setError(null)
     setIsLoading(true)
-    const form = e.currentTarget
-    const formData = new FormData(form)
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        setError(text || 'Login failed')
-        setIsLoading(false)
-        return
-      }
-      const data = (await res.json()) as { redirect?: string }
-      // Brief delay so the browser commits Set-Cookie before we navigate
-      await new Promise((r) => setTimeout(r, 150))
-      window.location.href = data.redirect ?? '/dashboard'
-    } catch {
-      setError('Network error. Try again.')
-      setIsLoading(false)
-    }
   }
 
   return (
     <form
+      action="/api/auth/login"
+      method="POST"
       onSubmit={handleSubmit}
       className="space-y-6 w-full"
     >
@@ -65,7 +44,7 @@ export function LoginForm() {
           autoComplete="email"
           required
           placeholder="you@example.com"
-          className="h-11 transition-all focus:ring-2 focus:ring-blue-500"
+          className="h-11 focus:ring-2 focus:ring-blue-500"
         />
       </div>
       <div className="space-y-2">
@@ -79,7 +58,7 @@ export function LoginForm() {
           autoComplete="current-password"
           required
           placeholder="Enter your password"
-          className="h-11 transition-all focus:ring-2 focus:ring-blue-500"
+          className="h-11 focus:ring-2 focus:ring-blue-500"
         />
       </div>
       <Button

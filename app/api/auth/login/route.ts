@@ -59,10 +59,10 @@ export async function POST(request: Request) {
 
   console.log('[LOGIN] Success for user:', data.user.email)
 
-  // Return 200 + Set-Cookie so browser stores cookies; client then navigates to /dashboard.
-  // (302 redirect can lose Set-Cookie on some runtimes.)
-  const isSecure = new URL(request.url).protocol === 'https:'
-  const res = NextResponse.json({ redirect: '/dashboard' }, { status: 200 })
+  // 302 + Set-Cookie so browser follows in same navigation (native form POST).
+  const origin = new URL(request.url).origin
+  const res = NextResponse.redirect(new URL('/dashboard', origin), 302)
+  const isSecure = origin.startsWith('https')
   capturedCookies.forEach(({ name, value, options }) => {
     res.cookies.set(name, value, {
       path: '/',
