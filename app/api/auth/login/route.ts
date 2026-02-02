@@ -57,7 +57,6 @@ export async function POST(request: Request) {
   console.log('[LOGIN] Success for user:', data.user.email)
   console.log('[LOGIN] Session expires at:', data.session.expires_at)
 
-  // Return JSON response - cookies are automatically included by Next.js
   return NextResponse.json({ redirect: '/dashboard' }, { status: 200 })
 }
 
