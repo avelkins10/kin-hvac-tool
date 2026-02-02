@@ -25,6 +25,7 @@ export async function POST(request: Request) {
   }
 
   const cookieStore = await cookies()
+  const capturedCookies: Array<{ name: string; value: string; options?: CookieOptions }> = []
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
       setAll(cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }>) {
         try {
           cookiesToSet.forEach(({ name, value, options }) => {
-            console.log('[LOGIN] Setting cookie:', { name, hasValue: !!value, options })
+            capturedCookies.push({ name, value, options })
             cookieStore.set(name, value, options)
           })
         } catch (error) {
@@ -57,13 +58,14 @@ export async function POST(request: Request) {
   }
 
   console.log('[LOGIN] Success for user:', data.user.email)
-  console.log('[LOGIN] Session expires at:', data.session.expires_at)
 
-  // Redirect so browser receives Set-Cookie on this response; client fetch will
-  // follow redirect and then LoginForm will use res.url for full page load.
   const origin = new URL(request.url).origin
   const dashboardUrl = new URL('/dashboard', origin)
-  return NextResponse.redirect(dashboardUrl, 302)
+  const res = NextResponse.redirect(dashboardUrl, 302)
+  capturedCookies.forEach(({ name, value, options }) => {
+    res.cookies.set(name, value, { path: '/', ...options })
+  })
+  return res
 }
 
 function redirectToSignin(originUrl: string, error: string) {
