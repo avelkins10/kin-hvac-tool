@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
 
 /**
- * Submits via fetch so browser stores Set-Cookie from 200 response, then we
- * navigate to /dashboard so the next request includes cookies.
+ * Submits via fetch. API returns 302 to /dashboard with Set-Cookie so the
+ * browser stores session cookies; we then use res.url for full page load.
+ * Also supports JSON { redirect } for compatibility.
  */
 export function LoginForm() {
   const searchParams = useSearchParams()

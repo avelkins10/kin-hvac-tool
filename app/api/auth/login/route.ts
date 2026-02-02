@@ -3,11 +3,13 @@
  * Sign-in using Supabase Auth with proper cookie handling via next/headers
  */
 import { createServerClient } from '@supabase/ssr'
+import type { CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 
 export async function POST(request: Request) {
   const formData = await request.formData()
@@ -29,7 +31,7 @@ export async function POST(request: Request) {
       getAll() {
         return cookieStore.getAll()
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }>) {
         try {
           cookiesToSet.forEach(({ name, value, options }) => {
             console.log('[LOGIN] Setting cookie:', { name, hasValue: !!value, options })
@@ -57,7 +59,11 @@ export async function POST(request: Request) {
   console.log('[LOGIN] Success for user:', data.user.email)
   console.log('[LOGIN] Session expires at:', data.session.expires_at)
 
-  return NextResponse.json({ redirect: '/dashboard' }, { status: 200 })
+  // Redirect so browser receives Set-Cookie on this response; client fetch will
+  // follow redirect and then LoginForm will use res.url for full page load.
+  const origin = new URL(request.url).origin
+  const dashboardUrl = new URL('/dashboard', origin)
+  return NextResponse.redirect(dashboardUrl, 302)
 }
 
 function redirectToSignin(originUrl: string, error: string) {
