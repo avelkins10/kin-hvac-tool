@@ -1,78 +1,52 @@
-'use client'
+/**
+ * GET /auth/signed-in?next=/dashboard
+ * Server-side redirect after login so the same request that has the session
+ * cookies is used to redirect to dashboard (avoids client-side redirect
+ * before cookies are committed).
+ */
+import { redirect } from 'next/navigation'
+import { getCurrentUser } from '@/lib/supabase/server'
 
-import { Suspense, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { Spinner } from '@/components/ui/spinner'
-
-function SignedInRedirect() {
-  const searchParams = useSearchParams()
-  const next = searchParams.get('next') || '/dashboard'
-  const debug = searchParams.get('debug') === '1'
-  const [debugInfo, setDebugInfo] = useState<{ cookiePresent: boolean; cookieHeader: string } | null>(null)
-
-  useEffect(() => {
-    if (debug) {
-      fetch('/api/debug-auth')
-        .then((r) => r.json())
-        .then((d) => setDebugInfo(d))
-        .catch(() => setDebugInfo({ cookiePresent: false, cookieHeader: '(fetch failed)' }))
-      return
-    }
-    const safe =
-      next.startsWith('/') && !next.startsWith('//') && !next.includes('://')
-        ? next
-        : '/dashboard'
-    // Short delay so the browser commits Set-Cookie before we navigate to dashboard
-    const t = setTimeout(() => window.location.replace(safe), 200)
-    return () => clearTimeout(t)
-  }, [next, debug])
-
-  useEffect(() => {
-    if (!debug || !debugInfo) return
-    const t = setTimeout(() => {
-      const safe =
-        next.startsWith('/') && !next.startsWith('//') && !next.includes('://')
-          ? next
-          : '/dashboard'
-      window.location.replace(safe)
-    }, 4000)
-    return () => clearTimeout(t)
-  }, [debug, debugInfo, next])
-
-  if (debug && debugInfo) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 bg-gray-50">
-        <p className="text-sm font-medium text-gray-700">Debug: what the server saw on this request</p>
-        <pre className="text-xs bg-white p-4 rounded border max-w-lg overflow-auto">
-          {JSON.stringify(debugInfo, null, 2)}
-        </pre>
-        <p className="text-sm text-amber-600">
-          {debugInfo.cookiePresent ? 'Cookies present — redirecting in 4s.' : 'No cookies — session not sent to server.'}
-        </p>
-      </div>
-    )
+function safeNext(next: string | null | undefined): string {
+  if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('://')) {
+    return '/dashboard'
   }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-slate-50">
-      <div className="flex flex-col items-center gap-4">
-        <Spinner className="h-8 w-8 text-blue-600" />
-        <p className="text-gray-600">Taking you to the dashboard…</p>
-      </div>
-    </div>
-  )
+  return next
 }
 
-export default function SignedInPage() {
+export default async function SignedInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string; debug?: string }>
+}) {
+  const params = await searchParams
+  const next = safeNext(params?.next)
+
+  // Debug: show cookie state and redirect after delay (client handles this)
+  if (params?.debug === '1') {
+    return <SignedInDebugPage next={next} />
+  }
+
+  const user = await getCurrentUser()
+  if (user) {
+    redirect(next)
+  }
+
+  redirect('/auth/signin?error=Session+not+found.+Please+sign+in+again.')
+}
+
+async function SignedInDebugPage({ next }: { next: string }) {
+  const user = await getCurrentUser()
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-slate-50">
-          <Spinner className="h-8 w-8 text-blue-600" />
-        </div>
-      }
-    >
-      <SignedInRedirect />
-    </Suspense>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 bg-gray-50">
+      <p className="text-sm font-medium text-gray-700">Debug: server saw user on this request</p>
+      <pre className="text-xs bg-white p-4 rounded border max-w-lg overflow-auto">
+        {JSON.stringify({ hasUser: Boolean(user), userId: user?.id ?? null }, null, 2)}
+      </pre>
+      <p className="text-sm text-amber-600">
+        {user ? `Session present — add ?next=${encodeURIComponent(next)} without debug to redirect.` : 'No session — cookies not seen by server.'}
+      </p>
+      <p className="text-xs text-gray-500">Remove ?debug=1 to use normal redirect.</p>
+    </div>
   )
 }

@@ -16,10 +16,38 @@ export interface Session {
   }
 }
 
+/** When BYPASS_AUTH=true, use first DB user (prefer SUPER_ADMIN) or a mock so app works without login. */
+async function getBypassSession(): Promise<Session> {
+  const preferSuperAdmin = await prisma.user.findFirst({
+    where: { role: 'SUPER_ADMIN' },
+    select: { id: true, email: true, role: true, companyId: true },
+  })
+  if (preferSuperAdmin) {
+    return { user: { ...preferSuperAdmin, role: preferSuperAdmin.role as UserRole } }
+  }
+  const anyUser = await prisma.user.findFirst({
+    select: { id: true, email: true, role: true, companyId: true },
+  })
+  if (anyUser) {
+    return { user: { ...anyUser, role: anyUser.role as UserRole } }
+  }
+  return {
+    user: {
+      id: 'bypass-demo',
+      email: 'demo@bypass.local',
+      role: 'SUPER_ADMIN',
+      companyId: null,
+    },
+  }
+}
+
 /**
  * Require authentication - redirects to signin if not authenticated
  */
 export async function requireAuth(): Promise<Session> {
+  if (process.env.BYPASS_AUTH === 'true') {
+    return getBypassSession()
+  }
   const supabaseUser = await getSupabaseUser()
   if (!supabaseUser) {
     redirect('/auth/signin')
@@ -110,6 +138,10 @@ export async function requireRole(allowedRoles: UserRole[]): Promise<Session> {
  * Get current user (returns null if not authenticated)
  */
 export async function getCurrentUser() {
+  if (process.env.BYPASS_AUTH === 'true') {
+    const session = await getBypassSession()
+    return session.user
+  }
   const supabaseUser = await getSupabaseUser()
   if (!supabaseUser) {
     return null

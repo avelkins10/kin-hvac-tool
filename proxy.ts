@@ -1,6 +1,8 @@
 import { updateSession } from '@/lib/supabase/middleware'
 import { NextResponse, type NextRequest } from 'next/server'
 
+const bypassAuth = process.env.BYPASS_AUTH === 'true'
+
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname
 
@@ -18,6 +20,11 @@ export async function proxy(request: NextRequest) {
     path.startsWith('/_next') ||
     path.startsWith('/api/webhooks')
   ) {
+    return NextResponse.next()
+  }
+
+  // Bypass: skip auth redirect so app is usable without login (dev/demo only)
+  if (bypassAuth) {
     return NextResponse.next()
   }
 
