@@ -8,9 +8,8 @@ const nextConfig = {
   },
   // Exclude problematic packages from bundling
   // docusign-esign uses AMD modules incompatible with Turbopack
-  serverExternalPackages: ['docusign-esign'],
-  // Ensure Prisma Client is transpiled and bundled correctly
-  transpilePackages: ['@prisma/client'],
+  // @prisma/client + prisma: avoid "Can't resolve '@prisma/client-runtime-utils'" with pnpm/Turbopack
+  serverExternalPackages: ['docusign-esign', '@prisma/client', 'prisma'],
 }
 
 export default nextConfig
