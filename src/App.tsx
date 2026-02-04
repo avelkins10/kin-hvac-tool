@@ -5,7 +5,7 @@ import { PriceBookProvider } from "./contexts/PriceBookContext";
 import { MaintenanceProvider } from "./contexts/MaintenanceContext";
 import { IncentivesProvider } from "./contexts/IncentivesContext";
 import { ProposalBuilder } from "@/components/proposal-builder/ProposalBuilder";
-import { AdminPortal } from "./components/AdminPortal";
+import { AdminSettings } from "@/components/admin/AdminSettings";
 import { Toaster } from "sonner";
 import { BuilderNavigation } from "@/components/builder/BuilderNavigation";
 
@@ -84,7 +84,15 @@ export default function App() {
         <IncentivesProvider>
           <div className="min-h-screen bg-background">
             {showAdmin ? (
-              <AdminPortal onClose={handleCloseAdmin} />
+              <div className="relative">
+                <button
+                  onClick={handleCloseAdmin}
+                  className="absolute top-4 right-4 z-50 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90"
+                >
+                  Back to Builder
+                </button>
+                <AdminSettings />
+              </div>
             ) : (
               <>
                 <BuilderNavigation
