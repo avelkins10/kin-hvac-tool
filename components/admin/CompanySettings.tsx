@@ -64,11 +64,6 @@ export function CompanySettings() {
   };
 
   const saveLightreachSettings = async () => {
-    if (!lightreachOrgAlias.trim()) {
-      toast.error("Please enter an organization alias");
-      return;
-    }
-
     setSavingLightreach(true);
 
     try {
@@ -76,7 +71,7 @@ export function CompanySettings() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orgAlias: lightreachOrgAlias.trim(),
+          orgAlias: lightreachOrgAlias.trim() || null, // Allow clearing
         }),
       });
 
@@ -238,7 +233,7 @@ export function CompanySettings() {
           <div className="flex justify-end pt-4">
             <Button
               onClick={saveLightreachSettings}
-              disabled={savingLightreach || !lightreachOrgAlias.trim()}
+              disabled={savingLightreach}
             >
               {savingLightreach ? (
                 <>
