@@ -1,13 +1,10 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Home } from "lucide-react";
 import { SectionHeader } from "../shared/SectionHeader";
 import { FormField } from "../shared/FormField";
-import {
-  useProposalState,
-  useProperty,
-} from "../hooks/useProposalState";
+import { useProposalState, useProperty } from "../hooks/useProposalState";
 import {
   Select,
   SelectContent,
@@ -24,15 +21,14 @@ export function PropertySection() {
   const { setProperty, markSectionComplete } = useProposalState();
 
   const handleNumberChange = useCallback(
-    (field: keyof typeof property) => (
-      e: React.ChangeEvent<HTMLInputElement>
-    ) => {
-      const value = parseInt(e.target.value, 10);
-      if (!isNaN(value) && value >= 0) {
-        setProperty({ [field]: value });
-      }
-    },
-    [setProperty]
+    (field: keyof typeof property) =>
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = parseInt(e.target.value, 10);
+        if (!isNaN(value) && value >= 0) {
+          setProperty({ [field]: value });
+        }
+      },
+    [setProperty],
   );
 
   const handleSelectChange = useCallback(
@@ -40,22 +36,25 @@ export function PropertySection() {
       const numValue = parseInt(value, 10);
       setProperty({ [field]: numValue });
     },
-    [setProperty]
+    [setProperty],
   );
 
   const handleCheckboxChange = useCallback(
     (field: keyof typeof property) => (checked: boolean) => {
       setProperty({ [field]: checked });
     },
-    [setProperty]
+    [setProperty],
   );
 
   // Check if section is complete
   const isComplete = property.squareFootage > 0 && property.yearBuilt > 1800;
 
-  if (isComplete) {
-    markSectionComplete("property");
-  }
+  // Mark section complete (in useEffect to avoid render loop)
+  useEffect(() => {
+    if (isComplete) {
+      markSectionComplete("property");
+    }
+  }, [isComplete, markSectionComplete]);
 
   return (
     <div className="space-y-8">
@@ -103,10 +102,11 @@ export function PropertySection() {
                   "border-2 hover:border-primary/50",
                   property.stories === num
                     ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-card text-foreground"
+                    : "border-border bg-card text-foreground",
                 )}
               >
-                {num}{num === 4 ? "+" : ""}
+                {num}
+                {num === 4 ? "+" : ""}
               </button>
             ))}
           </div>

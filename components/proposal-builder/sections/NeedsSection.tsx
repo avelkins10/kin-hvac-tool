@@ -1,12 +1,18 @@
 "use client";
 
-import { useCallback } from "react";
-import { Heart, Leaf, Volume2, Brain, DollarSign, Clock, Users, Zap } from "lucide-react";
-import { SectionHeader } from "../shared/SectionHeader";
+import { useCallback, useEffect } from "react";
 import {
-  useProposalState,
-  useNeeds,
-} from "../hooks/useProposalState";
+  Heart,
+  Leaf,
+  Volume2,
+  Brain,
+  DollarSign,
+  Clock,
+  Users,
+  Zap,
+} from "lucide-react";
+import { SectionHeader } from "../shared/SectionHeader";
+import { useProposalState, useNeeds } from "../hooks/useProposalState";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -76,29 +82,32 @@ export function NeedsSection() {
     (priority: "comfort" | "efficiency" | "budget") => {
       setNeeds({ priority });
     },
-    [setNeeds]
+    [setNeeds],
   );
 
   const handleSelectChange = useCallback(
     (field: keyof typeof needs) => (value: string) => {
       setNeeds({ [field]: value });
     },
-    [setNeeds]
+    [setNeeds],
   );
 
   const handleCheckboxChange = useCallback(
     (field: keyof typeof needs) => (checked: boolean) => {
       setNeeds({ [field]: checked });
     },
-    [setNeeds]
+    [setNeeds],
   );
 
   // Check if section is complete
   const isComplete = needs.priority && needs.timeline !== "";
 
-  if (isComplete) {
-    markSectionComplete("needs");
-  }
+  // Mark section complete (in useEffect to avoid render loop)
+  useEffect(() => {
+    if (isComplete) {
+      markSectionComplete("needs");
+    }
+  }, [isComplete, markSectionComplete]);
 
   return (
     <div className="space-y-8">
@@ -112,7 +121,8 @@ export function NeedsSection() {
         {/* Top Priority */}
         <div className="space-y-4">
           <Label className="text-sm font-medium">
-            What's your top priority? <span className="text-destructive">*</span>
+            What's your top priority?{" "}
+            <span className="text-destructive">*</span>
           </Label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {PRIORITY_OPTIONS.map((option) => (
@@ -121,7 +131,7 @@ export function NeedsSection() {
                 type="button"
                 onClick={() =>
                   handlePriorityChange(
-                    option.value as "comfort" | "efficiency" | "budget"
+                    option.value as "comfort" | "efficiency" | "budget",
                   )
                 }
                 className={cn(
@@ -129,7 +139,7 @@ export function NeedsSection() {
                   "hover:border-primary/50 card-hover",
                   needs.priority === option.value
                     ? "border-primary bg-primary/5 glow-primary"
-                    : "border-border bg-card"
+                    : "border-border bg-card",
                 )}
               >
                 <div
@@ -137,7 +147,7 @@ export function NeedsSection() {
                     "w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
                     needs.priority === option.value
                       ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
+                      : "bg-muted text-muted-foreground",
                   )}
                 >
                   {option.icon}
@@ -156,7 +166,8 @@ export function NeedsSection() {
         {/* Timeline */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">
-            When do you need the work done? <span className="text-destructive">*</span>
+            When do you need the work done?{" "}
+            <span className="text-destructive">*</span>
           </Label>
           <Select
             value={needs.timeline}

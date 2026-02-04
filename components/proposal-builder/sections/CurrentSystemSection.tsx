@@ -1,14 +1,11 @@
 "use client";
 
-import { useCallback, useState, useRef } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { Wind, Camera, Loader2, Sparkles, AlertCircle } from "lucide-react";
 import Image from "next/image";
 import { SectionHeader } from "../shared/SectionHeader";
 import { FormField } from "../shared/FormField";
-import {
-  useProposalState,
-  useCurrentSystem,
-} from "../hooks/useProposalState";
+import { useProposalState, useCurrentSystem } from "../hooks/useProposalState";
 import {
   Select,
   SelectContent,
@@ -52,7 +49,7 @@ async function resizeImageToJpeg(file: File, maxDim = 1600): Promise<File> {
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("Image compression failed"))),
       "image/jpeg",
-      0.8
+      0.8,
     );
   });
 
@@ -103,7 +100,7 @@ export function CurrentSystemSection() {
     (field: keyof typeof currentSystem) => (value: string) => {
       setCurrentSystem({ [field]: value });
     },
-    [setCurrentSystem]
+    [setCurrentSystem],
   );
 
   const handleIssueToggle = useCallback(
@@ -113,14 +110,14 @@ export function CurrentSystemSection() {
         : [...currentSystem.issues, issue];
       setCurrentSystem({ issues: newIssues });
     },
-    [currentSystem.issues, setCurrentSystem]
+    [currentSystem.issues, setCurrentSystem],
   );
 
   const handleCheckboxChange = useCallback(
     (field: keyof typeof currentSystem) => (checked: boolean) => {
       setCurrentSystem({ [field]: checked });
     },
-    [setCurrentSystem]
+    [setCurrentSystem],
   );
 
   // Handle photo upload and AI analysis
@@ -148,7 +145,9 @@ export function CurrentSystemSection() {
         });
 
         // Store the photo
-        setCurrentSystem({ nameplatePhoto: `data:image/jpeg;base64,${base64}` });
+        setCurrentSystem({
+          nameplatePhoto: `data:image/jpeg;base64,${base64}`,
+        });
 
         // Call AI analysis API
         const response = await fetch("/api/ai/analyze-nameplate", {
@@ -177,22 +176,27 @@ export function CurrentSystemSection() {
         toast.success("System analyzed successfully!");
       } catch (error) {
         console.error("Error analyzing nameplate:", error);
-        setAnalysisError("Failed to analyze the image. Please try again or enter details manually.");
+        setAnalysisError(
+          "Failed to analyze the image. Please try again or enter details manually.",
+        );
         toast.error("Failed to analyze image");
       } finally {
         setIsAnalyzing(false);
       }
     },
-    [setCurrentSystem]
+    [setCurrentSystem],
   );
 
   // Check if section is complete
   const isComplete =
     currentSystem.systemAge !== "" && currentSystem.equipmentType !== "auto";
 
-  if (isComplete) {
-    markSectionComplete("current-system");
-  }
+  // Mark section complete (in useEffect to avoid render loop)
+  useEffect(() => {
+    if (isComplete) {
+      markSectionComplete("current-system");
+    }
+  }, [isComplete, markSectionComplete]);
 
   return (
     <div className="space-y-8">
@@ -233,7 +237,7 @@ export function CurrentSystemSection() {
                   "mt-4 flex items-center gap-2 px-4 py-2 rounded-xl font-medium",
                   "bg-primary text-primary-foreground",
                   "hover:opacity-90 active:scale-[0.98] transition-all",
-                  "disabled:opacity-50 disabled:cursor-not-allowed"
+                  "disabled:opacity-50 disabled:cursor-not-allowed",
                 )}
               >
                 {isAnalyzing ? (
@@ -314,7 +318,9 @@ export function CurrentSystemSection() {
                   {currentSystem.tonnage && (
                     <div className="p-3 bg-white rounded-lg">
                       <p className="text-xs text-muted-foreground">Tonnage</p>
-                      <p className="font-medium">{currentSystem.tonnage} tons</p>
+                      <p className="font-medium">
+                        {currentSystem.tonnage} tons
+                      </p>
                     </div>
                   )}
                   {currentSystem.seerRating && (
@@ -408,7 +414,7 @@ export function CurrentSystemSection() {
                   "border hover:border-primary/50",
                   currentSystem.issues.includes(issue)
                     ? "border-primary bg-primary/10 text-primary font-medium"
-                    : "border-border bg-card text-foreground"
+                    : "border-border bg-card text-foreground",
                 )}
               >
                 {issue}

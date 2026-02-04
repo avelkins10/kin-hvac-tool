@@ -1,13 +1,10 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { UserCircle } from "lucide-react";
 import { SectionHeader } from "../shared/SectionHeader";
 import { FormField } from "../shared/FormField";
-import {
-  useProposalState,
-  useCustomer,
-} from "../hooks/useProposalState";
+import { useProposalState, useCustomer } from "../hooks/useProposalState";
 import {
   Select,
   SelectContent,
@@ -75,19 +72,18 @@ export function CustomerSection() {
   const { setCustomer, markSectionComplete } = useProposalState();
 
   const handleChange = useCallback(
-    (field: keyof typeof customer) => (
-      e: React.ChangeEvent<HTMLInputElement>
-    ) => {
-      setCustomer({ [field]: e.target.value });
-    },
-    [setCustomer]
+    (field: keyof typeof customer) =>
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        setCustomer({ [field]: e.target.value });
+      },
+    [setCustomer],
   );
 
   const handleStateChange = useCallback(
     (value: string) => {
       setCustomer({ state: value });
     },
-    [setCustomer]
+    [setCustomer],
   );
 
   // Check if section is complete
@@ -100,10 +96,12 @@ export function CustomerSection() {
     customer.state !== "" &&
     customer.zip.trim() !== "";
 
-  // Mark section complete when all required fields are filled
-  if (isComplete) {
-    markSectionComplete("customer");
-  }
+  // Mark section complete when all required fields are filled (in useEffect to avoid render loop)
+  useEffect(() => {
+    if (isComplete) {
+      markSectionComplete("customer");
+    }
+  }, [isComplete, markSectionComplete]);
 
   return (
     <div className="space-y-8">
