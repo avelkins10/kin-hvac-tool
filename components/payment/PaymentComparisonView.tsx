@@ -5,10 +5,19 @@ import { cn } from "@/lib/utils";
 import { PaymentComparisonViewProps, getEscalatorColor } from "./types";
 
 export function PaymentComparisonView({
-  options,
+  options = [],
   selectedId,
   onSelect,
 }: PaymentComparisonViewProps) {
+  // Guard against undefined/empty options
+  if (!options || options.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        No comfort plan options available
+      </div>
+    );
+  }
+
   // Group by term
   const optionsByTerm = options.reduce(
     (acc, option) => {
