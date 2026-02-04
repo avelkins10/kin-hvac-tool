@@ -41,6 +41,13 @@
   --info: oklch(0.58 0.14 240);
   --info-light: oklch(0.94 0.03 240);
 
+  /* Payment & Escalator Colors */
+  --card-selected-border: var(--primary);
+  --card-selected-bg: oklch(0.97 0.02 245);
+  --escalator-low: oklch(0.6 0.14 145); /* Green - 0% */
+  --escalator-mid: oklch(0.65 0.14 85); /* Yellow - 0.99% */
+  --escalator-high: oklch(0.6 0.16 25); /* Orange - 1.99% */
+
   /* Core Theme Variables */
   --background: oklch(0.99 0 0);
   --foreground: var(--gray-900);
@@ -167,6 +174,13 @@
   --color-info: var(--info);
   --color-info-light: var(--info-light);
 
+  /* Payment & Escalator colors */
+  --color-card-selected-border: var(--card-selected-border);
+  --color-card-selected-bg: var(--card-selected-bg);
+  --color-escalator-low: var(--escalator-low);
+  --color-escalator-mid: var(--escalator-mid);
+  --color-escalator-high: var(--escalator-high);
+
   /* Primary scale */
   --color-primary-50: var(--primary-50);
   --color-primary-100: var(--primary-100);
@@ -231,5 +245,119 @@
       0 4px 6px -1px rgb(0 0 0 / 0.05),
       0 2px 4px -2px rgb(0 0 0 / 0.05);
     transform: translateY(-2px);
+  }
+
+  /* Frosted glass effect */
+  .glass-blur {
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+  }
+
+  /* Payment card animations */
+  .payment-card-enter {
+    animation: paymentCardEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes paymentCardEnter {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* Staggered animation delays */
+  .stagger-1 {
+    animation-delay: 0ms;
+  }
+  .stagger-2 {
+    animation-delay: 75ms;
+  }
+  .stagger-3 {
+    animation-delay: 150ms;
+  }
+  .stagger-4 {
+    animation-delay: 225ms;
+  }
+  .stagger-5 {
+    animation-delay: 300ms;
+  }
+  .stagger-6 {
+    animation-delay: 375ms;
+  }
+
+  /* Shimmer effect for loading states */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--muted) 0%,
+      oklch(0.95 0 0) 50%,
+      var(--muted) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  /* Glow effect for selected cards */
+  .glow-primary {
+    box-shadow:
+      0 0 0 1px var(--primary),
+      0 4px 16px -4px oklch(0.55 0.18 245 / 0.25),
+      0 12px 24px -8px oklch(0.55 0.18 245 / 0.15);
+  }
+
+  /* Recommended badge shimmer */
+  .badge-shine {
+    position: relative;
+    overflow: hidden;
+  }
+  .badge-shine::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      oklch(1 0 0 / 0.3) 50%,
+      transparent 60%
+    );
+    animation: badgeShine 3s ease-in-out infinite;
+  }
+
+  @keyframes badgeShine {
+    0%,
+    100% {
+      transform: translateX(-100%);
+    }
+    50% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* Subtle pulse for recommended items */
+  .pulse-subtle {
+    animation: pulseSoft 2s ease-in-out infinite;
+  }
+
+  @keyframes pulseSoft {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 oklch(0.55 0.18 245 / 0);
+    }
+    50% {
+      box-shadow: 0 0 0 4px oklch(0.55 0.18 245 / 0.1);
+    }
   }
 }

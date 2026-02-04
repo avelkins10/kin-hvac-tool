@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
+import { ChevronDown, ChevronUp, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,11 +13,30 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import {
   DisclosureCheckboxes,
   AcceptedDisclosure,
 } from "./DisclosureCheckboxes";
+import { cn } from "@/lib/utils";
+
+// Co-borrower relationship types
+type CoBorrowerRelationship = "spouse" | "co-owner" | "other";
+
+interface CoBorrowerData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  relationship: CoBorrowerRelationship | "";
+}
 
 interface FinanceApplicationFormProps {
   proposalId: string;
@@ -34,6 +54,7 @@ interface FinanceApplicationFormProps {
   onSuccess?: (applicationId: string) => void;
   onCancel?: () => void;
   showDisclosures?: boolean;
+  allowCoBorrower?: boolean;
 }
 
 export function FinanceApplicationForm({
@@ -43,6 +64,7 @@ export function FinanceApplicationForm({
   onSuccess,
   onCancel,
   showDisclosures = true,
+  allowCoBorrower = true,
 }: FinanceApplicationFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -59,6 +81,16 @@ export function FinanceApplicationForm({
   const [acceptedDisclosures, setAcceptedDisclosures] = useState<
     AcceptedDisclosure[]
   >([]);
+
+  // Co-borrower state
+  const [showCoBorrower, setShowCoBorrower] = useState(false);
+  const [coBorrowerData, setCoBorrowerData] = useState<CoBorrowerData>({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    relationship: "",
+  });
 
   const handleDisclosureChange = useCallback(
     (disclosures: AcceptedDisclosure[]) => {
@@ -116,6 +148,40 @@ export function FinanceApplicationForm({
         "ZIP code must be 5 digits or 9 digits (12345 or 12345-6789)";
     }
 
+    // Co-borrower validation (only if co-borrower section is shown and has data)
+    if (showCoBorrower) {
+      const hasCoBorrowerData =
+        coBorrowerData.firstName.trim() ||
+        coBorrowerData.lastName.trim() ||
+        coBorrowerData.email.trim() ||
+        coBorrowerData.phone.trim();
+
+      if (hasCoBorrowerData) {
+        if (!coBorrowerData.firstName.trim()) {
+          newErrors.coBorrowerFirstName = "Co-borrower first name is required";
+        }
+        if (!coBorrowerData.lastName.trim()) {
+          newErrors.coBorrowerLastName = "Co-borrower last name is required";
+        }
+        if (!coBorrowerData.email.trim()) {
+          newErrors.coBorrowerEmail = "Co-borrower email is required";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(coBorrowerData.email)) {
+          newErrors.coBorrowerEmail = "Invalid email format";
+        }
+        if (!coBorrowerData.phone.trim()) {
+          newErrors.coBorrowerPhone = "Co-borrower phone is required";
+        } else {
+          const digitsOnly = coBorrowerData.phone.replace(/\D/g, "");
+          if (digitsOnly.length < 10) {
+            newErrors.coBorrowerPhone = "Phone must be at least 10 digits";
+          }
+        }
+        if (!coBorrowerData.relationship) {
+          newErrors.coBorrowerRelationship = "Relationship is required";
+        }
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -131,6 +197,12 @@ export function FinanceApplicationForm({
     setIsSubmitting(true);
 
     try {
+      // Build co-borrower data if present
+      const hasCoBorrower =
+        showCoBorrower &&
+        coBorrowerData.firstName.trim() &&
+        coBorrowerData.lastName.trim();
+
       const response = await fetch("/api/finance/lightreach/apply", {
         method: "POST",
         headers: {
@@ -153,6 +225,16 @@ export function FinanceApplicationForm({
               type: d.type,
               version: d.version,
             })),
+            // Include co-borrower if provided
+            ...(hasCoBorrower && {
+              coBorrower: {
+                firstName: coBorrowerData.firstName,
+                lastName: coBorrowerData.lastName,
+                email: coBorrowerData.email,
+                phone: coBorrowerData.phone,
+                relationship: coBorrowerData.relationship,
+              },
+            }),
           },
         }),
       });
@@ -184,6 +266,46 @@ export function FinanceApplicationForm({
       setErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors[field];
+        return newErrors;
+      });
+    }
+  };
+
+  const handleCoBorrowerChange = (
+    field: keyof CoBorrowerData,
+    value: string,
+  ) => {
+    setCoBorrowerData((prev) => ({ ...prev, [field]: value }));
+    // Clear co-borrower error for this field
+    const errorKey = `coBorrower${field.charAt(0).toUpperCase() + field.slice(1)}`;
+    if (errors[errorKey]) {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[errorKey];
+        return newErrors;
+      });
+    }
+  };
+
+  const toggleCoBorrower = () => {
+    setShowCoBorrower((prev) => !prev);
+    // Clear co-borrower data when hiding
+    if (showCoBorrower) {
+      setCoBorrowerData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        relationship: "",
+      });
+      // Clear any co-borrower errors
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        Object.keys(newErrors).forEach((key) => {
+          if (key.startsWith("coBorrower")) {
+            delete newErrors[key];
+          }
+        });
         return newErrors;
       });
     }
@@ -346,6 +468,153 @@ export function FinanceApplicationForm({
               )}
             </div>
           </div>
+
+          {/* Co-Borrower Section */}
+          {allowCoBorrower && (
+            <div className="pt-4 border-t">
+              <button
+                type="button"
+                onClick={toggleCoBorrower}
+                className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                disabled={isSubmitting}
+              >
+                <UserPlus className="w-4 h-4" />
+                {showCoBorrower ? "Remove Co-Borrower" : "Add Co-Borrower"}
+                {showCoBorrower ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </button>
+
+              <div
+                className={cn(
+                  "overflow-hidden transition-all duration-300",
+                  showCoBorrower ? "max-h-[500px] mt-4" : "max-h-0",
+                )}
+              >
+                <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Adding a co-borrower may improve approval odds for larger
+                    amounts.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="coBorrowerFirstName">First Name</Label>
+                      <Input
+                        id="coBorrowerFirstName"
+                        value={coBorrowerData.firstName}
+                        onChange={(e) =>
+                          handleCoBorrowerChange("firstName", e.target.value)
+                        }
+                        aria-invalid={!!errors.coBorrowerFirstName}
+                        disabled={isSubmitting}
+                      />
+                      {errors.coBorrowerFirstName && (
+                        <p className="text-sm text-destructive">
+                          {errors.coBorrowerFirstName}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="coBorrowerLastName">Last Name</Label>
+                      <Input
+                        id="coBorrowerLastName"
+                        value={coBorrowerData.lastName}
+                        onChange={(e) =>
+                          handleCoBorrowerChange("lastName", e.target.value)
+                        }
+                        aria-invalid={!!errors.coBorrowerLastName}
+                        disabled={isSubmitting}
+                      />
+                      {errors.coBorrowerLastName && (
+                        <p className="text-sm text-destructive">
+                          {errors.coBorrowerLastName}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="coBorrowerEmail">Email</Label>
+                    <Input
+                      id="coBorrowerEmail"
+                      type="email"
+                      value={coBorrowerData.email}
+                      onChange={(e) =>
+                        handleCoBorrowerChange("email", e.target.value)
+                      }
+                      aria-invalid={!!errors.coBorrowerEmail}
+                      disabled={isSubmitting}
+                    />
+                    {errors.coBorrowerEmail && (
+                      <p className="text-sm text-destructive">
+                        {errors.coBorrowerEmail}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="coBorrowerPhone">Phone</Label>
+                      <Input
+                        id="coBorrowerPhone"
+                        type="tel"
+                        value={coBorrowerData.phone}
+                        onChange={(e) =>
+                          handleCoBorrowerChange("phone", e.target.value)
+                        }
+                        aria-invalid={!!errors.coBorrowerPhone}
+                        disabled={isSubmitting}
+                      />
+                      {errors.coBorrowerPhone && (
+                        <p className="text-sm text-destructive">
+                          {errors.coBorrowerPhone}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="coBorrowerRelationship">
+                        Relationship
+                      </Label>
+                      <Select
+                        value={coBorrowerData.relationship}
+                        onValueChange={(value) =>
+                          handleCoBorrowerChange(
+                            "relationship",
+                            value as CoBorrowerRelationship,
+                          )
+                        }
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger
+                          id="coBorrowerRelationship"
+                          aria-invalid={!!errors.coBorrowerRelationship}
+                        >
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="spouse">Spouse</SelectItem>
+                          <SelectItem value="co-owner">
+                            Co-Owner / Partner
+                          </SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {errors.coBorrowerRelationship && (
+                        <p className="text-sm text-destructive">
+                          {errors.coBorrowerRelationship}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Credit Application Disclosures */}
           {showDisclosures && (

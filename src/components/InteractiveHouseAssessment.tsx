@@ -70,6 +70,11 @@ import { StepNavigation } from "@/components/builder/StepNavigation";
 import { AutoSaveIndicator } from "@/components/builder/AutoSaveIndicator";
 import { HelpTooltip } from "@/components/builder/HelpTooltip";
 import { AssessmentCompletionCard } from "@/components/builder/AssessmentCompletionCard";
+import {
+  PaymentStep,
+  PaymentMethodType,
+  FinancingOption as PaymentFinancingOption,
+} from "@/components/payment";
 
 async function resizeImageToJpeg(file: File, maxDim = 1600): Promise<File> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -3281,7 +3286,7 @@ function InteractiveHouseAssessmentInner({
     </div>
   );
 
-  // Render payment step
+  // Render payment step - uses new PaymentStep component
   const renderPaymentStep = () => {
     if (!selectedEquipment) return null;
 
@@ -3302,258 +3307,113 @@ function InteractiveHouseAssessmentInner({
       maintenanceCustomerPrice -
       incentivesTotal;
 
+    // Transform financing options to payment component format
+    const paymentFinancingOptions: PaymentFinancingOption[] = (
+      financingOptions || []
+    ).map((opt) => ({
+      id: opt.id,
+      name: opt.name,
+      type: opt.type as "finance" | "lease",
+      provider: opt.provider,
+      termMonths: opt.termMonths,
+      apr: opt.apr,
+      description: opt.description,
+      available: opt.available,
+      escalatorRate: opt.name.includes("1.99%")
+        ? 1.99
+        : opt.name.includes("0.99%")
+          ? 0.99
+          : 0,
+    }));
+
+    // Handle financing option change from PaymentStep
+    const handleFinancingOptionChange = (
+      option: PaymentFinancingOption | null,
+    ) => {
+      if (option) {
+        // Find matching original option or use the synthetic one
+        const originalOption = financingOptions?.find(
+          (o) => o.id === option.id,
+        );
+        setSelectedFinancingOption(
+          originalOption || (option as FinancingOption),
+        );
+      } else {
+        setSelectedFinancingOption(null);
+      }
+    };
+
+    // Handle showing finance form
+    const handleShowFinanceForm = async () => {
+      const msg = systemDesignErrorMessage();
+      if (msg) {
+        toast.error(msg);
+        return;
+      }
+      const id = proposalId ?? (await handleSendToKin()) ?? null;
+      if (id) setShowFinanceForm(true);
+      else if (!proposalId)
+        toast.error("Save the proposal first, then try again.");
+    };
+
     return (
       <div className="bg-card/10 backdrop-blur-sm rounded-lg p-4 md:p-6 border shadow-lg">
-        {/* Payment Method Selector */}
-        <div className="grid grid-cols-3 gap-2 mb-6">
-          <Button
-            variant={paymentMethod === "cash" ? "default" : "outline"}
-            onClick={() => setPaymentMethod("cash")}
-            className="w-full"
-          >
-            Cash
-          </Button>
-          <Button
-            variant={paymentMethod === "financing" ? "default" : "outline"}
-            onClick={() => setPaymentMethod("financing")}
-            className="w-full"
-          >
-            Financing
-          </Button>
-          <Button
-            variant={paymentMethod === "leasing" ? "default" : "outline"}
-            onClick={() => setPaymentMethod("leasing")}
-            className="w-full"
-          >
-            Leasing
-          </Button>
-        </div>
+        <PaymentStep
+          totalPrice={totalCustomerPrice}
+          customerState={customerData.state || "CA"}
+          financingOptions={paymentFinancingOptions}
+          selectedPaymentMethod={paymentMethod as PaymentMethodType}
+          selectedFinancingOption={
+            selectedFinancingOption
+              ? {
+                  ...selectedFinancingOption,
+                  type: selectedFinancingOption.type as "finance" | "lease",
+                  escalatorRate: selectedFinancingOption.name?.includes("1.99%")
+                    ? 1.99
+                    : selectedFinancingOption.name?.includes("0.99%")
+                      ? 0.99
+                      : 0,
+                }
+              : null
+          }
+          onPaymentMethodChange={(method) =>
+            setPaymentMethod(method as "cash" | "financing" | "leasing")
+          }
+          onFinancingOptionChange={handleFinancingOptionChange}
+          proposalId={proposalId || undefined}
+          onShowFinanceForm={handleShowFinanceForm}
+        />
 
-        {/* Cash Options */}
-        {paymentMethod === "cash" && (
-          <div className="space-y-4">
-            <div className="p-6 border-2 border-primary rounded-xl bg-primary/5">
-              <h3 className="text-xl font-bold mb-2">Pay in Full</h3>
-              <p className="text-3xl font-bold text-primary mb-2">
-                ${totalCustomerPrice.toLocaleString()}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                One-time payment - own your system outright
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Financing Options */}
-        {paymentMethod === "financing" && financingOptions && (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground mb-3">
-              Select a financing term below. Monthly payments are based on
-              system price of ${totalCustomerPrice.toLocaleString()}
-            </p>
-            {financingOptions
-              .filter((opt) => opt.type === "finance" && opt.available)
-              .map((option) => {
-                const monthlyPayment = calculateMonthlyPayment(
-                  totalCustomerPrice,
-                  option,
-                );
-                const isSelected = selectedFinancingOption?.id === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    onClick={() => setSelectedFinancingOption(option)}
-                    className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
-                      isSelected
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:border-primary/50"
-                    }`}
+        {/* Finance Application Section - Show if Comfort Plan selected and proposal saved */}
+        {proposalId &&
+          paymentMethod === "leasing" &&
+          selectedFinancingOption?.provider?.toLowerCase() === "lightreach" && (
+            <div className="mt-6 p-4 border-2 border-primary/20 rounded-lg bg-primary/5">
+              <h3 className="text-lg font-semibold mb-3">
+                Comfort Plan Finance Application
+              </h3>
+              {selectedFinanceApplicationId ? (
+                <div className="space-y-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedFinanceApplicationId(null)}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <h3
-                        className={`font-semibold ${isSelected ? "text-white" : ""}`}
-                      >
-                        {option.name}
-                      </h3>
-                      {isSelected && <Check className="w-5 h-5 text-primary" />}
-                    </div>
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <span
-                        className={`text-2xl font-bold ${isSelected ? "text-primary" : "text-primary"}`}
-                      >
-                        ${monthlyPayment.toFixed(2)}
-                      </span>
-                      <span
-                        className={`text-sm ${isSelected ? "text-gray-200" : "text-muted-foreground"}`}
-                      >
-                        /month
-                      </span>
-                    </div>
-                    <p
-                      className={`text-sm ${isSelected ? "text-gray-200" : "text-muted-foreground"}`}
-                    >
-                      {option.description}
-                    </p>
-                    {option.apr > 0 && (
-                      <p
-                        className={`text-xs mt-1 ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
-                      >
-                        {option.apr}% APR
-                      </p>
-                    )}
-                  </button>
-                );
-              })}
-          </div>
-        )}
-
-        {/* Leasing Options */}
-        {paymentMethod === "leasing" && financingOptions && (
-          <div className="space-y-6">
-            <p className="text-sm text-muted-foreground mb-3">
-              Select a lease term below. Monthly payments are based on system
-              price of ${totalCustomerPrice.toLocaleString()}
-            </p>
-
-            {/* Finance Application Section - Show if Comfort Plan selected and proposal saved */}
-            {proposalId &&
-              selectedFinancingOption?.provider?.toLowerCase() ===
-                "lightreach" && (
-                <div className="mt-6 p-4 border-2 border-primary/20 rounded-lg bg-primary/5">
-                  <h3 className="text-lg font-semibold mb-3">
-                    Comfort Plan Finance Application
-                  </h3>
-                  {selectedFinanceApplicationId ? (
-                    <div className="space-y-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedFinanceApplicationId(null)}
-                      >
-                        ← Back to Applications
-                      </Button>
-                      <FinanceApplicationStatus
-                        applicationId={selectedFinanceApplicationId}
-                        autoRefresh
-                      />
-                    </div>
-                  ) : (
-                    <FinanceApplicationList
-                      proposalId={proposalId}
-                      onNewApplication={async () => {
-                        const msg = systemDesignErrorMessage();
-                        if (msg) {
-                          toast.error(msg);
-                          return;
-                        }
-                        const id =
-                          proposalId ?? (await handleSendToKin()) ?? null;
-                        if (id) setShowFinanceForm(true);
-                        else if (!proposalId)
-                          toast.error(
-                            "Save the proposal first, then try again.",
-                          );
-                      }}
-                    />
-                  )}
+                    ← Back to Applications
+                  </Button>
+                  <FinanceApplicationStatus
+                    applicationId={selectedFinanceApplicationId}
+                    autoRefresh
+                  />
                 </div>
+              ) : (
+                <FinanceApplicationList
+                  proposalId={proposalId}
+                  onNewApplication={handleShowFinanceForm}
+                />
               )}
-            {Object.entries(
-              financingOptions
-                .filter(
-                  (opt) =>
-                    opt.type === "lease" &&
-                    opt.available &&
-                    (opt.termMonths === 120 || opt.termMonths === 144),
-                )
-                .reduce(
-                  (acc, option) => {
-                    const term = option.termMonths;
-                    if (!acc[term]) {
-                      acc[term] = [];
-                    }
-                    acc[term].push(option);
-                    return acc;
-                  },
-                  {} as Record<number, typeof financingOptions>,
-                ),
-            )
-              .sort((a, b) => Number(a[0]) - Number(b[0]))
-              .map(([termMonths, options]) => {
-                return (
-                  <div key={termMonths}>
-                    <h4 className="font-semibold mb-3">
-                      {Math.floor(Number(termMonths) / 12)} Year
-                      {Math.floor(Number(termMonths) / 12) !== 1 ? "s" : ""}
-                    </h4>
-                    <div className="space-y-2">
-                      {options.map((option) => {
-                        const monthlyPayment = calculateMonthlyPayment(
-                          totalCustomerPrice,
-                          option,
-                        );
-                        const escalator = option.name.includes("1.99%")
-                          ? "1.99%"
-                          : option.name.includes("0.99%")
-                            ? "0.99%"
-                            : "0%";
-                        const isSelected =
-                          selectedFinancingOption?.id === option.id;
-                        return (
-                          <button
-                            key={option.id}
-                            onClick={() => setSelectedFinancingOption(option)}
-                            className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
-                              isSelected
-                                ? "border-primary bg-primary/10"
-                                : "border-border hover:border-primary/50"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <div>
-                                <h3
-                                  className={`font-semibold ${isSelected ? "text-white" : ""}`}
-                                >
-                                  {option.provider} Lease
-                                </h3>
-                                <span
-                                  className={`text-xs ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
-                                >
-                                  {escalator} Escalator
-                                </span>
-                              </div>
-                              {isSelected && (
-                                <Check className="w-5 h-5 text-primary" />
-                              )}
-                            </div>
-                            <div className="flex items-baseline gap-2 mb-1">
-                              <span
-                                className={`text-2xl font-bold ${isSelected ? "text-primary" : "text-primary"}`}
-                              >
-                                ${monthlyPayment.toFixed(2)}
-                              </span>
-                              <span
-                                className={`text-sm ${isSelected ? "text-gray-200" : "text-muted-foreground"}`}
-                              >
-                                /month
-                              </span>
-                            </div>
-                            {escalator !== "0%" && (
-                              <p
-                                className={`text-xs ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
-                              >
-                                Year 1, increases {escalator} annually
-                              </p>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        )}
+            </div>
+          )}
       </div>
     );
   };

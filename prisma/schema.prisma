@@ -260,16 +260,17 @@ enum FinanceApplicationStatus {
 }
 
 model FinanceApplication {
-  id                  String                    @id @default(cuid())
-  proposalId          String
-  proposal            Proposal                  @relation(fields: [proposalId], references: [id], onDelete: Cascade)
-  lenderId            String                    // LightReach, Synchrony, etc.
-  externalApplicationId String?                 // External lender application ID
-  status              FinanceApplicationStatus  @default(PENDING)
-  applicationData     Json?                     // Application form data
-  responseData        Json?                     // Lender response data
-  createdAt           DateTime                  @default(now())
-  updatedAt           DateTime                  @updatedAt
+  id                    String                    @id @default(cuid())
+  proposalId            String
+  proposal              Proposal                  @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  lenderId              String                    // LightReach, Synchrony, etc.
+  externalApplicationId String?                   // External lender application ID
+  status                FinanceApplicationStatus  @default(PENDING)
+  applicationData       Json?                     // Application form data
+  responseData          Json?                     // Lender response data
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  milestones            FinanceMilestone[]
 
   @@index([proposalId])
   @@index([status])
@@ -340,4 +341,36 @@ model Notification {
   @@index([userId])
   @@index([companyId])
   @@index([read])
+}
+
+// Webhook event tracking for LightReach and other integrations
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String    // 'lightreach', 'stripe', etc.
+  eventType   String    // 'account.status_changed', 'contract.signed', etc.
+  eventId     String    @unique // External event ID for idempotency
+  payload     Json      // Raw webhook payload
+  processedAt DateTime? // When the event was successfully processed
+  error       String?   // Error message if processing failed
+  createdAt   DateTime  @default(now())
+
+  @@index([provider])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+// Finance milestone tracking for application progress
+model FinanceMilestone {
+  id                   String             @id @default(cuid())
+  financeApplicationId String
+  financeApplication   FinanceApplication @relation(fields: [financeApplicationId], references: [id], onDelete: Cascade)
+  milestoneType        String             // 'credit_approved', 'contract_sent', 'contract_signed', 'funded', etc.
+  status               String             // 'pending', 'completed', 'blocked'
+  completedAt          DateTime?
+  metadata             Json?              // Additional milestone-specific data
+  createdAt            DateTime           @default(now())
+
+  @@index([financeApplicationId])
+  @@index([milestoneType])
+  @@index([status])
 }
