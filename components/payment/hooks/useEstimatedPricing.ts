@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ComfortPlanProduct,
   ComfortPlanOption,
   transformToComfortPlanOptions,
-} from '../types';
+} from "../types";
 
 interface UseEstimatedPricingOptions {
   state: string;
@@ -22,7 +22,10 @@ interface UseEstimatedPricingResult {
 }
 
 // Simple cache to avoid redundant API calls
-const pricingCache = new Map<string, { products: ComfortPlanProduct[]; timestamp: number }>();
+const pricingCache = new Map<
+  string,
+  { products: ComfortPlanProduct[]; timestamp: number }
+>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function getCacheKey(state: string, amount: number): string {
@@ -42,6 +45,7 @@ export function useEstimatedPricing({
 
   // Track the last fetched params to avoid duplicate fetches
   const lastFetchRef = useRef<string | null>(null);
+  const isLoadingRef = useRef(false);
 
   const fetchPricing = useCallback(async () => {
     if (!state || state.length !== 2 || totalFinancedAmount <= 0) {
@@ -60,35 +64,39 @@ export function useEstimatedPricing({
       return;
     }
 
-    // Prevent duplicate fetches for the same params
-    if (lastFetchRef.current === cacheKey && isLoading) {
+    // Prevent duplicate fetches for the same params (use ref to avoid dependency loop)
+    if (lastFetchRef.current === cacheKey && isLoadingRef.current) {
       return;
     }
 
     lastFetchRef.current = cacheKey;
+    isLoadingRef.current = true;
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/finance/lightreach/estimated-pricing', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        "/api/finance/lightreach/estimated-pricing",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            state: state.toUpperCase(),
+            totalFinancedAmount,
+          }),
         },
-        body: JSON.stringify({
-          state: state.toUpperCase(),
-          totalFinancedAmount,
-        }),
-      });
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
         // Handle specific error codes
-        if (data.code === 'CREDENTIALS_REQUIRED') {
-          setError('LightReach integration is not configured');
+        if (data.code === "CREDENTIALS_REQUIRED") {
+          setError("LightReach integration is not configured");
         } else {
-          setError(data.error || 'Failed to fetch pricing');
+          setError(data.error || "Failed to fetch pricing");
         }
         setProducts([]);
         return;
@@ -103,13 +111,14 @@ export function useEstimatedPricing({
         timestamp: Date.now(),
       });
     } catch (err) {
-      console.error('Error fetching estimated pricing:', err);
-      setError('Unable to fetch pricing. Please try again.');
+      console.error("Error fetching estimated pricing:", err);
+      setError("Unable to fetch pricing. Please try again.");
       setProducts([]);
     } finally {
+      isLoadingRef.current = false;
       setIsLoading(false);
     }
-  }, [state, totalFinancedAmount, isLoading]);
+  }, [state, totalFinancedAmount]); // Note: removed isLoading to prevent infinite loop
 
   // Auto-fetch when params change and enabled
   useEffect(() => {
