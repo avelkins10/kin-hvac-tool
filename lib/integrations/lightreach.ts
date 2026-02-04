@@ -40,8 +40,9 @@ export class LightReachClient implements IFinanceProvider {
   private password: string;
   private baseUrl: string;
   private authUrl: string;
-  private accessToken: string | null = null;
-  private tokenExpiry: number = 0;
+  // Token cache is keyed by org alias (or empty string for platform-level)
+  private tokenCache: Map<string, { token: string; expiry: number }> =
+    new Map();
   private readonly maxRetries = 3;
   private readonly retryDelay = 1000; // 1 second
   private readonly tokenRefreshBuffer = 5 * 60 * 1000; // Refresh token 5 minutes before expiry
@@ -100,14 +101,17 @@ export class LightReachClient implements IFinanceProvider {
 
   /**
    * Authenticate and get access token
+   * @param orgAlias - Optional organization alias for impersonation.
+   *                   Per LightReach docs, use ?org=${aliasOfOrgToImpersonate} to
+   *                   authenticate on behalf of a sub-organization (dealer/installer).
    */
-  private async getAccessToken(): Promise<string> {
+  private async getAccessToken(orgAlias?: string): Promise<string> {
+    const cacheKey = orgAlias || "";
+
     // Return cached token if still valid
-    if (
-      this.accessToken &&
-      Date.now() < this.tokenExpiry - this.tokenRefreshBuffer
-    ) {
-      return this.accessToken;
+    const cached = this.tokenCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiry - this.tokenRefreshBuffer) {
+      return cached.token;
     }
 
     if (!this.username || !this.password) {
@@ -119,7 +123,19 @@ export class LightReachClient implements IFinanceProvider {
     }
 
     try {
-      const response = await this.makeRequest(this.authUrl, {
+      // Build auth URL with optional org impersonation
+      let authUrl = this.authUrl;
+      if (orgAlias) {
+        authUrl = `${this.authUrl}?org=${encodeURIComponent(orgAlias)}`;
+      }
+
+      console.log("[LightReach] Authenticating:", {
+        authUrl,
+        orgAlias: orgAlias || "(platform-level)",
+        timestamp: new Date().toISOString(),
+      });
+
+      const response = await this.makeRequest(authUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -147,14 +163,22 @@ export class LightReachClient implements IFinanceProvider {
       }
 
       const authResponse: PalmettoAuthResponse = await response.json();
-      this.accessToken = authResponse.access_token;
+      const accessToken = authResponse.access_token;
 
       // Set token expiry (default to 1 hour if not provided)
       const expiresIn = authResponse.expires_in || 3600;
-      this.tokenExpiry = Date.now() + expiresIn * 1000;
+      const tokenExpiry = Date.now() + expiresIn * 1000;
 
-      console.log("[LightReach] Authentication successful");
-      return this.accessToken;
+      // Cache the token
+      this.tokenCache.set(cacheKey, {
+        token: accessToken,
+        expiry: tokenExpiry,
+      });
+
+      console.log("[LightReach] Authentication successful", {
+        orgAlias: orgAlias || "(platform-level)",
+      });
+      return accessToken;
     } catch (error) {
       if (error instanceof FinanceAPIError) {
         throw error;
@@ -290,8 +314,8 @@ export class LightReachClient implements IFinanceProvider {
     // Validate input data
     this.validateApplicationData(data);
 
-    // Get access token
-    const token = await this.getAccessToken();
+    // Get access token with org impersonation if provided
+    const token = await this.getAccessToken(data.orgAlias);
 
     // Transform our application data to Palmetto Finance API v2 format
     // Based on official API documentation: /api/v2/accounts/
@@ -882,13 +906,15 @@ export class LightReachClient implements IFinanceProvider {
    * Get estimated pricing for HVAC before creating an account.
    * Use this to show monthly payment options in the proposal builder.
    * POST /api/v2/estimated-pricing/hvac
+   * @param orgAlias - Optional organization alias for impersonation
    */
   async getEstimatedPricing(
     state: string,
     totalFinancedAmount: number,
     systemDesign?: HVACSystemDesign,
+    orgAlias?: string,
   ): Promise<EstimatedPricingResponse[]> {
-    const token = await this.getAccessToken();
+    const token = await this.getAccessToken(orgAlias);
 
     const url = `${this.baseUrl}/api/v2/estimated-pricing/hvac`;
     const body: {

@@ -168,15 +168,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Log application submission attempt
-    console.log("[Finance] Submitting application:", {
-      proposalId,
-      userId: session.user.id,
-      companyId: session.user.companyId,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Check for LightReach credentials - first from company settings, then env vars
+    // Get company settings for LightReach org alias
     const company = await prisma.company.findUnique({
       where: { id: session.user.companyId },
       select: { settings: true },
@@ -184,38 +176,37 @@ export async function POST(request: NextRequest) {
     const companySettings = (company?.settings as Record<string, any>) || {};
     const lightreachSettings = companySettings.lightreach || {};
 
-    // Use credentials from company settings if configured, otherwise fall back to env vars
-    const lightreachEmail =
-      lightreachSettings.email || process.env.PALMETTO_FINANCE_ACCOUNT_EMAIL;
-    const lightreachPassword =
-      lightreachSettings.password ||
-      process.env.PALMETTO_FINANCE_ACCOUNT_PASSWORD;
-    const lightreachEnvironment =
-      lightreachSettings.environment ||
-      process.env.PALMETTO_FINANCE_ENVIRONMENT ||
-      "next";
-
-    const hasCredentials = !!lightreachEmail && !!lightreachPassword;
+    // Check for platform-level credentials (required for API access)
+    const hasCredentials =
+      !!process.env.PALMETTO_FINANCE_ACCOUNT_EMAIL &&
+      !!process.env.PALMETTO_FINANCE_ACCOUNT_PASSWORD;
     const enableTestMode = process.env.ENABLE_FINANCE_TEST_MODE === "true";
 
     if (!hasCredentials && !enableTestMode) {
       return NextResponse.json(
         {
           error:
-            "LightReach credentials not configured. Configure them in Admin Settings > Company > LightReach Finance Integration, or set environment variables.",
+            "LightReach platform credentials not configured. Contact system administrator.",
           code: "CREDENTIALS_REQUIRED",
         },
         { status: 503 },
       );
     }
 
-    // If using company-configured credentials, set them as env vars for the LightReach client
-    // (This is a workaround until the client is refactored to accept credentials dynamically)
-    if (lightreachSettings.configured) {
-      process.env.PALMETTO_FINANCE_ACCOUNT_EMAIL = lightreachEmail;
-      process.env.PALMETTO_FINANCE_ACCOUNT_PASSWORD = lightreachPassword;
-      process.env.PALMETTO_FINANCE_ENVIRONMENT = lightreachEnvironment;
+    // Add org alias for organization impersonation if configured
+    // This routes the account to the correct dealer in LightReach's portal
+    if (lightreachSettings.orgAlias) {
+      applicationData.orgAlias = lightreachSettings.orgAlias;
     }
+
+    // Log application submission attempt
+    console.log("[Finance] Submitting application:", {
+      proposalId,
+      userId: session.user.id,
+      companyId: session.user.companyId,
+      orgAlias: applicationData.orgAlias || "(none)",
+      timestamp: new Date().toISOString(),
+    });
 
     let response: any;
 

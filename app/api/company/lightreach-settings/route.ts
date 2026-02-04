@@ -3,11 +3,13 @@ import { requireAuth } from '@/lib/auth-helpers'
 import { prisma } from '@/lib/db'
 
 /**
- * POST /api/company/lightreach-credentials
- * Save LightReach credentials for the company
+ * POST /api/company/lightreach-settings
+ * Save LightReach organization settings for the company
  *
- * Note: In production, these should be encrypted before storage.
- * For now, we're storing them in the company settings JSON field.
+ * LightReach uses organization impersonation:
+ * - Platform has ONE set of API credentials (in env vars)
+ * - Each company/dealer has an org alias for routing accounts
+ * - Sales rep info is per-user (stored in User model)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -22,11 +24,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { email, password, environment } = body
+    const { orgAlias } = body
 
-    if (!email || !password) {
+    if (!orgAlias || typeof orgAlias !== 'string' || !orgAlias.trim()) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: 'Organization alias is required' },
         { status: 400 }
       )
     }
@@ -39,14 +41,12 @@ export async function POST(request: NextRequest) {
 
     const currentSettings = (company?.settings as Record<string, any>) || {}
 
-    // Update settings with LightReach credentials
-    // Note: In production, encrypt the password before storing
+    // Update settings with LightReach org alias
     const updatedSettings = {
       ...currentSettings,
       lightreach: {
-        email,
-        password, // TODO: Encrypt this in production
-        environment: environment || 'next',
+        ...currentSettings.lightreach,
+        orgAlias: orgAlias.trim(),
         configured: true,
         updatedAt: new Date().toISOString(),
       },
@@ -60,24 +60,27 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    console.log('[LightReachCredentials] Saved credentials for company:', session.user.companyId)
+    console.log('[LightReachSettings] Saved org alias for company:', {
+      companyId: session.user.companyId,
+      orgAlias: orgAlias.trim(),
+    })
 
     return NextResponse.json({
       success: true,
-      message: 'Credentials saved successfully',
+      message: 'Organization settings saved successfully',
     })
   } catch (error) {
-    console.error('[LightReachCredentials] Error:', error)
+    console.error('[LightReachSettings] Error:', error)
     return NextResponse.json(
-      { error: 'Failed to save credentials' },
+      { error: 'Failed to save settings' },
       { status: 500 }
     )
   }
 }
 
 /**
- * GET /api/company/lightreach-credentials
- * Check if LightReach credentials are configured (doesn't return actual credentials)
+ * GET /api/company/lightreach-settings
+ * Get LightReach organization settings for the company
  */
 export async function GET() {
   try {
@@ -93,13 +96,12 @@ export async function GET() {
 
     return NextResponse.json({
       configured: !!lightreach.configured,
-      email: lightreach.email || null,
-      environment: lightreach.environment || 'next',
+      orgAlias: lightreach.orgAlias || null,
     })
   } catch (error) {
-    console.error('[LightReachCredentials] Error:', error)
+    console.error('[LightReachSettings] Error:', error)
     return NextResponse.json(
-      { error: 'Failed to check credentials' },
+      { error: 'Failed to get settings' },
       { status: 500 }
     )
   }

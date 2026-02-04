@@ -12,14 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Building2,
-  Save,
-  Key,
-  CheckCircle,
-  XCircle,
-  Loader2,
-} from "lucide-react";
+import { Building2, Save, Key, CheckCircle, Loader2, Info } from "lucide-react";
 import { toast } from "sonner";
 
 interface CompanyData {
@@ -32,17 +25,13 @@ export function CompanySettings() {
   const [company, setCompany] = useState<CompanyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [testingCredentials, setTestingCredentials] = useState(false);
-  const [credentialsStatus, setCredentialsStatus] = useState<
-    "untested" | "valid" | "invalid"
-  >("untested");
+  const [savingLightreach, setSavingLightreach] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     settings: {} as any,
   });
-  const [lightreachEmail, setLightreachEmail] = useState("");
-  const [lightreachPassword, setLightreachPassword] = useState("");
-  const [lightreachEnvironment, setLightreachEnvironment] = useState("next");
+  // LightReach org alias for impersonation (NOT credentials - those are platform-level)
+  const [lightreachOrgAlias, setLightreachOrgAlias] = useState("");
 
   useEffect(() => {
     fetchCompany();
@@ -59,16 +48,9 @@ export function CompanySettings() {
           name: data.name || "",
           settings: data.settings || {},
         });
-        // Load LightReach settings
-        if (data.settings?.lightreach) {
-          setLightreachEmail(data.settings.lightreach.email || "");
-          setLightreachEnvironment(
-            data.settings.lightreach.environment || "next",
-          );
-          // Don't load password - it should be re-entered for security
-          if (data.settings.lightreach.configured) {
-            setCredentialsStatus("valid");
-          }
+        // Load LightReach org alias
+        if (data.settings?.lightreach?.orgAlias) {
+          setLightreachOrgAlias(data.settings.lightreach.orgAlias);
         }
       } else {
         toast.error("Failed to load company settings");
@@ -81,69 +63,44 @@ export function CompanySettings() {
     }
   };
 
-  const testAndSaveCredentials = async () => {
-    if (!lightreachEmail || !lightreachPassword) {
-      toast.error("Please enter both email and password");
+  const saveLightreachSettings = async () => {
+    if (!lightreachOrgAlias.trim()) {
+      toast.error("Please enter an organization alias");
       return;
     }
 
-    setTestingCredentials(true);
-    setCredentialsStatus("untested");
+    setSavingLightreach(true);
 
     try {
-      // Test the credentials by calling the test endpoint
-      const response = await fetch("/api/finance/lightreach/test-credentials", {
+      const response = await fetch("/api/company/lightreach-settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: lightreachEmail,
-          password: lightreachPassword,
-          environment: lightreachEnvironment,
+          orgAlias: lightreachOrgAlias.trim(),
         }),
       });
 
-      const result = await response.json();
-
-      if (response.ok && result.valid) {
-        setCredentialsStatus("valid");
-
-        // Save credentials to company settings
+      if (response.ok) {
+        // Update local state
         const updatedSettings = {
           ...formData.settings,
           lightreach: {
-            email: lightreachEmail,
-            environment: lightreachEnvironment,
+            ...formData.settings?.lightreach,
+            orgAlias: lightreachOrgAlias.trim(),
             configured: true,
-            // Password is stored encrypted on the server
           },
         };
-
-        // Save to server (credentials saved separately via secure endpoint)
-        await fetch("/api/company/lightreach-credentials", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: lightreachEmail,
-            password: lightreachPassword,
-            environment: lightreachEnvironment,
-          }),
-        });
-
         setFormData({ ...formData, settings: updatedSettings });
-        toast.success("LightReach credentials verified and saved!");
+        toast.success("LightReach organization settings saved!");
       } else {
-        setCredentialsStatus("invalid");
-        toast.error(
-          result.error ||
-            "Invalid credentials. Please check your email and password.",
-        );
+        const error = await response.json();
+        toast.error(error.error || "Failed to save settings");
       }
     } catch (error) {
-      console.error("Error testing credentials:", error);
-      setCredentialsStatus("invalid");
-      toast.error("Failed to test credentials. Please try again.");
+      console.error("Error saving LightReach settings:", error);
+      toast.error("Failed to save settings. Please try again.");
     } finally {
-      setTestingCredentials(false);
+      setSavingLightreach(false);
     }
   };
 
@@ -182,6 +139,8 @@ export function CompanySettings() {
       </Card>
     );
   }
+
+  const isOrgConfigured = !!formData.settings?.lightreach?.configured;
 
   return (
     <div className="space-y-6">
@@ -223,112 +182,84 @@ export function CompanySettings() {
           <CardTitle className="flex items-center gap-2">
             <Key className="w-5 h-5" />
             LightReach Finance Integration
-            {credentialsStatus === "valid" && (
+            {isOrgConfigured && (
               <Badge
                 variant="outline"
                 className="ml-2 bg-green-50 text-green-700 border-green-200"
               >
                 <CheckCircle className="w-3 h-3 mr-1" />
-                Connected
-              </Badge>
-            )}
-            {credentialsStatus === "invalid" && (
-              <Badge
-                variant="outline"
-                className="ml-2 bg-red-50 text-red-700 border-red-200"
-              >
-                <XCircle className="w-3 h-3 mr-1" />
-                Invalid
+                Configured
               </Badge>
             )}
           </CardTitle>
           <CardDescription>
-            Configure your LightReach (Palmetto Finance) credentials for Comfort
-            Plan financing
+            Configure your LightReach organization for Comfort Plan financing
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="lightreachEmail">Account Email</Label>
-              <Input
-                id="lightreachEmail"
-                type="email"
-                value={lightreachEmail}
-                onChange={(e) => {
-                  setLightreachEmail(e.target.value);
-                  setCredentialsStatus("untested");
-                }}
-                placeholder="your-account@company.com"
-              />
-            </div>
-            <div>
-              <Label htmlFor="lightreachPassword">Password</Label>
-              <Input
-                id="lightreachPassword"
-                type="password"
-                value={lightreachPassword}
-                onChange={(e) => {
-                  setLightreachPassword(e.target.value);
-                  setCredentialsStatus("untested");
-                }}
-                placeholder={
-                  credentialsStatus === "valid" ? "••••••••" : "Enter password"
-                }
-              />
+          {/* Info box explaining the architecture */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex gap-2">
+              <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium">How LightReach Integration Works</p>
+                <ul className="mt-2 space-y-1 list-disc list-inside">
+                  <li>
+                    <strong>Platform credentials</strong> are configured by the
+                    system administrator (environment variables)
+                  </li>
+                  <li>
+                    <strong>Organization alias</strong> identifies your company
+                    in LightReach&apos;s system
+                  </li>
+                  <li>
+                    <strong>Sales rep info</strong> is configured per-user in
+                    their profile settings
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
 
           <div>
-            <Label htmlFor="lightreachEnv">Environment</Label>
-            <select
-              id="lightreachEnv"
-              value={lightreachEnvironment}
-              onChange={(e) => {
-                setLightreachEnvironment(e.target.value);
-                setCredentialsStatus("untested");
-              }}
-              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
-            >
-              <option value="next">Staging (next.palmetto.finance)</option>
-              <option value="prod">Production (palmetto.finance)</option>
-            </select>
+            <Label htmlFor="lightreachOrgAlias">Organization Alias</Label>
+            <Input
+              id="lightreachOrgAlias"
+              value={lightreachOrgAlias}
+              onChange={(e) => setLightreachOrgAlias(e.target.value)}
+              placeholder="e.g., kin-hvac or your-company-name"
+            />
             <p className="text-xs text-muted-foreground mt-1">
-              Use Staging for testing, Production for live applications
+              This is your company&apos;s identifier in LightReach. Contact
+              LightReach support if you don&apos;t know your org alias.
             </p>
           </div>
 
           <div className="flex justify-end pt-4">
             <Button
-              onClick={testAndSaveCredentials}
-              disabled={testingCredentials || !lightreachEmail}
-              variant={credentialsStatus === "valid" ? "outline" : "default"}
+              onClick={saveLightreachSettings}
+              disabled={savingLightreach || !lightreachOrgAlias.trim()}
             >
-              {testingCredentials ? (
+              {savingLightreach ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Testing...
-                </>
-              ) : credentialsStatus === "valid" ? (
-                <>
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Re-test Credentials
+                  Saving...
                 </>
               ) : (
                 <>
-                  <Key className="w-4 h-4 mr-2" />
-                  Test & Save Credentials
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Organization Settings
                 </>
               )}
             </Button>
           </div>
 
-          {credentialsStatus === "invalid" && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              <p className="font-medium">Unable to verify credentials</p>
+          {!isOrgConfigured && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+              <p className="font-medium">Organization not configured</p>
               <p className="mt-1">
-                Please check your email and password. Make sure you&apos;re
-                using the correct environment (Staging vs Production).
+                Enter your LightReach organization alias to enable Comfort Plan
+                financing for your company.
               </p>
             </div>
           )}
