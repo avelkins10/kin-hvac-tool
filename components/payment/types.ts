@@ -163,20 +163,40 @@ export function transformToComfortPlanOptions(
       const lastPayment =
         payments.length > 0 ? payments[payments.length - 1] : null;
 
+      // Derive termYears from monthlyPayments array if not provided
+      // Each payment entry represents one year
+      const termYears = product.termYears || payments.length || 0;
+
+      // LightReach API returns escalationRate as decimal (0.0099 = 0.99%)
+      // Convert to percentage if value is less than 1
+      let escalatorRate = product.escalationRate || 0;
+      if (escalatorRate > 0 && escalatorRate < 1) {
+        escalatorRate = escalatorRate * 100; // Convert 0.0099 -> 0.99
+      }
+
+      // Calculate total cost from payments if not provided
+      let totalCost = product.totalAmountPaid || 0;
+      if (totalCost === 0 && payments.length > 0) {
+        totalCost = payments.reduce(
+          (sum, p) => sum + (p.yearlyCost || (p.monthlyPayment || 0) * 12),
+          0,
+        );
+      }
+
       return {
         id: `comfort-plan-${index}`,
         productId: product.productId || "",
         name: product.name || "",
-        termYears: product.termYears || 0,
-        termMonths: (product.termYears || 0) * 12,
-        escalatorRate: product.escalationRate || 0,
+        termYears,
+        termMonths: termYears * 12,
+        escalatorRate,
         year1Payment: year1?.monthlyPayment ?? 0,
         year10Payment:
           year10?.monthlyPayment ?? lastPayment?.monthlyPayment ?? 0,
-        totalCost: product.totalAmountPaid || 0,
+        totalCost,
         monthlyPayments: payments,
         // Mark 10-year 0% as recommended (lowest risk, predictable payments)
-        isRecommended: product.termYears === 10 && product.escalationRate === 0,
+        isRecommended: termYears === 10 && escalatorRate === 0,
       };
     });
 }
