@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { Check, Star } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { PaymentComparisonViewProps, getEscalatorColor } from './types';
+import { Check, Star } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { PaymentComparisonViewProps, getEscalatorColor } from "./types";
 
 export function PaymentComparisonView({
   options,
@@ -17,7 +17,7 @@ export function PaymentComparisonView({
       acc[term].push(option);
       return acc;
     },
-    {} as Record<number, typeof options>
+    {} as Record<number, typeof options>,
   );
 
   const sortedTerms = Object.keys(optionsByTerm)
@@ -25,9 +25,9 @@ export function PaymentComparisonView({
     .sort((a, b) => a - b);
 
   const escalatorColorClasses = {
-    low: 'text-escalator-low',
-    mid: 'text-escalator-mid',
-    high: 'text-escalator-high',
+    low: "text-escalator-low",
+    mid: "text-escalator-mid",
+    high: "text-escalator-high",
   };
 
   return (
@@ -60,22 +60,23 @@ export function PaymentComparisonView({
               const isSelected = selectedId === option.id;
               const escalatorColor = getEscalatorColor(option.escalatorRate);
               const finalYearPayment =
-                option.monthlyPayments[option.monthlyPayments.length - 1]?.monthlyPayment ?? 0;
+                option.monthlyPayments[option.monthlyPayments.length - 1]
+                  ?.monthlyPayment ?? 0;
 
               return (
                 <tr
                   key={option.id}
                   onClick={() => onSelect(option.id)}
                   className={cn(
-                    'border-b border-border/50 cursor-pointer transition-colors',
-                    isSelected
-                      ? 'bg-primary/5'
-                      : 'hover:bg-muted/50'
+                    "border-b border-border/50 cursor-pointer transition-colors",
+                    isSelected ? "bg-primary/5" : "hover:bg-muted/50",
                   )}
                 >
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">{option.termYears} Year</span>
+                      <span className="font-medium">
+                        {option.termYears} Year
+                      </span>
                       {option.isRecommended && (
                         <span className="flex items-center gap-1 px-1.5 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded">
                           <Star className="w-3 h-3 fill-current" />
@@ -85,26 +86,31 @@ export function PaymentComparisonView({
                     </div>
                   </td>
                   <td className="py-4 px-4">
-                    <span className={cn('font-medium', escalatorColorClasses[escalatorColor])}>
+                    <span
+                      className={cn(
+                        "font-medium",
+                        escalatorColorClasses[escalatorColor],
+                      )}
+                    >
                       {option.escalatorRate}%
                     </span>
                   </td>
                   <td className="py-4 px-4 text-right font-medium">
-                    ${option.year1Payment.toFixed(0)}/mo
+                    ${(option.year1Payment ?? 0).toFixed(0)}/mo
                   </td>
                   <td className="py-4 px-4 text-right">
                     ${finalYearPayment.toFixed(0)}/mo
                   </td>
                   <td className="py-4 px-4 text-right">
-                    ${option.totalCost.toLocaleString()}
+                    ${(option.totalCost ?? 0).toLocaleString()}
                   </td>
                   <td className="py-4 px-4 text-center">
                     <div
                       className={cn(
-                        'w-5 h-5 rounded-full border-2 flex items-center justify-center mx-auto transition-all',
+                        "w-5 h-5 rounded-full border-2 flex items-center justify-center mx-auto transition-all",
                         isSelected
-                          ? 'border-primary bg-primary'
-                          : 'border-muted-foreground/30'
+                          ? "border-primary bg-primary"
+                          : "border-muted-foreground/30",
                       )}
                     >
                       {isSelected && <Check className="w-3 h-3 text-white" />}
@@ -129,9 +135,12 @@ export function PaymentComparisonView({
                 .sort((a, b) => a.escalatorRate - b.escalatorRate)
                 .map((option) => {
                   const isSelected = selectedId === option.id;
-                  const escalatorColor = getEscalatorColor(option.escalatorRate);
+                  const escalatorColor = getEscalatorColor(
+                    option.escalatorRate,
+                  );
                   const finalYearPayment =
-                    option.monthlyPayments[option.monthlyPayments.length - 1]?.monthlyPayment ?? 0;
+                    option.monthlyPayments[option.monthlyPayments.length - 1]
+                      ?.monthlyPayment ?? 0;
 
                   return (
                     <button
@@ -139,11 +148,11 @@ export function PaymentComparisonView({
                       type="button"
                       onClick={() => onSelect(option.id)}
                       className={cn(
-                        'relative flex-shrink-0 w-[200px] p-4 rounded-xl border-2 text-left snap-start transition-all',
-                        'active:scale-[0.98]',
+                        "relative flex-shrink-0 w-[200px] p-4 rounded-xl border-2 text-left snap-start transition-all",
+                        "active:scale-[0.98]",
                         isSelected
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border'
+                          ? "border-primary bg-primary/5"
+                          : "border-border",
                       )}
                     >
                       {option.isRecommended && (
@@ -155,16 +164,18 @@ export function PaymentComparisonView({
 
                       <div
                         className={cn(
-                          'text-xs font-medium mb-2',
-                          escalatorColorClasses[escalatorColor]
+                          "text-xs font-medium mb-2",
+                          escalatorColorClasses[escalatorColor],
                         )}
                       >
                         {option.escalatorRate}% escalator
                       </div>
 
                       <div className="text-2xl font-bold text-primary mb-1">
-                        ${option.year1Payment.toFixed(0)}
-                        <span className="text-sm font-normal text-muted-foreground">/mo</span>
+                        ${(option.year1Payment ?? 0).toFixed(0)}
+                        <span className="text-sm font-normal text-muted-foreground">
+                          /mo
+                        </span>
                       </div>
 
                       <div className="space-y-1 text-xs text-muted-foreground">
@@ -174,7 +185,9 @@ export function PaymentComparisonView({
                         </div>
                         <div className="flex justify-between">
                           <span>Total</span>
-                          <span>${option.totalCost.toLocaleString()}</span>
+                          <span>
+                            ${(option.totalCost ?? 0).toLocaleString()}
+                          </span>
                         </div>
                       </div>
 

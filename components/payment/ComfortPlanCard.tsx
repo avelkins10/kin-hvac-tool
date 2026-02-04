@@ -110,7 +110,7 @@ export function ComfortPlanCard({
               isSelected ? "text-primary" : "text-foreground",
             )}
           >
-            {option.year1Payment.toFixed(0)}
+            {(option.year1Payment ?? 0).toFixed(0)}
           </span>
           <span className="text-muted-foreground font-medium">/mo</span>
         </div>
@@ -138,7 +138,7 @@ export function ComfortPlanCard({
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Total cost</span>
           <span className="font-semibold text-foreground">
-            ${option.totalCost.toLocaleString()}
+            ${(option.totalCost ?? 0).toLocaleString()}
           </span>
         </div>
       </div>
