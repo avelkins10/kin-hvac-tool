@@ -126,9 +126,11 @@ export function ComfortPlanCard({
             </span>
             <span className="font-semibold text-foreground">
               $
-              {option.monthlyPayments[
-                option.monthlyPayments.length - 1
-              ]?.monthlyPayment.toFixed(0)}
+              {(option.monthlyPayments.length > 0
+                ? (option.monthlyPayments[option.monthlyPayments.length - 1]
+                    ?.monthlyPayment ?? 0)
+                : 0
+              ).toFixed(0)}
               /mo
             </span>
           </div>
