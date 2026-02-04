@@ -8,7 +8,7 @@ import { QuickActions } from '@/components/dashboard/QuickActions'
 import { NavCard } from '@/components/dashboard/NavCard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, AlertTriangle, FileText, Send, Eye, Users, UserCog, Workflow } from 'lucide-react'
+import { Plus, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { getProposalCustomerDisplay } from '@/lib/utils'
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
@@ -32,19 +32,15 @@ async function getDashboardData() {
 
   const where: any = {}
 
-  // Company isolation
   if (session.user.role === 'SUPER_ADMIN') {
-    // Super admin can see all
   } else {
     where.companyId = session.user.companyId
   }
 
-  // User filter - Sales reps only see their own proposals
   if (session.user.role === 'SALES_REP') {
     where.userId = session.user.id
   }
 
-  // Get proposal counts by status
   const statusCounts = await prisma.proposal.groupBy({
     by: ['status'],
     where,
@@ -53,7 +49,6 @@ async function getDashboardData() {
     },
   })
 
-  // Get recent proposals (last 10)
   const recentProposals = await prisma.proposal.findMany({
     where,
     include: {
@@ -71,7 +66,6 @@ async function getDashboardData() {
     take: 10,
   })
 
-  // Get proposals expiring soon (within 7 days)
   const sevenDaysFromNow = new Date()
   sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
 
@@ -101,10 +95,8 @@ async function getDashboardData() {
     take: 5,
   })
 
-  // Calculate totals
   const totalProposals = await prisma.proposal.count({ where })
 
-  // Format status counts
   const statusCountsMap: Record<string, number> = {
     DRAFT: 0,
     SENT: 0,
@@ -118,7 +110,6 @@ async function getDashboardData() {
     statusCountsMap[item.status] = item._count.id
   })
 
-  // Calculate additional stats for QuickStats
   const sentProposals = await prisma.proposal.findMany({
     where: {
       ...where,
@@ -133,17 +124,6 @@ async function getDashboardData() {
     },
   })
 
-  const acceptedProposals = await prisma.proposal.findMany({
-    where: {
-      ...where,
-      status: 'ACCEPTED',
-    },
-    select: {
-      totals: true,
-    },
-  })
-
-  // Calculate average value
   const allProposalsWithTotals = await prisma.proposal.findMany({
     where,
     select: {
@@ -157,13 +137,11 @@ async function getDashboardData() {
   }, 0)
   const avgValue = allProposalsWithTotals.length > 0 ? totalValue / allProposalsWithTotals.length : 0
 
-  // Calculate last sent days ago
   const lastSent = sentProposals[0]?.createdAt
   const lastSentDaysAgo = lastSent
     ? Math.floor((new Date().getTime() - new Date(lastSent).getTime()) / (1000 * 60 * 60 * 24))
     : null
 
-  // Calculate win rate (accepted / (accepted + rejected))
   const rejectedCount = statusCountsMap.REJECTED || 0
   const acceptedCount = statusCountsMap.ACCEPTED || 0
   const winRate = acceptedCount + rejectedCount > 0
@@ -186,8 +164,8 @@ export default async function DashboardPage() {
   const data = await getDashboardData()
 
   return (
-    <AuthenticatedLayout>
-      <div className="container mx-auto px-6 py-8">
+    <AuthenticatedLayout serverSession={session}>
+      <div className="p-6 md:p-8 space-y-6">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -197,21 +175,21 @@ export default async function DashboardPage() {
         </Breadcrumb>
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-500">Welcome back! Here's your overview.</p>
+            <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
+            <p className="text-muted-foreground mt-1">Welcome back! Here&apos;s your overview.</p>
           </div>
           <Link href="/builder">
-            <Button className="bg-blue-500 hover:bg-blue-600">
+            <Button>
               <Plus className="w-4 h-4 mr-2" />
               New Proposal
             </Button>
           </Link>
         </div>
 
-        {/* Metric Cards - Full Width, 4 columns */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* Metric Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             title="Total Proposals"
             value={data.totalProposals}
@@ -244,14 +222,12 @@ export default async function DashboardPage() {
           />
         </div>
 
-        {/* Main Content - 2 Column Layout */}
+        {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Takes 2/3 width */}
+          {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Recent Proposals */}
             <RecentProposals proposals={data.recentProposals} />
 
-            {/* Outcomes Summary */}
             <OutcomesSummary
               accepted={data.statusCounts.ACCEPTED || 0}
               rejected={data.statusCounts.REJECTED || 0}
@@ -259,46 +235,43 @@ export default async function DashboardPage() {
               total={data.totalProposals}
             />
 
-            {/* Expiring Soon */}
             {data.expiringSoon && data.expiringSoon.length > 0 && (
-              <Card className="border-2 border-amber-200 bg-amber-50/30">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <div className="p-1.5 bg-amber-100 rounded-lg">
-                      <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <Card className="border-warning/30 bg-warning-light/30">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <div className="p-1.5 bg-warning/10 rounded-md">
+                      <AlertTriangle className="h-4 w-4 text-warning" />
                     </div>
-                    <span>Expiring Soon</span>
+                    Expiring Soon
                   </CardTitle>
                   <CardDescription>Proposals expiring within 7 days</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {data.expiringSoon.map((proposal) => {
                       const customer = getProposalCustomerDisplay(proposal.customerData)
                       const expiresAt = proposal.expiresAt ? new Date(proposal.expiresAt) : null
-                      const daysUntilExpiry = expiresAt 
+                      const daysUntilExpiry = expiresAt
                         ? Math.ceil((expiresAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
                         : null
-                      
+
                       return (
                         <Link
                           key={proposal.id}
                           href={`/proposals/${proposal.id}/view`}
-                          className="block p-4 border-2 border-amber-200 rounded-lg hover:border-amber-300 hover:bg-amber-50 transition-all duration-200 group"
+                          className="block p-3 border border-warning/20 rounded-lg hover:border-warning/40 hover:bg-warning-light/50 transition-colors"
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-gray-900 group-hover:text-amber-700 transition-colors">
-                                {customer.name}
-                              </h3>
-                              <p className="text-sm text-gray-600 mt-1">
-                                {expiresAt 
-                                  ? `Expires ${daysUntilExpiry === 0 ? 'today' : `in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? 's' : ''}`} • ${expiresAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-                                  : 'No expiration date'}
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-medium text-foreground truncate">{customer.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {expiresAt
+                                  ? `Expires ${daysUntilExpiry === 0 ? 'today' : `in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? 's' : ''}`}`
+                                  : 'No expiration'}
                               </p>
                             </div>
                             {daysUntilExpiry !== null && daysUntilExpiry <= 3 && (
-                              <span className="px-2 py-1 text-xs font-semibold bg-red-100 text-red-700 rounded-md shrink-0">
+                              <span className="px-2 py-0.5 text-xs font-medium bg-error/10 text-error rounded">
                                 Urgent
                               </span>
                             )}
@@ -312,19 +285,16 @@ export default async function DashboardPage() {
             )}
           </div>
 
-          {/* Right Column - Takes 1/3 width */}
+          {/* Right Column */}
           <div className="space-y-6">
-            {/* Quick Stats */}
             <QuickStats
               avgValue={data.avgValue}
               lastSentDaysAgo={data.lastSentDaysAgo}
               winRate={data.winRate}
             />
 
-            {/* Quick Actions */}
             <QuickActions />
 
-            {/* Navigation Cards */}
             <div className="space-y-3">
               <NavCard
                 title="All Proposals"

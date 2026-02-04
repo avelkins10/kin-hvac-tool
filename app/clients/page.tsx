@@ -3,10 +3,10 @@ import { ClientList } from '@/components/clients/ClientList'
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
 
 export default async function ClientsPage() {
-  await requireAuth()
+  const session = await requireAuth()
 
   return (
-    <AuthenticatedLayout>
+    <AuthenticatedLayout serverSession={session}>
       <div className="p-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>

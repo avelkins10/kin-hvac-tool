@@ -75,11 +75,8 @@ export async function GET(request: NextRequest) {
       lightreachSalesRepPhone: user.lightreachSalesRepPhone ?? undefined,
     })
   } catch (error) {
-    console.error('Error fetching user:', error)
-    // Avoid 500 on missing DB columns or transient errors so the client can still show layout
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('[GET /api/auth/user] Error:', error)
+    // Missing Supabase env, DB error, or transient failure → return 401 so client shows "not logged in" instead of 500
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 }

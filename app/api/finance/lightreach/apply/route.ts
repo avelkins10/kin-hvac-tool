@@ -80,14 +80,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Per-user sales rep info for LightReach (override env if set)
-    const submittingUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        lightreachSalesRepName: true,
-        lightreachSalesRepEmail: true,
-        lightreachSalesRepPhone: true,
-      },
-    })
+    let submittingUser: { lightreachSalesRepName?: string | null; lightreachSalesRepEmail?: string | null; lightreachSalesRepPhone?: string | null } | null = null
+    try {
+      submittingUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          lightreachSalesRepName: true,
+          lightreachSalesRepEmail: true,
+          lightreachSalesRepPhone: true,
+        },
+      })
+    } catch {
+      // Schema may not have lightreach columns yet or Prisma client may be stale (e.g. cached build)
+      submittingUser = null
+    }
     if (submittingUser?.lightreachSalesRepName?.trim()) {
       applicationData.salesRepName = submittingUser.lightreachSalesRepName.trim()
     }

@@ -1,37 +1,37 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/auth-helpers'
-import { prisma } from '@/lib/db'
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth-helpers";
+import { prisma } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAuth()
+    const session = await requireAuth();
 
-    const where: any = {}
+    const where: any = {};
 
     // Company isolation
-    if (session.user.role === 'SUPER_ADMIN') {
+    if (session.user.role === "SUPER_ADMIN") {
       // Super admin can see all, but we'll filter by companyId if provided
-      const companyId = new URL(request.url).searchParams.get('companyId')
+      const companyId = new URL(request.url).searchParams.get("companyId");
       if (companyId) {
-        where.companyId = companyId
+        where.companyId = companyId;
       }
     } else {
-      where.companyId = session.user.companyId
+      where.companyId = session.user.companyId;
     }
 
     // User filter - Sales reps only see their own proposals
-    if (session.user.role === 'SALES_REP') {
-      where.userId = session.user.id
+    if (session.user.role === "SALES_REP") {
+      where.userId = session.user.id;
     }
 
     // Get proposal counts by status
     const statusCounts = await prisma.proposal.groupBy({
-      by: ['status'],
+      by: ["status"],
       where,
       _count: {
         id: true,
       },
-    })
+    });
 
     // Get recent proposals (last 10)
     const recentProposals = await prisma.proposal.findMany({
@@ -46,14 +46,14 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
       take: 10,
-    })
+    });
 
     // Get proposals expiring soon (within 7 days)
-    const sevenDaysFromNow = new Date()
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
     const expiringSoon = await prisma.proposal.findMany({
       where: {
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
           gte: new Date(),
         },
         status: {
-          not: 'EXPIRED',
+          not: "EXPIRED",
         },
       },
       include: {
@@ -76,13 +76,13 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: {
-        expiresAt: 'asc',
+        expiresAt: "asc",
       },
       take: 5,
-    })
+    });
 
     // Calculate totals
-    const totalProposals = await prisma.proposal.count({ where })
+    const totalProposals = await prisma.proposal.count({ where });
     const totalValue = await prisma.proposal.aggregate({
       where: {
         ...where,
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
       _sum: {
         // We'll need to calculate this from JSON, but for now return count
       },
-    })
+    });
 
     // Format status counts
     const statusCountsMap: Record<string, number> = {
@@ -103,20 +103,30 @@ export async function GET(request: NextRequest) {
       ACCEPTED: 0,
       REJECTED: 0,
       EXPIRED: 0,
-    }
+    };
 
     statusCounts.forEach((item) => {
-      statusCountsMap[item.status] = item._count.id
-    })
+      statusCountsMap[item.status] = item._count.id;
+    });
 
-    return NextResponse.json({
-      statusCounts: statusCountsMap,
-      totalProposals,
-      recentProposals,
-      expiringSoon,
-    })
+    return NextResponse.json(
+      {
+        statusCounts: statusCountsMap,
+        totalProposals,
+        recentProposals,
+        expiringSoon,
+      },
+      {
+        headers: {
+          "Cache-Control": "private, s-maxage=60, stale-while-revalidate=300",
+        },
+      },
+    );
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error("Error fetching dashboard stats:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
+import { AlertCircle } from 'lucide-react'
 
 /**
  * Native form POST to /api/auth/login so browser gets 302 + Set-Cookie
@@ -26,17 +27,19 @@ export function LoginForm() {
     setIsLoading(true)
   }
 
+  const debug = searchParams.get('debug') === '1'
+
   return (
     <form
       action="/api/auth/login"
       method="POST"
       onSubmit={handleSubmit}
-      className="space-y-6 w-full"
+      className="space-y-4 w-full"
     >
+      {debug && <input type="hidden" name="debug" value="1" />}
+
       <div className="space-y-2">
-        <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-          Email Address
-        </Label>
+        <Label htmlFor="email">Email</Label>
         <Input
           id="email"
           name="email"
@@ -44,13 +47,11 @@ export function LoginForm() {
           autoComplete="email"
           required
           placeholder="you@example.com"
-          className="h-11 focus:ring-2 focus:ring-blue-500"
         />
       </div>
+
       <div className="space-y-2">
-        <Label htmlFor="password" className="text-sm font-medium text-gray-700">
-          Password
-        </Label>
+        <Label htmlFor="password">Password</Label>
         <Input
           id="password"
           name="password"
@@ -58,28 +59,26 @@ export function LoginForm() {
           autoComplete="current-password"
           required
           placeholder="Enter your password"
-          className="h-11 focus:ring-2 focus:ring-blue-500"
         />
       </div>
-      <Button
-        type="submit"
-        className="w-full h-11 text-base font-semibold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md transition-all"
-        disabled={isLoading}
-      >
+
+      {error && (
+        <div className="flex items-start gap-2 p-3 bg-error-light border border-error/20 rounded-md" role="alert">
+          <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
+          <p className="text-sm text-error">{error}</p>
+        </div>
+      )}
+
+      <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? (
           <span className="flex items-center justify-center">
-            <Spinner className="mr-2 h-5 w-5 text-white" />
-            Logging in...
+            <Spinner className="mr-2 h-4 w-4" />
+            Signing in...
           </span>
         ) : (
-          'Sign In'
+          'Sign in'
         )}
       </Button>
-      {error && (
-        <p className="text-sm text-red-600 text-center" role="alert">
-          {error}
-        </p>
-      )}
     </form>
   )
 }

@@ -3,12 +3,12 @@
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { 
-  LayoutDashboard, 
-  FileText, 
-  Users, 
-  Plus, 
-  Settings, 
+import {
+  LayoutDashboard,
+  FileText,
+  Users,
+  Plus,
+  Settings,
   LogOut,
   Menu,
   X,
@@ -38,7 +38,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const isAdmin = session?.role === 'COMPANY_ADMIN' || session?.role === 'SUPER_ADMIN'
-  
+
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Proposals', href: '/proposals', icon: FileText },
@@ -55,25 +55,24 @@ export function AppLayout({ children }: AppLayoutProps) {
     return pathname?.startsWith(href)
   }
 
-  // API returns flat user { id, email, role, ... }; support that or legacy session.user
   const userObj = session?.user ?? session
   const userInitials = userObj?.email
     ? userObj.email.substring(0, 2).toUpperCase()
     : 'U'
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Top Navigation Bar */}
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <nav className="bg-white border-b border-border sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo and Desktop Navigation */}
             <div className="flex items-center">
-              <Link href="/dashboard" className="flex items-center space-x-2 group">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
-                  <span className="text-white font-bold text-sm">HV</span>
+              <Link href="/dashboard" className="flex items-center space-x-2.5 group">
+                <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center shadow-sm">
+                  <span className="text-primary-foreground font-semibold text-sm">KIN</span>
                 </div>
-                <span className="font-semibold text-gray-900 hidden sm:block group-hover:text-blue-600 transition-colors">
+                <span className="font-semibold text-foreground hidden sm:block">
                   HVAC Proposals
                 </span>
               </Link>
@@ -87,10 +86,10 @@ export function AppLayout({ children }: AppLayoutProps) {
                       key={item.name}
                       href={item.href}
                       className={cn(
-                        'inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+                        'inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
                         isActive(item.href)
-                          ? 'bg-blue-50 text-blue-700 shadow-sm'
-                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                          ? 'bg-primary-50 text-primary-700'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       )}
                     >
                       <Icon className="w-4 h-4 mr-2" />
@@ -101,15 +100,16 @@ export function AppLayout({ children }: AppLayoutProps) {
               </div>
             </div>
 
-            {/* Right side: User menu and mobile menu button */}
-            <div className="flex items-center space-x-4">
-              {/* User Menu */}
+            {/* Right side */}
+            <div className="flex items-center space-x-3">
               {userObj && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback>{userInitials}</AvatarFallback>
+                    <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                      <Avatar className="h-9 w-9">
+                        <AvatarFallback className="bg-primary-100 text-primary-700 text-sm font-medium">
+                          {userInitials}
+                        </AvatarFallback>
                       </Avatar>
                     </Button>
                   </DropdownMenuTrigger>
@@ -124,7 +124,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                         </p>
                         {userObj.role && (
                           <p className="text-xs leading-none text-muted-foreground mt-1">
-                            Role: {userObj.role.replace('_', ' ')}
+                            {userObj.role.replace('_', ' ')}
                           </p>
                         )}
                       </div>
@@ -136,7 +136,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                         <span>Profile</span>
                       </Link>
                     </DropdownMenuItem>
-                    {(userObj.role === 'COMPANY_ADMIN' || userObj.role === 'SUPER_ADMIN') && (
+                    {isAdmin && (
                       <>
                         <DropdownMenuItem asChild>
                           <Link href="/admin/settings" className="cursor-pointer">
@@ -148,7 +148,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                       </>
                     )}
                     <DropdownMenuItem
-                      className="cursor-pointer text-red-600"
+                      className="cursor-pointer text-destructive focus:text-destructive"
                       onClick={() => signOut()}
                     >
                       <LogOut className="mr-2 h-4 w-4" />
@@ -161,13 +161,14 @@ export function AppLayout({ children }: AppLayoutProps) {
               {/* Mobile menu button */}
               <Button
                 variant="ghost"
+                size="sm"
                 className="md:hidden"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
                 {mobileMenuOpen ? (
-                  <X className="h-6 w-6" />
+                  <X className="h-5 w-5" />
                 ) : (
-                  <Menu className="h-6 w-6" />
+                  <Menu className="h-5 w-5" />
                 )}
               </Button>
             </div>
@@ -176,8 +177,8 @@ export function AppLayout({ children }: AppLayoutProps) {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200">
-            <div className="px-2 pt-2 pb-3 space-y-1">
+          <div className="md:hidden border-t border-border bg-white">
+            <div className="px-3 py-3 space-y-1">
               {navigation.map((item) => {
                 const Icon = item.icon
                 return (
@@ -186,10 +187,10 @@ export function AppLayout({ children }: AppLayoutProps) {
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
                     className={cn(
-                      'flex items-center px-3 py-2 rounded-md text-base font-medium',
+                      'flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
                       isActive(item.href)
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                        ? 'bg-primary-50 text-primary-700'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     )}
                   >
                     <Icon className="w-5 h-5 mr-3" />

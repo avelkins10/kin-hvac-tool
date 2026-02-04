@@ -1,45 +1,45 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/auth-helpers'
-import { prisma } from '@/lib/db'
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth-helpers";
+import { prisma } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await requireAuth()
+    const session = await requireAuth();
 
-    const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status')
-    const companyId = searchParams.get('companyId')
-    const userId = searchParams.get('userId')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
-    const skip = (page - 1) * limit
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status");
+    const companyId = searchParams.get("companyId");
+    const userId = searchParams.get("userId");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const skip = (page - 1) * limit;
 
-    const where: any = {}
+    const where: any = {};
 
     // Company isolation
-    if (session.user.role === 'SUPER_ADMIN') {
+    if (session.user.role === "SUPER_ADMIN") {
       if (companyId) {
-        where.companyId = companyId
+        where.companyId = companyId;
       }
     } else {
-      where.companyId = session.user.companyId || undefined
+      where.companyId = session.user.companyId || undefined;
     }
 
     // User filter - Security: SALES_REP role must only see their own proposals
-    if (session.user.role === 'SALES_REP') {
+    if (session.user.role === "SALES_REP") {
       // Ignore any userId query parameter and force to session user
       if (userId && userId !== session.user.id) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      where.userId = session.user.id
+      where.userId = session.user.id;
     } else if (userId) {
       // Other roles can filter by userId if provided
-      where.userId = userId
+      where.userId = userId;
     }
 
     // Status filter
     if (status) {
-      where.status = status
+      where.status = status;
     }
 
     const [proposals, total] = await Promise.all([
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
             },
             take: 1,
             orderBy: {
-              createdAt: 'desc',
+              createdAt: "desc",
             },
           },
           financeApplications: {
@@ -69,39 +69,49 @@ export async function GET(request: NextRequest) {
             },
             take: 1,
             orderBy: {
-              createdAt: 'desc',
+              createdAt: "desc",
             },
           },
         },
         orderBy: {
-          createdAt: 'desc',
+          createdAt: "desc",
         },
         skip,
         take: limit,
       }),
       prisma.proposal.count({ where }),
-    ])
+    ]);
 
-    return NextResponse.json({
-      proposals,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+    return NextResponse.json(
+      {
+        proposals,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
       },
-    })
+      {
+        headers: {
+          "Cache-Control": "private, s-maxage=30, stale-while-revalidate=120",
+        },
+      },
+    );
   } catch (error) {
-    console.error('Error fetching proposals:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error("Error fetching proposals:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAuth()
+    const session = await requireAuth();
 
-    const body = await request.json()
+    const body = await request.json();
     const {
       customerData,
       homeData,
@@ -117,17 +127,20 @@ export async function POST(request: NextRequest) {
       financingOption,
       totals,
       nameplateAnalysis,
-    } = body
+    } = body;
 
     if (!session.user.companyId) {
-      return NextResponse.json({ error: 'No company associated' }, { status: 400 })
+      return NextResponse.json(
+        { error: "No company associated" },
+        { status: 400 },
+      );
     }
 
     const proposal = await prisma.proposal.create({
       data: {
         userId: session.user.id,
         companyId: session.user.companyId,
-        status: 'DRAFT',
+        status: "DRAFT",
         customerData: customerData || null,
         homeData: homeData || null,
         hvacData: hvacData || null,
@@ -151,7 +164,7 @@ export async function POST(request: NextRequest) {
           },
         },
       },
-    })
+    });
 
     // Create initial version
     await prisma.proposalVersion.create({
@@ -160,11 +173,14 @@ export async function POST(request: NextRequest) {
         versionNumber: 1,
         data: body,
       },
-    })
+    });
 
-    return NextResponse.json(proposal, { status: 201 })
+    return NextResponse.json(proposal, { status: 201 });
   } catch (error) {
-    console.error('Error creating proposal:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error("Error creating proposal:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

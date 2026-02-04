@@ -46,7 +46,7 @@ export default async function ProposalViewPage({ params }: PageProps) {
   const isAdmin = session.user.role === 'COMPANY_ADMIN' || session.user.role === 'SUPER_ADMIN'
 
   return (
-    <AuthenticatedLayout>
+    <AuthenticatedLayout serverSession={session}>
       <div className="bg-gray-50 p-8">
         <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-8">
         <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">

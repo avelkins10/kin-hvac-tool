@@ -34,16 +34,39 @@ export function useSupabaseAuth(): UseSupabaseAuthReturn {
   const router = useRouter()
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        // Fetch User record from database to get role and companyId
-        fetchUserData(session.user.id)
-      } else {
-        setUser(null)
-        setLoading(false)
-      }
-    })
+    // Prefer cookie-based session: try /api/auth/user first so we stay in sync with
+    // server (server has cookies; client getSession() can miss them after full-page nav).
+    fetch('/api/auth/user', { credentials: 'same-origin' })
+      .then((res) => {
+        if (res.ok) return res.json()
+        return null
+      })
+      .then((userData) => {
+        if (userData) {
+          setUser(userData as AuthUser)
+          setLoading(false)
+          return
+        }
+        // Fallback: client Supabase session (e.g. localStorage/cookies from client)
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            fetchUserData(session.user.id)
+          } else {
+            setUser(null)
+            setLoading(false)
+          }
+        })
+      })
+      .catch(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            fetchUserData(session.user.id)
+          } else {
+            setUser(null)
+            setLoading(false)
+          }
+        })
+      })
 
     // Listen for auth changes
     const {

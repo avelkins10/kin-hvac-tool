@@ -6,9 +6,9 @@ import Link from 'next/link'
 
 export function QuickActions() {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
-      
+    <div className="bg-white rounded-lg border border-border p-5">
+      <h3 className="font-medium text-foreground mb-4">Quick Actions</h3>
+
       <div className="space-y-2">
         <Link href="/builder">
           <Button className="w-full justify-start" variant="outline">
@@ -16,21 +16,21 @@ export function QuickActions() {
             New Proposal
           </Button>
         </Link>
-        
+
         <Link href="/proposals?status=DRAFT">
           <Button className="w-full justify-start" variant="outline">
             <Send className="w-4 h-4 mr-2" />
             Send All Drafts
           </Button>
         </Link>
-        
+
         <Link href="/clients">
           <Button className="w-full justify-start" variant="outline">
             <Users className="w-4 h-4 mr-2" />
             Add Client
           </Button>
         </Link>
-        
+
         <Link href="/builder">
           <Button className="w-full justify-start" variant="outline">
             <Settings className="w-4 h-4 mr-2" />

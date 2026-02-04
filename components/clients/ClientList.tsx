@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Input } from '@/components/ui/input'
-import { Search } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { ClientCard } from './ClientCard'
 
 interface Client {
@@ -14,31 +15,40 @@ interface Client {
   lastProposalDate: string
 }
 
+const CLIENTS_PER_PAGE = 12
+
 export function ClientList() {
   const [clients, setClients] = useState<Client[]>([])
-  const [filteredClients, setFilteredClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     fetchClients()
   }, [])
 
+  // Reset to first page when search term changes
   useEffect(() => {
-    if (!searchTerm) {
-      setFilteredClients(clients)
-      return
-    }
+    setCurrentPage(1)
+  }, [searchTerm])
+
+  const filteredClients = useMemo(() => {
+    if (!searchTerm) return clients
 
     const searchLower = searchTerm.toLowerCase()
-    const filtered = clients.filter(
+    return clients.filter(
       (client) =>
         client.name?.toLowerCase().includes(searchLower) ||
         client.email.toLowerCase().includes(searchLower) ||
         client.phone?.toLowerCase().includes(searchLower)
     )
-    setFilteredClients(filtered)
   }, [searchTerm, clients])
+
+  const totalPages = Math.ceil(filteredClients.length / CLIENTS_PER_PAGE)
+  const paginatedClients = useMemo(() => {
+    const startIndex = (currentPage - 1) * CLIENTS_PER_PAGE
+    return filteredClients.slice(startIndex, startIndex + CLIENTS_PER_PAGE)
+  }, [filteredClients, currentPage])
 
   const fetchClients = async () => {
     try {
@@ -47,7 +57,6 @@ export function ClientList() {
       if (response.ok) {
         const data = await response.json()
         setClients(data.clients || [])
-        setFilteredClients(data.clients || [])
       }
     } catch (error) {
       console.error('Error fetching clients:', error)
@@ -77,11 +86,44 @@ export function ClientList() {
           {searchTerm ? 'No clients found matching your search.' : 'No clients found.'}
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredClients.map((client) => (
-            <ClientCard key={client.email} client={client} />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {paginatedClients.map((client) => (
+              <ClientCard key={client.email} client={client} />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t pt-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {((currentPage - 1) * CLIENTS_PER_PAGE) + 1} to {Math.min(currentPage * CLIENTS_PER_PAGE, filteredClients.length)} of {filteredClients.length} clients
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

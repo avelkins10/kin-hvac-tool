@@ -2,78 +2,99 @@
 // Documentation: https://docs.palmetto.com
 // Based on Palmetto Finance API structure
 
-import { IFinanceProvider, FinanceApplicationData, FinanceApplicationResponse } from './finance-provider.interface'
+import {
+  IFinanceProvider,
+  FinanceApplicationData,
+  FinanceApplicationResponse,
+} from "./finance-provider.interface";
 import {
   FinanceAPIError,
   FinanceNetworkError,
   FinanceValidationError,
   logFinanceError,
   redactSensitiveData,
-} from './finance-errors'
+} from "./finance-errors";
 
 // Palmetto Finance API response types
 interface PalmettoAuthResponse {
-  access_token: string
-  token_type?: string
-  expires_in?: number
+  access_token: string;
+  token_type?: string;
+  expires_in?: number;
 }
 
 interface PalmettoAccountResponse {
-  id: string
-  status: string
+  id: string;
+  status: string;
   applicants?: Array<{
-    type: 'primary' | 'secondary'
-    firstName: string
-    lastName: string
-    email: string
-    phoneNumber: string
-  }>
-  [key: string]: any
+    type: "primary" | "secondary";
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+  }>;
+  [key: string]: any;
 }
 
 export class LightReachClient implements IFinanceProvider {
-  private username: string
-  private password: string
-  private baseUrl: string
-  private authUrl: string
-  private accessToken: string | null = null
-  private tokenExpiry: number = 0
-  private readonly maxRetries = 3
-  private readonly retryDelay = 1000 // 1 second
-  private readonly tokenRefreshBuffer = 5 * 60 * 1000 // Refresh token 5 minutes before expiry
+  private username: string;
+  private password: string;
+  private baseUrl: string;
+  private authUrl: string;
+  private accessToken: string | null = null;
+  private tokenExpiry: number = 0;
+  private readonly maxRetries = 3;
+  private readonly retryDelay = 1000; // 1 second
+  private readonly tokenRefreshBuffer = 5 * 60 * 1000; // Refresh token 5 minutes before expiry
 
   constructor() {
     // Support both old API key format and new username/password format
-    const apiKey = process.env.LIGHTREACH_API_KEY || ''
-    this.username = process.env.PALMETTO_FINANCE_ACCOUNT_EMAIL || process.env.LIGHTREACH_USERNAME || ''
-    this.password = process.env.PALMETTO_FINANCE_ACCOUNT_PASSWORD || process.env.LIGHTREACH_PASSWORD || ''
+    const apiKey = process.env.LIGHTREACH_API_KEY || "";
+    this.username =
+      process.env.PALMETTO_FINANCE_ACCOUNT_EMAIL ||
+      process.env.LIGHTREACH_USERNAME ||
+      "";
+    this.password =
+      process.env.PALMETTO_FINANCE_ACCOUNT_PASSWORD ||
+      process.env.LIGHTREACH_PASSWORD ||
+      "";
 
     // Determine environment (default to 'next' for staging)
-    const environment = (process.env.PALMETTO_FINANCE_ENVIRONMENT || 'next').toLowerCase()
-    const isProduction = environment === 'prod' || environment === 'production'
+    const environment = (
+      process.env.PALMETTO_FINANCE_ENVIRONMENT || "next"
+    ).toLowerCase();
+    const isProduction = environment === "prod" || environment === "production";
 
     if (isProduction) {
-      this.baseUrl = process.env.PALMETTO_FINANCE_BASE_URL || 'https://palmetto.finance'
-      this.authUrl = process.env.PALMETTO_FINANCE_AUTH_URL || 'https://palmetto.finance/api/auth/login'
+      this.baseUrl =
+        process.env.PALMETTO_FINANCE_BASE_URL || "https://palmetto.finance";
+      this.authUrl =
+        process.env.PALMETTO_FINANCE_AUTH_URL ||
+        "https://palmetto.finance/api/auth/login";
     } else {
-      this.baseUrl = process.env.PALMETTO_FINANCE_BASE_URL || 'https://next.palmetto.finance'
-      this.authUrl = process.env.PALMETTO_FINANCE_AUTH_URL || 'https://next.palmetto.finance/api/auth/login'
+      this.baseUrl =
+        process.env.PALMETTO_FINANCE_BASE_URL ||
+        "https://next.palmetto.finance";
+      this.authUrl =
+        process.env.PALMETTO_FINANCE_AUTH_URL ||
+        "https://next.palmetto.finance/api/auth/login";
     }
 
     // Fallback to old LIGHTREACH_BASE_URL if set
     if (process.env.LIGHTREACH_BASE_URL) {
-      this.baseUrl = process.env.LIGHTREACH_BASE_URL
+      this.baseUrl = process.env.LIGHTREACH_BASE_URL;
     }
 
     // Legacy support: if API key is provided, log warning
     if (apiKey && !this.username) {
       console.warn(
-        '[LightReach] LIGHTREACH_API_KEY is deprecated. Please use PALMETTO_FINANCE_ACCOUNT_EMAIL and PALMETTO_FINANCE_ACCOUNT_PASSWORD'
-      )
+        "[LightReach] LIGHTREACH_API_KEY is deprecated. Please use PALMETTO_FINANCE_ACCOUNT_EMAIL and PALMETTO_FINANCE_ACCOUNT_PASSWORD",
+      );
     }
 
     if (!this.username || !this.password) {
-      console.warn('[LightReach] Palmetto Finance credentials not configured. Finance operations will fail.')
+      console.warn(
+        "[LightReach] Palmetto Finance credentials not configured. Finance operations will fail.",
+      );
     }
   }
 
@@ -82,66 +103,69 @@ export class LightReachClient implements IFinanceProvider {
    */
   private async getAccessToken(): Promise<string> {
     // Return cached token if still valid
-    if (this.accessToken && Date.now() < this.tokenExpiry - this.tokenRefreshBuffer) {
-      return this.accessToken
+    if (
+      this.accessToken &&
+      Date.now() < this.tokenExpiry - this.tokenRefreshBuffer
+    ) {
+      return this.accessToken;
     }
 
     if (!this.username || !this.password) {
       throw new FinanceAPIError(
-        'Palmetto Finance credentials not configured',
-        'lightreach',
-        500
-      )
+        "Palmetto Finance credentials not configured",
+        "lightreach",
+        500,
+      );
     }
 
     try {
       const response = await this.makeRequest(this.authUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           username: this.username,
           password: this.password,
         }),
-      })
+      });
 
       if (!response.ok) {
-        let errorData: any = {}
+        let errorData: any = {};
         try {
-          errorData = await response.json()
+          errorData = await response.json();
         } catch {
-          errorData = { message: response.statusText }
+          errorData = { message: response.statusText };
         }
 
         throw new FinanceAPIError(
-          errorData.message || 'Authentication failed',
-          'lightreach',
+          errorData.message || "Authentication failed",
+          "lightreach",
           response.status,
-          errorData
-        )
+          errorData,
+        );
       }
 
-      const authResponse: PalmettoAuthResponse = await response.json()
-      this.accessToken = authResponse.access_token
+      const authResponse: PalmettoAuthResponse = await response.json();
+      this.accessToken = authResponse.access_token;
 
       // Set token expiry (default to 1 hour if not provided)
-      const expiresIn = authResponse.expires_in || 3600
-      this.tokenExpiry = Date.now() + expiresIn * 1000
+      const expiresIn = authResponse.expires_in || 3600;
+      this.tokenExpiry = Date.now() + expiresIn * 1000;
 
-      console.log('[LightReach] Authentication successful')
-      return this.accessToken
+      console.log("[LightReach] Authentication successful");
+      return this.accessToken;
     } catch (error) {
       if (error instanceof FinanceAPIError) {
-        throw error
+        throw error;
       }
 
-      logFinanceError(error, 'getAccessToken')
+      logFinanceError(error, "getAccessToken");
       throw new FinanceAPIError(
-        `Failed to authenticate: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'lightreach',
-        500
-      )
+        `Failed to authenticate: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
+        500,
+      );
     }
   }
 
@@ -150,68 +174,71 @@ export class LightReachClient implements IFinanceProvider {
    */
   private validateApplicationData(data: FinanceApplicationData): void {
     const requiredFields: (keyof FinanceApplicationData)[] = [
-      'firstName',
-      'lastName',
-      'email',
-      'phone',
-      'address',
-      'city',
-      'state',
-      'zip',
-      'systemPrice',
-    ]
+      "firstName",
+      "lastName",
+      "email",
+      "phone",
+      "address",
+      "city",
+      "state",
+      "zip",
+      "systemPrice",
+    ];
 
     for (const field of requiredFields) {
-      if (!data[field] || (typeof data[field] === 'string' && data[field].trim() === '')) {
+      if (
+        !data[field] ||
+        (typeof data[field] === "string" && data[field].trim() === "")
+      ) {
         throw new FinanceValidationError(
           `Missing required field: ${field}`,
-          field as string
-        )
+          field as string,
+        );
       }
     }
 
     // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(data.email)) {
-      throw new FinanceValidationError('Invalid email format', 'email')
+      throw new FinanceValidationError("Invalid email format", "email");
     }
 
     // Validate phone format and length (at least 10 digits)
-    const phoneRegex = /^[\d\s\-\(\)\+]+$/
+    const phoneRegex = /^[\d\s\-\(\)\+]+$/;
     if (!phoneRegex.test(data.phone)) {
-      throw new FinanceValidationError('Invalid phone format', 'phone')
+      throw new FinanceValidationError("Invalid phone format", "phone");
     }
-    const digitsOnly = data.phone.replace(/\D/g, '')
+    const digitsOnly = data.phone.replace(/\D/g, "");
     if (digitsOnly.length < 10) {
       throw new FinanceValidationError(
-        'Phone number must be at least 10 digits',
-        'phone'
-      )
+        "Phone number must be at least 10 digits",
+        "phone",
+      );
     }
 
     // Validate system price
-    if (typeof data.systemPrice !== 'number' || data.systemPrice <= 0) {
+    if (typeof data.systemPrice !== "number" || data.systemPrice <= 0) {
       throw new FinanceValidationError(
-        'System price must be a positive number',
-        'systemPrice'
-      )
+        "System price must be a positive number",
+        "systemPrice",
+      );
     }
 
     // Validate state (2-letter code)
     if (data.state.length !== 2) {
       throw new FinanceValidationError(
-        'State must be a 2-letter code',
-        'state'
-      )
+        "State must be a 2-letter code",
+        "state",
+      );
     }
 
     // Validate ZIP code (5 or 9 digits)
-    const zipRegex = /^\d{5}(-\d{4})?$/
+    const zipRegex = /^\d{5}(-\d{4})?$/;
     if (!zipRegex.test(data.zip)) {
       throw new FinanceValidationError(
-        'ZIP code must be 5 digits or 9 digits (12345 or 12345-6789)',
-        'zip'
-      )
+        "ZIP code must be 5 digits or 9 digits (12345 or 12345-6789)",
+        "zip",
+      );
     }
   }
 
@@ -221,56 +248,58 @@ export class LightReachClient implements IFinanceProvider {
   private async makeRequest(
     url: string,
     options: RequestInit,
-    retries = this.maxRetries
+    retries = this.maxRetries,
   ): Promise<Response> {
-    let lastError: Error | null = null
+    let lastError: Error | null = null;
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
         const response = await fetch(url, {
           ...options,
           signal: controller.signal,
-        })
+        });
 
-        clearTimeout(timeoutId)
-        return response
+        clearTimeout(timeoutId);
+        return response;
       } catch (error: any) {
-        lastError = error
+        lastError = error;
 
         // Don't retry on abort (timeout) or if it's the last attempt
-        if (error.name === 'AbortError' || attempt === retries) {
-          break
+        if (error.name === "AbortError" || attempt === retries) {
+          break;
         }
 
         // Wait before retrying (exponential backoff)
-        const delay = this.retryDelay * Math.pow(2, attempt)
-        await new Promise((resolve) => setTimeout(resolve, delay))
+        const delay = this.retryDelay * Math.pow(2, attempt);
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 
     throw new FinanceNetworkError(
-      `Request failed after ${retries + 1} attempts: ${lastError?.message || 'Unknown error'}`,
-      { url, lastError: lastError?.message }
-    )
+      `Request failed after ${retries + 1} attempts: ${lastError?.message || "Unknown error"}`,
+      { url, lastError: lastError?.message },
+    );
   }
 
-  async createApplication(data: FinanceApplicationData): Promise<FinanceApplicationResponse> {
+  async createApplication(
+    data: FinanceApplicationData,
+  ): Promise<FinanceApplicationResponse> {
     // Validate input data
-    this.validateApplicationData(data)
+    this.validateApplicationData(data);
 
     // Get access token
-    const token = await this.getAccessToken()
+    const token = await this.getAccessToken();
 
     // Transform our application data to Palmetto Finance API v2 format
     // Based on official API documentation: /api/v2/accounts/
     const palmettoAccountData = {
-      programType: 'hvac' as const,
+      programType: "hvac" as const,
       applicants: [
         {
-          type: 'primary' as const,
+          type: "primary" as const,
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email.toLowerCase().trim(),
@@ -290,114 +319,141 @@ export class LightReachClient implements IFinanceProvider {
         zip: data.zip.trim(),
       },
       // Sales rep info - required but can be set from env or passed in data
-      salesRepName: data.salesRepName || process.env.PALMETTO_SALES_REP_NAME || 'Austin Elkins',
-      salesRepEmail: data.salesRepEmail || process.env.PALMETTO_SALES_REP_EMAIL || 'austin@kinhome.com',
-      salesRepPhoneNumber: data.salesRepPhoneNumber || process.env.PALMETTO_SALES_REP_PHONE || '801-928-6369',
+      salesRepName:
+        data.salesRepName ||
+        process.env.PALMETTO_SALES_REP_NAME ||
+        "Austin Elkins",
+      salesRepEmail:
+        data.salesRepEmail ||
+        process.env.PALMETTO_SALES_REP_EMAIL ||
+        "austin@kinhome.com",
+      salesRepPhoneNumber:
+        data.salesRepPhoneNumber ||
+        process.env.PALMETTO_SALES_REP_PHONE ||
+        "801-928-6369",
       // External reference to link back to our proposal
-      ...(data.externalReference && { externalReference: data.externalReference }),
-      ...(data.externalReferenceIds && { externalReferenceIds: data.externalReferenceIds }),
+      ...(data.externalReference && {
+        externalReference: data.externalReference,
+      }),
+      ...(data.externalReferenceIds && {
+        externalReferenceIds: data.externalReferenceIds,
+      }),
       // Human-readable name for Palmetto dashboard (e.g. customer name)
-      ...(data.friendlyName && data.friendlyName.trim() && { friendlyName: data.friendlyName.trim() }),
+      ...(data.friendlyName &&
+        data.friendlyName.trim() && { friendlyName: data.friendlyName.trim() }),
       // System design (home size, equipment, systems) so LightReach portal shows account details
-      ...(data.systemDesign && typeof data.systemDesign === 'object' && Object.keys(data.systemDesign).length > 0 && { systemDesign: data.systemDesign }),
-    }
+      ...(data.systemDesign &&
+        typeof data.systemDesign === "object" &&
+        Object.keys(data.systemDesign).length > 0 && {
+          systemDesign: data.systemDesign,
+        }),
+    };
 
     // Use v2 endpoint as recommended by API docs
-    const url = `${this.baseUrl}/api/v2/accounts`
-    const requestBody = JSON.stringify(palmettoAccountData)
+    const url = `${this.baseUrl}/api/v2/accounts`;
+    const requestBody = JSON.stringify(palmettoAccountData);
 
     // Log request (with sensitive data redacted)
-    const logData = redactSensitiveData(palmettoAccountData)
-    console.log('[LightReach] Creating account/application:', {
+    const logData = redactSensitiveData(palmettoAccountData);
+    console.log("[LightReach] Creating account/application:", {
       url,
       data: logData,
       timestamp: new Date().toISOString(),
-    })
+    });
 
     try {
       const response = await this.makeRequest(url, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: requestBody,
-      })
+      });
 
       // Handle non-OK responses
       if (!response.ok) {
-        let errorData: any = {}
+        let errorData: any = {};
         try {
-          errorData = await response.json()
+          errorData = await response.json();
         } catch {
           // If response isn't JSON, use status text
-          errorData = { message: response.statusText }
+          errorData = { message: response.statusText };
         }
 
         logFinanceError(
           new FinanceAPIError(
-            errorData.message || `HTTP ${response.status}: ${response.statusText}`,
-            'lightreach',
+            errorData.message ||
+              `HTTP ${response.status}: ${response.statusText}`,
+            "lightreach",
             response.status,
-            errorData
+            errorData,
           ),
-          'createApplication'
-        )
+          "createApplication",
+        );
 
         throw new FinanceAPIError(
-          errorData.message || 'Failed to create application',
-          'lightreach',
+          errorData.message || "Failed to create application",
+          "lightreach",
           response.status,
-          errorData
-        )
+          errorData,
+        );
       }
 
       // Parse response
-      let result: PalmettoAccountResponse
+      let result: PalmettoAccountResponse;
       try {
-        result = await response.json()
+        result = await response.json();
       } catch (error) {
         throw new FinanceAPIError(
-          'Invalid response format from Palmetto Finance API',
-          'lightreach',
+          "Invalid response format from Palmetto Finance API",
+          "lightreach",
           500,
-          { error: error instanceof Error ? error.message : 'Unknown error' }
-        )
+          { error: error instanceof Error ? error.message : "Unknown error" },
+        );
       }
 
       // Validate response has required fields
       if (!result.id) {
         throw new FinanceAPIError(
-          'Invalid response: missing account id',
-          'lightreach',
+          "Invalid response: missing account id",
+          "lightreach",
           500,
-          result
-        )
+          result,
+        );
       }
 
       // Map Palmetto status to our status format
-      const statusMap: Record<string, 'pending' | 'submitted' | 'approved' | 'denied' | 'conditional' | 'cancelled'> = {
-        '1 - Created': 'pending',
-        '2 - Credit Approved': 'approved',
-        '3 - Credit Approved': 'approved',
-        '4 - Credit Denied': 'denied',
-        'Terms & Conditions Accepted': 'submitted',
-        '5 - Contract Created': 'submitted',
-        '6 - Contract Sent': 'submitted',
-        '7 - Contract Signed': 'approved',
-        '8 - Contract Approved': 'approved',
-        '99 - Credit Expired': 'cancelled',
-      }
+      const statusMap: Record<
+        string,
+        | "pending"
+        | "submitted"
+        | "approved"
+        | "denied"
+        | "conditional"
+        | "cancelled"
+      > = {
+        "1 - Created": "pending",
+        "2 - Credit Approved": "approved",
+        "3 - Credit Approved": "approved",
+        "4 - Credit Denied": "denied",
+        "Terms & Conditions Accepted": "submitted",
+        "5 - Contract Created": "submitted",
+        "6 - Contract Sent": "submitted",
+        "7 - Contract Signed": "approved",
+        "8 - Contract Approved": "approved",
+        "99 - Credit Expired": "cancelled",
+      };
 
-      const mappedStatus = statusMap[result.status] || 'pending'
+      const mappedStatus = statusMap[result.status] || "pending";
 
       // Log successful response
-      console.log('[LightReach] Account/application created:', {
+      console.log("[LightReach] Account/application created:", {
         accountId: result.id,
         status: result.status,
         mappedStatus,
         timestamp: new Date().toISOString(),
-      })
+      });
 
       return {
         applicationId: result.id,
@@ -407,8 +463,10 @@ export class LightReachClient implements IFinanceProvider {
         totalCost: (result as any).totalCost || data.systemPrice,
         apr: (result as any).apr,
         term: (result as any).term,
-        message: (result as any).message || `Account created with status: ${result.status}`,
-      }
+        message:
+          (result as any).message ||
+          `Account created with status: ${result.status}`,
+      };
     } catch (error) {
       // Re-throw FinanceError types as-is
       if (
@@ -416,122 +474,138 @@ export class LightReachClient implements IFinanceProvider {
         error instanceof FinanceNetworkError ||
         error instanceof FinanceValidationError
       ) {
-        throw error
+        throw error;
       }
 
       // Wrap unexpected errors
-      logFinanceError(error, 'createApplication')
+      logFinanceError(error, "createApplication");
       throw new FinanceAPIError(
-        `Unexpected error creating application: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'lightreach',
+        `Unexpected error creating application: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
         500,
-        { originalError: error instanceof Error ? error.message : String(error) }
-      )
+        {
+          originalError: error instanceof Error ? error.message : String(error),
+        },
+      );
     }
   }
 
-  async getApplicationStatus(applicationId: string): Promise<FinanceApplicationResponse> {
-    if (!applicationId || applicationId.trim() === '') {
-      throw new FinanceValidationError('Application ID is required', 'applicationId')
+  async getApplicationStatus(
+    applicationId: string,
+  ): Promise<FinanceApplicationResponse> {
+    if (!applicationId || applicationId.trim() === "") {
+      throw new FinanceValidationError(
+        "Application ID is required",
+        "applicationId",
+      );
     }
 
     // Get access token
-    const token = await this.getAccessToken()
+    const token = await this.getAccessToken();
 
-    const url = `${this.baseUrl}/api/accounts/${applicationId}`
+    const url = `${this.baseUrl}/api/accounts/${applicationId}`;
 
-    console.log('[LightReach] Getting application status:', {
+    console.log("[LightReach] Getting application status:", {
       url,
       applicationId,
       timestamp: new Date().toISOString(),
-    })
+    });
 
     try {
       const response = await this.makeRequest(url, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
-      })
+      });
 
       if (!response.ok) {
-        let errorData: any = {}
+        let errorData: any = {};
         try {
-          errorData = await response.json()
+          errorData = await response.json();
         } catch {
-          errorData = { message: response.statusText }
+          errorData = { message: response.statusText };
         }
 
         if (response.status === 404) {
           throw new FinanceAPIError(
             `Application not found: ${applicationId}`,
-            'lightreach',
+            "lightreach",
             404,
-            errorData
-          )
+            errorData,
+          );
         }
 
         logFinanceError(
           new FinanceAPIError(
-            errorData.message || `HTTP ${response.status}: ${response.statusText}`,
-            'lightreach',
+            errorData.message ||
+              `HTTP ${response.status}: ${response.statusText}`,
+            "lightreach",
             response.status,
-            errorData
+            errorData,
           ),
-          'getApplicationStatus'
-        )
+          "getApplicationStatus",
+        );
 
         throw new FinanceAPIError(
-          errorData.message || 'Failed to get application status',
-          'lightreach',
+          errorData.message || "Failed to get application status",
+          "lightreach",
           response.status,
-          errorData
-        )
+          errorData,
+        );
       }
 
-      let result: PalmettoAccountResponse
+      let result: PalmettoAccountResponse;
       try {
-        result = await response.json()
+        result = await response.json();
       } catch (error) {
         throw new FinanceAPIError(
-          'Invalid response format from Palmetto Finance API',
-          'lightreach',
+          "Invalid response format from Palmetto Finance API",
+          "lightreach",
           500,
-          { error: error instanceof Error ? error.message : 'Unknown error' }
-        )
+          { error: error instanceof Error ? error.message : "Unknown error" },
+        );
       }
 
       if (!result.id) {
         throw new FinanceAPIError(
-          'Invalid response: missing account id',
-          'lightreach',
+          "Invalid response: missing account id",
+          "lightreach",
           500,
-          result
-        )
+          result,
+        );
       }
 
       // Map Palmetto status to our status format
-      const statusMap: Record<string, 'pending' | 'submitted' | 'approved' | 'denied' | 'conditional' | 'cancelled'> = {
-        '1 - Created': 'pending',
-        '2 - Credit Approved': 'approved',
-        '3 - Credit Approved': 'approved',
-        '4 - Credit Denied': 'denied',
-        'Terms & Conditions Accepted': 'submitted',
-        '5 - Contract Created': 'submitted',
-        '6 - Contract Sent': 'submitted',
-        '7 - Contract Signed': 'approved',
-        '8 - Contract Approved': 'approved',
-        '99 - Credit Expired': 'cancelled',
-      }
+      const statusMap: Record<
+        string,
+        | "pending"
+        | "submitted"
+        | "approved"
+        | "denied"
+        | "conditional"
+        | "cancelled"
+      > = {
+        "1 - Created": "pending",
+        "2 - Credit Approved": "approved",
+        "3 - Credit Approved": "approved",
+        "4 - Credit Denied": "denied",
+        "Terms & Conditions Accepted": "submitted",
+        "5 - Contract Created": "submitted",
+        "6 - Contract Sent": "submitted",
+        "7 - Contract Signed": "approved",
+        "8 - Contract Approved": "approved",
+        "99 - Credit Expired": "cancelled",
+      };
 
-      const mappedStatus = statusMap[result.status] || 'pending'
+      const mappedStatus = statusMap[result.status] || "pending";
 
-      console.log('[LightReach] Account status retrieved:', {
+      console.log("[LightReach] Account status retrieved:", {
         accountId: result.id,
         status: result.status,
         mappedStatus,
         timestamp: new Date().toISOString(),
-      })
+      });
 
       return {
         applicationId: result.id,
@@ -541,23 +615,25 @@ export class LightReachClient implements IFinanceProvider {
         apr: (result as any).apr,
         term: (result as any).term,
         message: (result as any).message || `Account status: ${result.status}`,
-      }
+      };
     } catch (error) {
       if (
         error instanceof FinanceAPIError ||
         error instanceof FinanceNetworkError ||
         error instanceof FinanceValidationError
       ) {
-        throw error
+        throw error;
       }
 
-      logFinanceError(error, 'getApplicationStatus')
+      logFinanceError(error, "getApplicationStatus");
       throw new FinanceAPIError(
-        `Unexpected error getting application status: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'lightreach',
+        `Unexpected error getting application status: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
         500,
-        { originalError: error instanceof Error ? error.message : String(error) }
-      )
+        {
+          originalError: error instanceof Error ? error.message : String(error),
+        },
+      );
     }
   }
 
@@ -569,112 +645,118 @@ export class LightReachClient implements IFinanceProvider {
   async getPricing(
     accountId: string,
     totalFinancedAmount: number,
-    systemDesign?: Record<string, unknown>
+    systemDesign?: Record<string, unknown>,
   ): Promise<any> {
-    if (!accountId || accountId.trim() === '') {
-      throw new FinanceValidationError('Account ID is required', 'accountId')
+    if (!accountId || accountId.trim() === "") {
+      throw new FinanceValidationError("Account ID is required", "accountId");
     }
 
     // Get access token
-    const token = await this.getAccessToken()
+    const token = await this.getAccessToken();
 
-    const url = `${this.baseUrl}/api/v2/accounts/${accountId}/pricing/hvac`
+    const url = `${this.baseUrl}/api/v2/accounts/${accountId}/pricing/hvac`;
 
-    const body: { totalFinancedAmount: number; systemDesign?: Record<string, unknown> } = {
+    const body: {
+      totalFinancedAmount: number;
+      systemDesign?: Record<string, unknown>;
+    } = {
       totalFinancedAmount,
-    }
+    };
     if (systemDesign && Object.keys(systemDesign).length > 0) {
-      body.systemDesign = systemDesign
+      body.systemDesign = systemDesign;
     }
 
-    console.log('[LightReach] Getting pricing:', {
+    console.log("[LightReach] Getting pricing:", {
       url,
       accountId,
       totalFinancedAmount,
       hasSystemDesign: !!body.systemDesign,
       timestamp: new Date().toISOString(),
-    })
+    });
 
     try {
       const response = await this.makeRequest(url, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(body),
-      })
+      });
 
       if (!response.ok) {
-        let errorData: any = {}
+        let errorData: any = {};
         try {
-          errorData = await response.json()
+          errorData = await response.json();
         } catch {
-          errorData = { message: response.statusText }
+          errorData = { message: response.statusText };
         }
 
         if (response.status === 404) {
           throw new FinanceAPIError(
             `Account not found: ${accountId}`,
-            'lightreach',
+            "lightreach",
             404,
-            errorData
-          )
+            errorData,
+          );
         }
 
         logFinanceError(
           new FinanceAPIError(
-            errorData.message || `HTTP ${response.status}: ${response.statusText}`,
-            'lightreach',
+            errorData.message ||
+              `HTTP ${response.status}: ${response.statusText}`,
+            "lightreach",
             response.status,
-            errorData
+            errorData,
           ),
-          'getPricing'
-        )
+          "getPricing",
+        );
 
         throw new FinanceAPIError(
-          errorData.message || 'Failed to get pricing',
-          'lightreach',
+          errorData.message || "Failed to get pricing",
+          "lightreach",
           response.status,
-          errorData
-        )
+          errorData,
+        );
       }
 
-      let result: any
+      let result: any;
       try {
-        result = await response.json()
+        result = await response.json();
       } catch (error) {
         throw new FinanceAPIError(
-          'Invalid response format from Palmetto Finance API',
-          'lightreach',
+          "Invalid response format from Palmetto Finance API",
+          "lightreach",
           500,
-          { error: error instanceof Error ? error.message : 'Unknown error' }
-        )
+          { error: error instanceof Error ? error.message : "Unknown error" },
+        );
       }
 
-      console.log('[LightReach] Pricing retrieved:', {
+      console.log("[LightReach] Pricing retrieved:", {
         accountId,
-        productsCount: Array.isArray(result) ? result.length : 'N/A',
+        productsCount: Array.isArray(result) ? result.length : "N/A",
         timestamp: new Date().toISOString(),
-      })
+      });
 
-      return result
+      return result;
     } catch (error) {
       if (
         error instanceof FinanceAPIError ||
         error instanceof FinanceNetworkError ||
         error instanceof FinanceValidationError
       ) {
-        throw error
+        throw error;
       }
 
-      logFinanceError(error, 'getPricing')
+      logFinanceError(error, "getPricing");
       throw new FinanceAPIError(
-        `Unexpected error getting pricing: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'lightreach',
+        `Unexpected error getting pricing: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
         500,
-        { originalError: error instanceof Error ? error.message : String(error) }
-      )
+        {
+          originalError: error instanceof Error ? error.message : String(error),
+        },
+      );
     }
   }
 
@@ -683,190 +765,1183 @@ export class LightReachClient implements IFinanceProvider {
    * GET /api/accounts/{accountId}/stipulations
    */
   async getStipulations(accountId: string): Promise<any> {
-    if (!accountId || accountId.trim() === '') {
-      throw new FinanceValidationError('Account ID is required', 'accountId')
+    if (!accountId || accountId.trim() === "") {
+      throw new FinanceValidationError("Account ID is required", "accountId");
     }
-    const token = await this.getAccessToken()
-    const url = `${this.baseUrl}/api/accounts/${accountId}/stipulations`
+    const token = await this.getAccessToken();
+    const url = `${this.baseUrl}/api/accounts/${accountId}/stipulations`;
     const response = await this.makeRequest(url, {
-      method: 'GET',
+      method: "GET",
       headers: { Authorization: `Bearer ${token}` },
-    })
+    });
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
+      const errorData = await response.json().catch(() => ({}));
       throw new FinanceAPIError(
-        (errorData as any)?.message || `Failed to get stipulations: ${response.status}`,
-        'lightreach',
+        (errorData as any)?.message ||
+          `Failed to get stipulations: ${response.status}`,
+        "lightreach",
         response.status,
-        errorData
-      )
+        errorData,
+      );
     }
-    return response.json()
+    return response.json();
   }
 
   /**
    * Get contract signing link for the current contract.
    * POST /api/accounts/{accountId}/contracts/current/signing-link
    */
-  async getSigningLink(accountId: string): Promise<{ url?: string; signingLink?: string }> {
-    if (!accountId || accountId.trim() === '') {
-      throw new FinanceValidationError('Account ID is required', 'accountId')
+  async getSigningLink(
+    accountId: string,
+  ): Promise<{ url?: string; signingLink?: string }> {
+    if (!accountId || accountId.trim() === "") {
+      throw new FinanceValidationError("Account ID is required", "accountId");
     }
-    const token = await this.getAccessToken()
-    const url = `${this.baseUrl}/api/accounts/${accountId}/contracts/current/signing-link`
+    const token = await this.getAccessToken();
+    const url = `${this.baseUrl}/api/accounts/${accountId}/contracts/current/signing-link`;
     const response = await this.makeRequest(url, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({}),
-    })
+    });
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
+      const errorData = await response.json().catch(() => ({}));
       throw new FinanceAPIError(
-        (errorData as any)?.message || `Failed to get signing link: ${response.status}`,
-        'lightreach',
+        (errorData as any)?.message ||
+          `Failed to get signing link: ${response.status}`,
+        "lightreach",
         response.status,
-        errorData
-      )
+        errorData,
+      );
     }
-    const data = await response.json()
-    return { url: data.url ?? data.signingLink, signingLink: data.signingLink ?? data.url }
+    const data = await response.json();
+    return {
+      url: data.url ?? data.signingLink,
+      signingLink: data.signingLink ?? data.url,
+    };
   }
 
   async getPaymentSchedule(
     applicationId: string,
-    options?: { systemDesign?: Record<string, unknown> }
+    options?: { systemDesign?: Record<string, unknown> },
   ): Promise<any> {
-    if (!applicationId || applicationId.trim() === '') {
-      throw new FinanceValidationError('Application ID is required', 'applicationId')
+    if (!applicationId || applicationId.trim() === "") {
+      throw new FinanceValidationError(
+        "Application ID is required",
+        "applicationId",
+      );
     }
 
     // Get access token
-    const token = await this.getAccessToken()
+    const token = await this.getAccessToken();
 
     // Get account details first to get total cost
-    const account = await this.getApplicationStatus(applicationId)
-    const totalCost = account.totalCost
+    const account = await this.getApplicationStatus(applicationId);
+    const totalCost = account.totalCost;
 
     if (!totalCost) {
       throw new FinanceAPIError(
-        'Cannot get payment schedule: total cost not available for this account',
-        'lightreach',
-        400
-      )
+        "Cannot get payment schedule: total cost not available for this account",
+        "lightreach",
+        400,
+      );
     }
 
     // Use pricing endpoint to get payment schedule; optional systemDesign for more accurate pricing
     const pricing = await this.getPricing(
       applicationId,
       totalCost,
-      options?.systemDesign
-    )
+      options?.systemDesign,
+    );
 
     // Extract payment schedule from pricing response
     // Pricing returns array of products, each with monthlyPayments array
     if (Array.isArray(pricing) && pricing.length > 0) {
       // Return the first product's payment schedule (or combine all if needed)
-      const firstProduct = pricing[0]
+      const firstProduct = pricing[0];
       return {
         productId: firstProduct.productId,
         productName: firstProduct.name,
         monthlyPayments: firstProduct.monthlyPayments || [],
         escalationRate: firstProduct.escalationRate,
         allProducts: pricing, // Include all products for reference
-      }
+      };
     }
 
-    return { monthlyPayments: [], message: 'No pricing products available' }
+    return { monthlyPayments: [], message: "No pricing products available" };
+  }
 
-    console.log('[LightReach] Getting payment schedule:', {
+  // ============================================================================
+  // PHASE 1: Estimated Pricing (Pre-Account)
+  // ============================================================================
+
+  /**
+   * Get estimated pricing for HVAC before creating an account.
+   * Use this to show monthly payment options in the proposal builder.
+   * POST /api/v2/estimated-pricing/hvac
+   */
+  async getEstimatedPricing(
+    state: string,
+    totalFinancedAmount: number,
+    systemDesign?: HVACSystemDesign,
+  ): Promise<EstimatedPricingResponse[]> {
+    const token = await this.getAccessToken();
+
+    const url = `${this.baseUrl}/api/v2/estimated-pricing/hvac`;
+    const body: {
+      state: string;
+      totalFinancedAmount: number;
+      systemDesign?: HVACSystemDesign;
+    } = {
+      state: state.toUpperCase(),
+      totalFinancedAmount,
+    };
+
+    if (systemDesign) {
+      body.systemDesign = systemDesign;
+    }
+
+    console.log("[LightReach] Getting estimated pricing:", {
       url,
-      applicationId,
+      state,
+      totalFinancedAmount,
+      hasSystemDesign: !!systemDesign,
       timestamp: new Date().toISOString(),
-    })
+    });
 
     try {
       const response = await this.makeRequest(url, {
-        method: 'GET',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      })
+        body: JSON.stringify(body),
+      });
 
       if (!response.ok) {
-        let errorData: any = {}
-        try {
-          errorData = await response.json()
-        } catch {
-          errorData = { message: response.statusText }
-        }
-
-        if (response.status === 404) {
-          throw new FinanceAPIError(
-            `Application not found: ${applicationId}`,
-            'lightreach',
-            404,
-            errorData
-          )
-        }
-
-        logFinanceError(
-          new FinanceAPIError(
-            errorData.message || `HTTP ${response.status}: ${response.statusText}`,
-            'lightreach',
-            response.status,
-            errorData
-          ),
-          'getPaymentSchedule'
-        )
-
+        const errorData = await response.json().catch(() => ({}));
         throw new FinanceAPIError(
-          errorData.message || 'Failed to get payment schedule',
-          'lightreach',
+          (errorData as any)?.message ||
+            `Failed to get estimated pricing: ${response.status}`,
+          "lightreach",
           response.status,
-          errorData
-        )
+          errorData,
+        );
       }
 
-      let result: any
-      try {
-        result = await response.json()
-      } catch (error) {
-        throw new FinanceAPIError(
-          'Invalid response format from LightReach API',
-          'lightreach',
-          500,
-          { error: error instanceof Error ? error.message : 'Unknown error' }
-        )
-      }
+      const result = await response.json();
 
-      console.log('[LightReach] Payment schedule retrieved:', {
-        applicationId,
-        scheduleLength: Array.isArray(result) ? result.length : 'N/A',
+      console.log("[LightReach] Estimated pricing retrieved:", {
+        productsCount: Array.isArray(result) ? result.length : 1,
         timestamp: new Date().toISOString(),
-      })
+      });
 
-      return result
+      return Array.isArray(result) ? result : [result];
     } catch (error) {
-      if (
-        error instanceof FinanceAPIError ||
-        error instanceof FinanceNetworkError ||
-        error instanceof FinanceValidationError
-      ) {
-        throw error
+      if (error instanceof FinanceAPIError) throw error;
+      logFinanceError(error, "getEstimatedPricing");
+      throw new FinanceAPIError(
+        `Unexpected error getting estimated pricing: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
+        500,
+      );
+    }
+  }
+
+  // ============================================================================
+  // PHASE 2: Approved Equipment Validation
+  // ============================================================================
+
+  /**
+   * Get approved vendors/equipment list for a specific equipment type.
+   * GET /api/approved-vendors/{equipmentType}?programType=hvac
+   * Equipment types: heatPump, airHandler, heatStrip, thermostat, furnace
+   */
+  async getApprovedVendors(equipmentType: string): Promise<ApprovedVendor[]> {
+    const token = await this.getAccessToken();
+
+    const url = `${this.baseUrl}/api/approved-vendors/${equipmentType}?programType=hvac`;
+
+    console.log("[LightReach] Getting approved vendors:", {
+      url,
+      equipmentType,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const response = await this.makeRequest(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new FinanceAPIError(
+          (errorData as any)?.message ||
+            `Failed to get approved vendors: ${response.status}`,
+          "lightreach",
+          response.status,
+          errorData,
+        );
       }
 
-      logFinanceError(error, 'getPaymentSchedule')
+      const result = await response.json();
+      return Array.isArray(result) ? result : [];
+    } catch (error) {
+      if (error instanceof FinanceAPIError) throw error;
+      logFinanceError(error, "getApprovedVendors");
       throw new FinanceAPIError(
-        `Unexpected error getting payment schedule: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'lightreach',
+        `Unexpected error getting approved vendors: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
         500,
-        { originalError: error instanceof Error ? error.message : String(error) }
-      )
+      );
+    }
+  }
+
+  /**
+   * Validate if equipment is on the approved vendor list.
+   * Returns true if approved, false if not found (warning only - don't block).
+   */
+  async validateEquipment(
+    manufacturer: string,
+    model: string,
+    equipmentType: string,
+  ): Promise<{ approved: boolean; vendor?: ApprovedVendor }> {
+    try {
+      const vendors = await this.getApprovedVendors(equipmentType);
+      const match = vendors.find(
+        (v) =>
+          v.manufacturer?.toLowerCase() === manufacturer.toLowerCase() &&
+          v.model?.toLowerCase() === model.toLowerCase(),
+      );
+      return { approved: !!match, vendor: match };
+    } catch (error) {
+      // Don't fail validation if API call fails - just log warning
+      console.warn(
+        "[LightReach] Equipment validation failed, allowing submission:",
+        error,
+      );
+      return { approved: true };
+    }
+  }
+
+  // ============================================================================
+  // PHASE 4: HVAC Quote Creation
+  // ============================================================================
+
+  /**
+   * Create a new HVAC quote for an account.
+   * POST /api/v2/accounts/{accountId}/quotes/hvac
+   */
+  async createQuote(
+    accountId: string,
+    productId: string,
+    totalFinancedAmount: number,
+    externalReference?: string,
+  ): Promise<HVACQuote> {
+    if (!accountId || accountId.trim() === "") {
+      throw new FinanceValidationError("Account ID is required", "accountId");
+    }
+
+    const token = await this.getAccessToken();
+
+    const url = `${this.baseUrl}/api/v2/accounts/${accountId}/quotes/hvac`;
+    const body: {
+      productId: string;
+      totalFinancedAmount: number;
+      externalReference?: string;
+    } = {
+      productId,
+      totalFinancedAmount,
+    };
+
+    if (externalReference) {
+      body.externalReference = externalReference;
+    }
+
+    console.log("[LightReach] Creating HVAC quote:", {
+      url,
+      accountId,
+      productId,
+      totalFinancedAmount,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const response = await this.makeRequest(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new FinanceAPIError(
+          (errorData as any)?.message ||
+            `Failed to create quote: ${response.status}`,
+          "lightreach",
+          response.status,
+          errorData,
+        );
+      }
+
+      const result = await response.json();
+
+      console.log("[LightReach] Quote created:", {
+        quoteId: result.id,
+        accountId,
+        status: result.status,
+        timestamp: new Date().toISOString(),
+      });
+
+      return result;
+    } catch (error) {
+      if (error instanceof FinanceAPIError) throw error;
+      logFinanceError(error, "createQuote");
+      throw new FinanceAPIError(
+        `Unexpected error creating quote: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
+        500,
+      );
+    }
+  }
+
+  /**
+   * Get all HVAC quotes for an account.
+   * GET /api/v2/accounts/{accountId}/quotes/hvac
+   */
+  async getQuotes(accountId: string): Promise<HVACQuote[]> {
+    if (!accountId || accountId.trim() === "") {
+      throw new FinanceValidationError("Account ID is required", "accountId");
+    }
+
+    const token = await this.getAccessToken();
+
+    const url = `${this.baseUrl}/api/v2/accounts/${accountId}/quotes/hvac`;
+
+    try {
+      const response = await this.makeRequest(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new FinanceAPIError(
+          (errorData as any)?.message ||
+            `Failed to get quotes: ${response.status}`,
+          "lightreach",
+          response.status,
+          errorData,
+        );
+      }
+
+      const result = await response.json();
+      return Array.isArray(result) ? result : [];
+    } catch (error) {
+      if (error instanceof FinanceAPIError) throw error;
+      logFinanceError(error, "getQuotes");
+      throw new FinanceAPIError(
+        `Unexpected error getting quotes: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
+        500,
+      );
+    }
+  }
+
+  /**
+   * Void an HVAC quote.
+   * POST /api/v2/accounts/{accountId}/quotes/hvac/{quoteId}/void
+   */
+  async voidQuote(accountId: string, quoteId: string): Promise<void> {
+    if (!accountId || !quoteId) {
+      throw new FinanceValidationError(
+        "Account ID and Quote ID are required",
+        "accountId",
+      );
+    }
+
+    const token = await this.getAccessToken();
+
+    const url = `${this.baseUrl}/api/v2/accounts/${accountId}/quotes/hvac/${quoteId}/void`;
+
+    console.log("[LightReach] Voiding quote:", {
+      accountId,
+      quoteId,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const response = await this.makeRequest(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new FinanceAPIError(
+          (errorData as any)?.message ||
+            `Failed to void quote: ${response.status}`,
+          "lightreach",
+          response.status,
+          errorData,
+        );
+      }
+
+      console.log("[LightReach] Quote voided:", { accountId, quoteId });
+    } catch (error) {
+      if (error instanceof FinanceAPIError) throw error;
+      logFinanceError(error, "voidQuote");
+      throw new FinanceAPIError(
+        `Unexpected error voiding quote: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
+        500,
+      );
+    }
+  }
+
+  // ============================================================================
+  // PHASE 5: Credit Application Disclosures
+  // ============================================================================
+
+  /**
+   * Get credit disclosures that must be displayed to customers.
+   * GET /api/disclosures?disclosureType={type}&language={lang}
+   */
+  async getDisclosures(
+    disclosureType?:
+      | "creditApplication"
+      | "prequalification"
+      | "txtMessageNotifications"
+      | "termsAndConditions",
+    language: string = "English",
+  ): Promise<Disclosure[]> {
+    const token = await this.getAccessToken();
+
+    let url = `${this.baseUrl}/api/disclosures?language=${encodeURIComponent(language)}`;
+    if (disclosureType) {
+      url += `&disclosureType=${encodeURIComponent(disclosureType)}`;
+    }
+
+    console.log("[LightReach] Getting disclosures:", {
+      url,
+      disclosureType,
+      language,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const response = await this.makeRequest(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new FinanceAPIError(
+          (errorData as any)?.message ||
+            `Failed to get disclosures: ${response.status}`,
+          "lightreach",
+          response.status,
+          errorData,
+        );
+      }
+
+      const result = await response.json();
+      return Array.isArray(result) ? result : [];
+    } catch (error) {
+      if (error instanceof FinanceAPIError) throw error;
+      logFinanceError(error, "getDisclosures");
+      throw new FinanceAPIError(
+        `Unexpected error getting disclosures: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
+        500,
+      );
+    }
+  }
+
+  // ============================================================================
+  // PHASE 6: Enhanced Contract Flow
+  // ============================================================================
+
+  /**
+   * Send contract to customer for signing.
+   * POST /api/accounts/{accountId}/contracts/send
+   */
+  async sendContract(
+    accountId: string,
+  ): Promise<{ success: boolean; contractId?: string }> {
+    if (!accountId || accountId.trim() === "") {
+      throw new FinanceValidationError("Account ID is required", "accountId");
+    }
+
+    const token = await this.getAccessToken();
+
+    const url = `${this.baseUrl}/api/accounts/${accountId}/contracts/send`;
+
+    console.log("[LightReach] Sending contract:", {
+      accountId,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const response = await this.makeRequest(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new FinanceAPIError(
+          (errorData as any)?.message ||
+            `Failed to send contract: ${response.status}`,
+          "lightreach",
+          response.status,
+          errorData,
+        );
+      }
+
+      const result = await response.json();
+
+      console.log("[LightReach] Contract sent:", {
+        accountId,
+        contractId: result.id || result.contractId,
+        timestamp: new Date().toISOString(),
+      });
+
+      return { success: true, contractId: result.id || result.contractId };
+    } catch (error) {
+      if (error instanceof FinanceAPIError) throw error;
+      logFinanceError(error, "sendContract");
+      throw new FinanceAPIError(
+        `Unexpected error sending contract: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
+        500,
+      );
+    }
+  }
+
+  /**
+   * Get current contract for an account.
+   * GET /api/accounts/{accountId}/contracts/current
+   */
+  async getCurrentContract(accountId: string): Promise<Contract | null> {
+    if (!accountId || accountId.trim() === "") {
+      throw new FinanceValidationError("Account ID is required", "accountId");
+    }
+
+    const token = await this.getAccessToken();
+
+    const url = `${this.baseUrl}/api/accounts/${accountId}/contracts/current`;
+
+    try {
+      const response = await this.makeRequest(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new FinanceAPIError(
+          (errorData as any)?.message ||
+            `Failed to get contract: ${response.status}`,
+          "lightreach",
+          response.status,
+          errorData,
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof FinanceAPIError) throw error;
+      logFinanceError(error, "getCurrentContract");
+      throw new FinanceAPIError(
+        `Unexpected error getting contract: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
+        500,
+      );
+    }
+  }
+
+  /**
+   * Void a contract.
+   * POST /api/accounts/{accountId}/contracts/{contractId}/void
+   */
+  async voidContract(accountId: string, contractId: string): Promise<void> {
+    if (!accountId || !contractId) {
+      throw new FinanceValidationError(
+        "Account ID and Contract ID are required",
+        "accountId",
+      );
+    }
+
+    const token = await this.getAccessToken();
+
+    const url = `${this.baseUrl}/api/accounts/${accountId}/contracts/${contractId}/void`;
+
+    console.log("[LightReach] Voiding contract:", {
+      accountId,
+      contractId,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const response = await this.makeRequest(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new FinanceAPIError(
+          (errorData as any)?.message ||
+            `Failed to void contract: ${response.status}`,
+          "lightreach",
+          response.status,
+          errorData,
+        );
+      }
+
+      console.log("[LightReach] Contract voided:", { accountId, contractId });
+    } catch (error) {
+      if (error instanceof FinanceAPIError) throw error;
+      logFinanceError(error, "voidContract");
+      throw new FinanceAPIError(
+        `Unexpected error voiding contract: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
+        500,
+      );
+    }
+  }
+
+  // ============================================================================
+  // PHASE 7: Install Package Submission
+  // ============================================================================
+
+  /**
+   * Save install package draft (does not submit).
+   * POST /api/v2/accounts/{accountId}/install-package/hvac/save
+   */
+  async saveInstallPackage(
+    accountId: string,
+    installPackage: HVACInstallPackage,
+  ): Promise<void> {
+    if (!accountId || accountId.trim() === "") {
+      throw new FinanceValidationError("Account ID is required", "accountId");
+    }
+
+    const token = await this.getAccessToken();
+
+    const url = `${this.baseUrl}/api/v2/accounts/${accountId}/install-package/hvac/save`;
+
+    console.log("[LightReach] Saving install package:", {
+      accountId,
+      hasSystemDesign: !!installPackage.systemDesign,
+      hasInstallDate: !!installPackage.systemInstallDate,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const response = await this.makeRequest(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(installPackage),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new FinanceAPIError(
+          (errorData as any)?.message ||
+            `Failed to save install package: ${response.status}`,
+          "lightreach",
+          response.status,
+          errorData,
+        );
+      }
+
+      console.log("[LightReach] Install package saved:", { accountId });
+    } catch (error) {
+      if (error instanceof FinanceAPIError) throw error;
+      logFinanceError(error, "saveInstallPackage");
+      throw new FinanceAPIError(
+        `Unexpected error saving install package: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
+        500,
+      );
+    }
+  }
+
+  /**
+   * Submit install package for NTP/funding.
+   * POST /api/v2/accounts/{accountId}/install-package/hvac/submit
+   */
+  async submitInstallPackage(
+    accountId: string,
+    installPackage: HVACInstallPackage,
+  ): Promise<void> {
+    if (!accountId || accountId.trim() === "") {
+      throw new FinanceValidationError("Account ID is required", "accountId");
+    }
+
+    // Validate required fields for submission
+    if (!installPackage.systemDesign?.systems?.length) {
+      throw new FinanceValidationError(
+        "System design with at least one system is required",
+        "systemDesign",
+      );
+    }
+    if (!installPackage.systemInstallDate) {
+      throw new FinanceValidationError(
+        "System install date is required",
+        "systemInstallDate",
+      );
+    }
+    if (!installPackage.permitAttestation) {
+      throw new FinanceValidationError(
+        "Permit attestation is required",
+        "permitAttestation",
+      );
+    }
+
+    const token = await this.getAccessToken();
+
+    const url = `${this.baseUrl}/api/v2/accounts/${accountId}/install-package/hvac/submit`;
+
+    console.log("[LightReach] Submitting install package:", {
+      accountId,
+      systemsCount: installPackage.systemDesign?.systems?.length,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const response = await this.makeRequest(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(installPackage),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new FinanceAPIError(
+          (errorData as any)?.message ||
+            `Failed to submit install package: ${response.status}`,
+          "lightreach",
+          response.status,
+          errorData,
+        );
+      }
+
+      console.log("[LightReach] Install package submitted:", { accountId });
+    } catch (error) {
+      if (error instanceof FinanceAPIError) throw error;
+      logFinanceError(error, "submitInstallPackage");
+      throw new FinanceAPIError(
+        `Unexpected error submitting install package: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
+        500,
+      );
+    }
+  }
+
+  /**
+   * Get install package review flags.
+   * GET /api/v2/accounts/{accountId}/install-package/flags
+   */
+  async getInstallPackageFlags(
+    accountId: string,
+  ): Promise<InstallPackageFlag[]> {
+    if (!accountId || accountId.trim() === "") {
+      throw new FinanceValidationError("Account ID is required", "accountId");
+    }
+
+    const token = await this.getAccessToken();
+
+    const url = `${this.baseUrl}/api/v2/accounts/${accountId}/install-package/flags`;
+
+    try {
+      const response = await this.makeRequest(url, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new FinanceAPIError(
+          (errorData as any)?.message ||
+            `Failed to get install package flags: ${response.status}`,
+          "lightreach",
+          response.status,
+          errorData,
+        );
+      }
+
+      const result = await response.json();
+      return Array.isArray(result) ? result : [];
+    } catch (error) {
+      if (error instanceof FinanceAPIError) throw error;
+      logFinanceError(error, "getInstallPackageFlags");
+      throw new FinanceAPIError(
+        `Unexpected error getting install package flags: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
+        500,
+      );
+    }
+  }
+
+  /**
+   * Upload a document to an account.
+   * POST /api/accounts/{accountId}/documents
+   */
+  async uploadDocument(
+    accountId: string,
+    documentType: DocumentType,
+    file: File | Blob,
+    filename: string,
+  ): Promise<{ documentId: string }> {
+    if (!accountId || accountId.trim() === "") {
+      throw new FinanceValidationError("Account ID is required", "accountId");
+    }
+
+    const token = await this.getAccessToken();
+
+    const url = `${this.baseUrl}/api/accounts/${accountId}/documents`;
+
+    const formData = new FormData();
+    formData.append("type", documentType);
+    formData.append("file", file, filename);
+
+    console.log("[LightReach] Uploading document:", {
+      accountId,
+      documentType,
+      filename,
+      timestamp: new Date().toISOString(),
+    });
+
+    try {
+      const response = await this.makeRequest(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new FinanceAPIError(
+          (errorData as any)?.message ||
+            `Failed to upload document: ${response.status}`,
+          "lightreach",
+          response.status,
+          errorData,
+        );
+      }
+
+      const result = await response.json();
+
+      console.log("[LightReach] Document uploaded:", {
+        accountId,
+        documentId: result.id || result.documentId,
+        documentType,
+      });
+
+      return { documentId: result.id || result.documentId };
+    } catch (error) {
+      if (error instanceof FinanceAPIError) throw error;
+      logFinanceError(error, "uploadDocument");
+      throw new FinanceAPIError(
+        `Unexpected error uploading document: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "lightreach",
+        500,
+      );
     }
   }
 }
 
-export const lightReachClient = new LightReachClient()
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+/** System category enum values for HVAC systems */
+export type HVACSystemCategory =
+  | "Conventional Ducted Split System"
+  | "Conventional Ducted System"
+  | "Package"
+  | "Ductless Mini Split"
+  | "Ducted Mini Split"
+  | "Heat Pump Split System"
+  | "Gas Conventional Split System"
+  | "Dual Fuel Split System"
+  | "Packaged Heat Pump"
+  | "Packaged Gas/Electric"
+  | "Packaged Dual Fuel"
+  | "Single Zone Mini Split"
+  | "Multi Zone Mini Split"
+  | "Air Conditioning/Air Handler Split System";
+
+/** Equipment type enum values */
+export type HVACEquipmentType =
+  | "heatPump"
+  | "airHandler"
+  | "heatStrip"
+  | "furnace"
+  | "evaporatorCoil"
+  | "ductlessOutdoor"
+  | "ductlessIndoor"
+  | "airConditioner"
+  | "packagedAC"
+  | "packagedHeatPump"
+  | "packagedGasAC"
+  | "packagedDualFuel"
+  | "other";
+
+/** Accessory type enum values */
+export type HVACAccessoryType =
+  | "thermostat"
+  | "airFilter"
+  | "dehumidifier"
+  | "humidifier"
+  | "electronicAirCleaner"
+  | "uvSystem"
+  | "zoning";
+
+/** Manufacturer enum values */
+export type HVACManufacturer =
+  | "Trane"
+  | "American Standard"
+  | "Run-Tru"
+  | "Ameristar"
+  | "Daikin"
+  | "Goodman"
+  | "Amana"
+  | "Samsung"
+  | "Mitsubishi Electric"
+  | "Lennox"
+  | "Carrier"
+  | "Bryant"
+  | "Rheem"
+  | "Fujitsu"
+  | "Bosch"
+  | "York"
+  | "LG"
+  | "Gree";
+
+/** Document types for install package */
+export type DocumentType =
+  | "bluetoothHVACTool"
+  | "proofOfLoadHVAC"
+  | "hvacInstallationPhotos"
+  | "other";
+
+/** Equipment item in system design */
+export interface HVACEquipmentItem {
+  type: HVACEquipmentType;
+  name: string;
+  manufacturer: string;
+  model: string;
+  quantity: number;
+  productId?: string;
+  serialNumbers?: string[];
+  size?: {
+    unit: string;
+    value: string;
+  };
+  efficiencies?: Array<{
+    unit: string;
+    value: string;
+  }>;
+}
+
+/** Accessory item in system design */
+export interface HVACAccessoryItem {
+  type: HVACAccessoryType;
+  name: string;
+  manufacturer?: string;
+  model?: string;
+  quantity: number;
+  productId?: string;
+  serialNumbers?: string[];
+  description?: string;
+}
+
+/** Single HVAC system in design */
+export interface HVACSystem {
+  systemCategory: HVACSystemCategory;
+  conditionedArea: number;
+  name?: string;
+  ahriNumber?: string;
+  manufacturer?: HVACManufacturer;
+  equipment: {
+    items: HVACEquipmentItem[];
+    totalCost?: number;
+  };
+  accessories?: {
+    items: HVACAccessoryItem[];
+    totalCost?: number;
+  };
+  zoning?: {
+    items: Array<{
+      type: "zoning" | "zoneBoard" | "zoneDamper" | "bypassDamper";
+      name?: string;
+      manufacturer?: string;
+      model?: string;
+      quantity: number;
+      productId?: string;
+      serialNumbers?: string[];
+      description?: string;
+    }>;
+    totalCost?: number;
+  };
+  sitePrep?: {
+    items: Array<{ name: string }>;
+    totalCost?: number;
+  };
+  discounts?: {
+    items: Array<{ name: string }>;
+    totalCost?: number;
+  };
+  efficiencies?: {
+    seer2?: string;
+    hspf2?: string;
+  };
+}
+
+/** System design structure */
+export interface HVACSystemDesign {
+  isPreliminary?: boolean;
+  systems: HVACSystem[];
+}
+
+/** Install package structure */
+export interface HVACInstallPackage {
+  systemDesign: HVACSystemDesign;
+  systemInstallDate?: Record<string, string>;
+  permitAttestation?: {
+    attestmentText?: string;
+    [key: string]: any;
+  };
+  workOrderTotalPrice?: number;
+  bypassApprovalValidation?: boolean;
+}
+
+/** Install package review flag */
+export interface InstallPackageFlag {
+  type: string;
+  status: string;
+  message?: string;
+  [key: string]: any;
+}
+
+/** Approved vendor from AVL */
+export interface ApprovedVendor {
+  manufacturer: string;
+  model: string;
+  type: string;
+  productId?: string;
+  [key: string]: any;
+}
+
+/** Estimated pricing response product */
+export interface EstimatedPricingResponse {
+  productId: string;
+  name: string;
+  type: string;
+  escalationRate?: number;
+  monthlyPayments: Array<{
+    year: number;
+    monthlyPayment: number;
+    yearlyCost?: number;
+  }>;
+  totalAmountPaid?: number;
+  [key: string]: any;
+}
+
+/** HVAC Quote structure */
+export interface HVACQuote {
+  id: string;
+  accountId?: string;
+  productId: string;
+  externalReference?: string;
+  type: "lease" | "ppa";
+  totalSystemCost: number;
+  productName?: string;
+  escalationRate?: number;
+  systemPricingDetails: Array<{
+    year: number;
+    monthlyPayment: number;
+    yearlyCost: number;
+  }>;
+  totalAmountPaid: number;
+  status: "active" | "contracted" | "voided";
+  contractId?: string;
+}
+
+/** Disclosure structure */
+export interface Disclosure {
+  id?: string;
+  name: string;
+  type:
+    | "creditApplication"
+    | "prequalification"
+    | "txtMessageNotifications"
+    | "termsAndConditions";
+  version: string;
+  versionNumber?: number;
+  summary: string;
+  text: string;
+  requireConsent: boolean;
+  acceptanceLabel?: string;
+  language: string;
+}
+
+/** Contract structure */
+export interface Contract {
+  id: string;
+  accountId: string;
+  status: string;
+  quoteId?: string;
+  sentAt?: string;
+  signedAt?: string;
+  approvedAt?: string;
+  [key: string]: any;
+}
+
+export const lightReachClient = new LightReachClient();

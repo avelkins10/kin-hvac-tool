@@ -3,10 +3,10 @@ import { PipelineBoard } from '@/components/proposals/PipelineBoard'
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
 
 export default async function PipelinePage() {
-  await requireAuth()
+  const session = await requireAuth()
 
   return (
-    <AuthenticatedLayout>
+    <AuthenticatedLayout serverSession={session}>
       <div className="bg-gray-50">
         <div className="p-6 border-b bg-white">
           <h1 className="text-3xl font-bold">Proposal Pipeline</h1>

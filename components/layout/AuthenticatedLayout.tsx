@@ -6,19 +6,34 @@ import { useEffect } from 'react'
 import { AppLayout } from './AppLayout'
 import { Spinner } from '@/components/ui/spinner'
 
-interface AuthenticatedLayoutProps {
-  children: React.ReactNode
+export type ServerSessionUser = {
+  id: string
+  email: string
+  role: string
+  companyId: string | null
 }
 
-export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
-  const { user: session, loading } = useSupabaseAuth()
+interface AuthenticatedLayoutProps {
+  children: React.ReactNode
+  /** When the page already ran requireAuth() on the server, pass session so the client does not redirect */
+  serverSession?: { user: ServerSessionUser } | null
+}
+
+export function AuthenticatedLayout({ children, serverSession }: AuthenticatedLayoutProps) {
+  const { user: clientSession, loading } = useSupabaseAuth()
   const router = useRouter()
+  const session = serverSession?.user ?? clientSession
 
   useEffect(() => {
-    if (!loading && !session) {
+    if (serverSession?.user) return
+    if (!loading && !clientSession) {
       router.push('/auth/signin')
     }
-  }, [loading, session, router])
+  }, [loading, clientSession, router, serverSession?.user])
+
+  if (serverSession?.user) {
+    return <AppLayout>{children}</AppLayout>
+  }
 
   if (loading) {
     return (
@@ -28,7 +43,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
     )
   }
 
-  if (!session) {
+  if (!clientSession) {
     return null
   }
 

@@ -1,10 +1,17 @@
-"use client"
+import Link from "next/link";
+import {
+  TrendingUp,
+  TrendingDown,
+  FileText,
+  Send,
+  Eye,
+  Users,
+  UserCog,
+  Workflow,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
-import Link from 'next/link'
-import { TrendingUp, TrendingDown, FileText, Send, Eye, Users, UserCog, Workflow } from 'lucide-react'
-import { cn } from '@/lib/utils'
-
-type IconName = 'FileText' | 'Send' | 'Eye' | 'Users' | 'UserCog' | 'Workflow'
+type IconName = "FileText" | "Send" | "Eye" | "Users" | "UserCog" | "Workflow";
 
 const iconMap = {
   FileText,
@@ -13,16 +20,16 @@ const iconMap = {
   Users,
   UserCog,
   Workflow,
-}
+};
 
 interface MetricCardProps {
-  title: string
-  value: number
-  icon: IconName
-  trend?: { value: number; label: string }
-  accentColor: 'blue' | 'gray' | 'amber' | 'green' | 'red'
-  href?: string
-  subtitle?: string
+  title: string;
+  value: number;
+  icon: IconName;
+  trend?: { value: number; label: string };
+  accentColor: "blue" | "gray" | "amber" | "green" | "red";
+  href?: string;
+  subtitle?: string;
 }
 
 export function MetricCard({
@@ -32,53 +39,96 @@ export function MetricCard({
   trend,
   accentColor,
   href,
-  subtitle
+  subtitle,
 }: MetricCardProps) {
-  const Icon = iconMap[icon]
-  const colorClasses = {
-    blue: 'bg-blue-50 border-blue-200 text-blue-600',
-    gray: 'bg-gray-50 border-gray-200 text-gray-600',
-    amber: 'bg-amber-50 border-amber-200 text-amber-600',
-    green: 'bg-green-50 border-green-200 text-green-600',
-    red: 'bg-red-50 border-red-200 text-red-600',
-  }
+  const Icon = iconMap[icon];
+
+  const colorConfig = {
+    blue: {
+      bg: "bg-primary-50",
+      border: "border-primary-100",
+      iconBg: "bg-primary-100",
+      iconColor: "text-primary-600",
+      accent: "text-primary-600",
+    },
+    gray: {
+      bg: "bg-gray-50",
+      border: "border-gray-100",
+      iconBg: "bg-gray-100",
+      iconColor: "text-gray-500",
+      accent: "text-gray-500",
+    },
+    amber: {
+      bg: "bg-warning-light",
+      border: "border-warning/20",
+      iconBg: "bg-warning/10",
+      iconColor: "text-warning",
+      accent: "text-warning",
+    },
+    green: {
+      bg: "bg-success-light",
+      border: "border-success/20",
+      iconBg: "bg-success/10",
+      iconColor: "text-success",
+      accent: "text-success",
+    },
+    red: {
+      bg: "bg-error-light",
+      border: "border-error/20",
+      iconBg: "bg-error/10",
+      iconColor: "text-error",
+      accent: "text-error",
+    },
+  };
+
+  const colors = colorConfig[accentColor];
 
   const content = (
-    <div className={cn(
-      "p-5 rounded-xl border-2 transition-all cursor-pointer group",
-      colorClasses[accentColor],
-      "hover:shadow-md"
-    )}>
+    <div
+      className={cn(
+        "p-5 rounded-lg border transition-all duration-150 cursor-pointer group card-hover",
+        colors.bg,
+        colors.border,
+        "hover:shadow-soft-md",
+      )}
+    >
       <div className="flex items-start justify-between mb-3">
-        <span className="text-sm font-medium text-gray-600">{title}</span>
-        <div className="p-2 rounded-lg bg-white/60">
-          <Icon className="w-5 h-5" />
+        <span className="text-sm font-medium text-muted-foreground">
+          {title}
+        </span>
+        <div className={cn("p-2 rounded-md", colors.iconBg)}>
+          <Icon className={cn("w-4 h-4", colors.iconColor)} />
         </div>
       </div>
-      
-      <div className="text-3xl font-bold text-gray-900 mb-1">{value}</div>
-      
+
+      <div className="text-3xl font-semibold text-foreground mb-1">{value}</div>
+
       {trend && (
-        <div className="flex items-center gap-1 text-sm">
+        <div className="flex items-center gap-1.5 text-sm">
           {trend.value >= 0 ? (
-            <TrendingUp className="w-4 h-4 text-green-500" />
+            <TrendingUp className="w-4 h-4 text-success" />
           ) : (
-            <TrendingDown className="w-4 h-4 text-red-500" />
+            <TrendingDown className="w-4 h-4 text-error" />
           )}
-          <span className={trend.value >= 0 ? 'text-green-600' : 'text-red-600'}>
-            {trend.value >= 0 ? '+' : ''}{trend.value}
+          <span
+            className={
+              trend.value >= 0
+                ? "text-success font-medium"
+                : "text-error font-medium"
+            }
+          >
+            {trend.value >= 0 ? "+" : ""}
+            {trend.value}
           </span>
-          <span className="text-gray-500">{trend.label}</span>
+          <span className="text-muted-foreground">{trend.label}</span>
         </div>
       )}
-      
+
       {subtitle && (
-        <div className="text-sm text-gray-500 mt-1 group-hover:text-blue-600 transition-colors">
-          {subtitle} →
-        </div>
+        <div className={cn("text-sm mt-1", colors.accent)}>{subtitle}</div>
       )}
     </div>
-  )
+  );
 
-  return href ? <Link href={href}>{content}</Link> : content
+  return href ? <Link href={href}>{content}</Link> : content;
 }

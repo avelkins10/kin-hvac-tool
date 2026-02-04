@@ -3,10 +3,10 @@ import { UserList } from '@/components/users/UserList'
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
 
 export default async function UsersPage() {
-  await requireRole(['COMPANY_ADMIN', 'SUPER_ADMIN'])
+  const session = await requireRole(['COMPANY_ADMIN', 'SUPER_ADMIN'])
 
   return (
-    <AuthenticatedLayout>
+    <AuthenticatedLayout serverSession={session}>
       <div className="p-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>

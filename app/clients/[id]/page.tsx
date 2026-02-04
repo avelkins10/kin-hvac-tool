@@ -91,13 +91,13 @@ export default async function ClientDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  await requireAuth()
+  const session = await requireAuth()
   const { id } = await params
   const data = await getClientData(id)
 
   if (!data) {
     return (
-      <AuthenticatedLayout>
+      <AuthenticatedLayout serverSession={session}>
         <div className="p-8">
           <h1 className="text-2xl font-bold mb-4">Client Not Found</h1>
           <p className="text-gray-500">The client you're looking for doesn't exist.</p>
@@ -112,7 +112,7 @@ export default async function ClientDetailPage({
   const { client, proposals, totalValue, proposalCount } = data
 
   return (
-    <AuthenticatedLayout>
+    <AuthenticatedLayout serverSession={session}>
       <div className="p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
