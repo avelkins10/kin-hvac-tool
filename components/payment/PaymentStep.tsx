@@ -461,10 +461,11 @@ export function PaymentStep({
               </div>
             )}
 
-          {/* Finance application link for LightReach */}
+          {/* Finance application link for LightReach/Comfort Plan */}
           {proposalId &&
-            selectedFinancingOption?.provider?.toLowerCase() ===
-              "lightreach" && (
+            (selectedFinancingOption?.provider?.toLowerCase() ===
+              "lightreach" ||
+              (selectedPaymentMethod === "leasing" && selectedComfortPlan)) && (
               <div className="mt-6 p-4 bg-muted/50 border border-border rounded-xl">
                 <p className="text-sm text-muted-foreground mb-3">
                   Ready to apply? Complete the finance application to get
