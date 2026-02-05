@@ -131,7 +131,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Attach system design from proposal so LightReach portal shows home size, equipment, etc.
-    const systemDesign = buildSystemDesignFromProposal(proposal);
+    const systemDesign = buildSystemDesignFromProposal(proposal, {
+      totalSystemCost: systemPrice,
+    });
     if (systemDesign) {
       applicationData.systemDesign = systemDesign;
     } else {

@@ -137,9 +137,14 @@ export function buildSystemDesignFromProposal(
   options: {
     isPreliminary?: boolean;
     includeSerialNumbers?: boolean;
+    totalSystemCost?: number;
   } = {},
 ): HVACSystemDesign | undefined {
-  const { isPreliminary = true, includeSerialNumbers = false } = options;
+  const {
+    isPreliminary = true,
+    includeSerialNumbers = false,
+    totalSystemCost,
+  } = options;
 
   const homeData = proposal?.homeData as
     | {
@@ -268,6 +273,7 @@ export function buildSystemDesignFromProposal(
         ahriNumber: equipment?.ahriNumber,
         equipment: {
           items: equipmentItems,
+          ...(totalSystemCost && { totalCost: totalSystemCost }),
         },
       },
     ],
