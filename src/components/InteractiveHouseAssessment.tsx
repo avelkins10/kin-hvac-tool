@@ -1,27 +1,15 @@
-"use client";
+"use client"
 
-import type React from "react";
+import type React from "react"
 
-import { useState, useEffect, useCallback, useRef, memo } from "react";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+import { useState, useEffect, useCallback, useRef, memo } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Slider } from "@/components/ui/slider"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   UserCircle,
   Home,
@@ -49,197 +37,168 @@ import {
   Edit,
   X,
   ClipboardList,
-} from "lucide-react";
-import {
-  usePriceBook,
-  DEFAULT_TIER_PRICES,
-  type FinancingOption,
-} from "../contexts/PriceBookContext";
-import { useMaintenance } from "../contexts/MaintenanceContext";
-import { useIncentives } from "../contexts/IncentivesContext";
-import { toast } from "sonner";
-import { FinanceApplicationList } from "@/components/finance/FinanceApplicationList";
-import { FinanceApplicationForm } from "@/components/finance/FinanceApplicationForm";
-import { FinanceApplicationStatus } from "@/components/finance/FinanceApplicationStatus";
-import {
-  shouldShowFinanceApplication,
-  extractCustomerDataFromProposal,
-  getSystemPriceFromProposal,
-} from "@/lib/finance-helpers";
-import { StepNavigation } from "@/components/builder/StepNavigation";
-import { AutoSaveIndicator } from "@/components/builder/AutoSaveIndicator";
-import { HelpTooltip } from "@/components/builder/HelpTooltip";
-import { AssessmentCompletionCard } from "@/components/builder/AssessmentCompletionCard";
-import {
-  PaymentStep,
-  PaymentMethodType,
-  FinancingOption as PaymentFinancingOption,
-} from "@/components/payment";
+} from "lucide-react"
+import { usePriceBook, DEFAULT_TIER_PRICES, type FinancingOption } from "../contexts/PriceBookContext"
+import { useMaintenance } from "../contexts/MaintenanceContext"
+import { useIncentives } from "../contexts/IncentivesContext"
+import { toast } from "sonner"
+import { FinanceApplicationList } from "@/components/finance/FinanceApplicationList"
+import { FinanceApplicationForm } from "@/components/finance/FinanceApplicationForm"
+import { FinanceApplicationStatus } from "@/components/finance/FinanceApplicationStatus"
+import { shouldShowFinanceApplication, extractCustomerDataFromProposal, getSystemPriceFromProposal } from "@/lib/finance-helpers"
+import { StepNavigation } from "@/components/builder/StepNavigation"
+import { AutoSaveIndicator } from "@/components/builder/AutoSaveIndicator"
+import { HelpTooltip } from "@/components/builder/HelpTooltip"
+import { AssessmentCompletionCard } from "@/components/builder/AssessmentCompletionCard"
 
 async function resizeImageToJpeg(file: File, maxDim = 1600): Promise<File> {
   const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error);
-    reader.onload = () => resolve(reader.result as string);
-    reader.readAsDataURL(file);
-  });
+    const reader = new FileReader()
+    reader.onerror = () => reject(reader.error)
+    reader.onload = () => resolve(reader.result as string)
+    reader.readAsDataURL(file)
+  })
 
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = reject;
-    image.src = dataUrl;
-  });
+    const image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = reject
+    image.src = dataUrl
+  })
 
-  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
 
-  const canvas = document.createElement("canvas");
-  canvas.width = img.width * scale;
-  canvas.height = img.height * scale;
+  const canvas = document.createElement("canvas")
+  canvas.width = img.width * scale
+  canvas.height = img.height * scale
 
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Cannot get canvas context");
+  const ctx = canvas.getContext("2d")
+  if (!ctx) throw new Error("Cannot get canvas context")
 
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
   const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error("Image compression failed"))),
-      "image/jpeg",
-      0.8,
-    );
-  });
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Image compression failed"))), "image/jpeg", 0.8)
+  })
 
   return new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
     type: "image/jpeg",
-  });
+  })
 }
 
 // Types
-type HotspotType =
-  | "customer"
-  | "home"
-  | "hvac"
-  | "solar"
-  | "electrical"
-  | "preferences";
+type HotspotType = "customer" | "home" | "hvac" | "solar" | "electrical" | "preferences"
 
 interface Hotspot {
-  id: string; // CHANGE: Changed type to string
-  top: string; // CHANGE: Added top property
-  left: string; // CHANGE: Added left property
-  label: string;
-  icon: React.ReactNode;
+  id: string // CHANGE: Changed type to string
+  top: string // CHANGE: Added top property
+  left: string // CHANGE: Added left property
+  label: string
+  icon: React.ReactNode
 }
 
 interface CustomerData {
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  state: string;
-  zip: string;
+  name: string
+  email: string
+  phone: string
+  address: string
+  city: string
+  state: string
+  zip: string
 }
 
 interface HomeData {
-  squareFootage: number;
-  yearBuilt: number;
-  stories: number;
-  bedrooms: number;
-  bathrooms: number;
-  hasAdditionsOrRemodeling: boolean;
-  additionsHaveDuctwork: boolean;
+  squareFootage: number
+  yearBuilt: number
+  stories: number
+  bedrooms: number
+  bathrooms: number
+  hasAdditionsOrRemodeling: boolean
+  additionsHaveDuctwork: boolean
 }
 
 interface HVACData {
-  currentSystem: string;
-  systemAge: string; // Changed to string to accommodate ranges
-  hasDuctwork: boolean;
-  equipmentType:
-    | "auto"
-    | "central"
-    | "mini-split"
-    | "package"
-    | "package-rooftop"
-    | "package-ground";
-  issues: string[];
-  lastServiced: string;
-  heatingType: string;
-  thermostatType: string;
-  zonesCount: number;
-  humidity: boolean;
-  airQuality: string;
-  noiseLevel: string;
-  hvacPlatePhoto?: string;
-  ductworkCondition: string;
-  ductworkAge: number;
-  climateZone: string;
+  currentSystem: string
+  systemAge: string // Changed to string to accommodate ranges
+  hasDuctwork: boolean
+  equipmentType: "auto" | "central" | "mini-split" | "package" | "package-rooftop" | "package-ground"
+  issues: string[]
+  lastServiced: string
+  heatingType: string
+  thermostatType: string
+  zonesCount: number
+  humidity: boolean
+  airQuality: string
+  noiseLevel: string
+  hvacPlatePhoto?: string
+  ductworkCondition: string
+  ductworkAge: number
+  climateZone: string
   // Added fields for AI analysis
-  nameplatePhoto?: string; // Base64 or URL (for backward compatibility)
-  nameplatePhotoUrl?: string; // Legacy; prefer nameplatePhotoPath + signed URL when serving
-  nameplatePhotoPath?: string; // Storage path; request signed URL when serving from private bucket
-  coolingType?: string;
-  tonnage?: string;
+  nameplatePhoto?: string // Base64 or URL (for backward compatibility)
+  nameplatePhotoUrl?: string // Legacy; prefer nameplatePhotoPath + signed URL when serving
+  nameplatePhotoPath?: string // Storage path; request signed URL when serving from private bucket
+  coolingType?: string
+  tonnage?: string
 }
 
 interface SolarData {
-  interested: boolean;
-  hasSolarInstalled: boolean;
-  roofCondition: string;
-  shading: string;
-  electricBill: number;
-  roofAge: number;
-  roofMaterial: string;
-  roofDirection: string;
-  hasPreviousQuotes: boolean;
-  batteryInterest: boolean;
-  utilityCompany: string;
-  peakUsageTime: string;
+  interested: boolean
+  hasSolarInstalled: boolean
+  roofCondition: string
+  shading: string
+  electricBill: number
+  roofAge: number
+  roofMaterial: string
+  roofDirection: string
+  hasPreviousQuotes: boolean
+  batteryInterest: boolean
+  utilityCompany: string
+  peakUsageTime: string
 }
 
 interface ElectricalData {
-  panelSize: number;
-  hasCapacity: boolean;
-  needsUpgrade: boolean;
-  openBreakers: number;
+  panelSize: number
+  hasCapacity: boolean
+  needsUpgrade: boolean
+  openBreakers: number
 }
 
 interface PreferencesData {
-  priority: "comfort" | "efficiency" | "budget";
-  financing: boolean;
-  timeline: string;
-  budgetRange: string;
-  brandPreference: string;
-  warrantyImportance: string;
-  environmentalConcern: boolean;
-  smartHomeIntegration: boolean;
-  noiseTolerrance: string;
-  allergies: boolean;
-  pets: boolean;
-  homeOccupancy: string;
-  decisionMaker: string;
-  competitorQuotes: boolean;
+  priority: "comfort" | "efficiency" | "budget"
+  financing: boolean
+  timeline: string
+  budgetRange: string
+  brandPreference: string
+  warrantyImportance: string
+  environmentalConcern: boolean
+  smartHomeIntegration: boolean
+  noiseTolerrance: string
+  allergies: boolean
+  pets: boolean
+  homeOccupancy: string
+  decisionMaker: string
+  competitorQuotes: boolean
 }
 
 interface SelectedEquipment {
-  tier: "good" | "better" | "best";
-  name: string;
-  salesPrice: number; // The base price before customer markup
-  price: number; // The price shown to the customer
-  baseCost: number; // Added base cost for margin calculation
-  seer: number;
-  features: string[];
-  recommended?: boolean; // Added recommended property
-  tonnage?: number; // Added tonnage for equipment selection
+  tier: "good" | "better" | "best"
+  name: string
+  salesPrice: number // The base price before customer markup
+  price: number // The price shown to the customer
+  baseCost: number // Added base cost for margin calculation
+  seer: number
+  features: string[]
+  recommended?: boolean // Added recommended property
+  tonnage?: number // Added tonnage for equipment selection
 }
 
 interface AddOn {
-  id: string;
-  name: string;
-  price: number; // Base price before customer markup
-  description: string;
-  selected: boolean;
+  id: string
+  name: string
+  price: number // Base price before customer markup
+  description: string
+  selected: boolean
 }
 
 // Hotspot definitions
@@ -287,7 +246,7 @@ const hotspots: Hotspot[] = [
     label: "Customer Preferences",
     icon: <Heart className="w-5 h-5 md:w-8 md:h-8 text-white" />,
   },
-];
+]
 
 // Default add-ons
 const defaultAddOns: AddOn[] = [
@@ -312,13 +271,7 @@ const defaultAddOns: AddOn[] = [
     description: "Protects HVAC equipment from power surges",
     selected: false,
   },
-  {
-    id: "4",
-    name: "Duct Sealing",
-    price: 450,
-    description: "Seal leaks for improved efficiency",
-    selected: false,
-  },
+  { id: "4", name: "Duct Sealing", price: 450, description: "Seal leaks for improved efficiency", selected: false },
   {
     id: "5",
     name: "Extended Warranty",
@@ -333,82 +286,46 @@ const defaultAddOns: AddOn[] = [
     description: "Control temperatures in different areas",
     selected: false,
   },
-];
+]
 
 interface Props {
-  onAdminAccess: () => void;
-  onSaveRef?: (saveFn: () => Promise<void>) => void;
-  onProposalIdChange?: (id: string | null) => void;
+  onAdminAccess: () => void
+  onSaveRef?: (saveFn: () => Promise<void>) => void
+  onProposalIdChange?: (id: string | null) => void
 }
 
 // #region agent log
-const LOG_ENDPOINT =
-  "http://127.0.0.1:7243/ingest/a83938d5-3a77-4ab6-916c-dbc5e276a756";
-function logAssessment(
-  location: string,
-  message: string,
-  data: Record<string, unknown>,
-  hypothesisId: string,
-) {
-  fetch(LOG_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-      sessionId: "debug-session",
-      hypothesisId,
-    }),
-  }).catch(() => {});
+const LOG_ENDPOINT = 'http://127.0.0.1:7243/ingest/a83938d5-3a77-4ab6-916c-dbc5e276a756'
+function logAssessment(location: string, message: string, data: Record<string, unknown>, hypothesisId: string) {
+  fetch(LOG_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location, message, data, timestamp: Date.now(), sessionId: 'debug-session', hypothesisId }) }).catch(() => {})
 }
 // #endregion
 
-function InteractiveHouseAssessmentInner({
-  onAdminAccess,
-  onSaveRef,
-  onProposalIdChange,
-}: Props) {
+function InteractiveHouseAssessmentInner({ onAdminAccess, onSaveRef, onProposalIdChange }: Props) {
   // #region agent log
-  const assessmentRenderCountRef = useRef(0);
-  assessmentRenderCountRef.current += 1;
+  const assessmentRenderCountRef = useRef(0)
+  assessmentRenderCountRef.current += 1
   // #endregion
   // View state
-  const [showPricing, setShowPricingState] = useState(false);
-  const setShowPricing = useCallback(
-    (v: boolean | ((prev: boolean) => boolean)) => {
-      logAssessment(
-        "InteractiveHouseAssessment.tsx:setShowPricing",
-        "setShowPricing called",
-        { renderCount: assessmentRenderCountRef.current },
-        "A",
-      );
-      setShowPricingState((prev) => {
-        const next = typeof v === "function" ? v(prev) : v;
-        return next === prev ? prev : next;
-      });
-    },
-    [],
-  );
+  const [showPricing, setShowPricingState] = useState(false)
+  const setShowPricing = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+    logAssessment('InteractiveHouseAssessment.tsx:setShowPricing', 'setShowPricing called', { renderCount: assessmentRenderCountRef.current }, 'A')
+    setShowPricingState((prev) => {
+      const next = typeof v === 'function' ? v(prev) : v
+      return next === prev ? prev : next
+    })
+  }, [])
   const [pricingStep, setPricingStep] = useState<
     "equipment" | "addons" | "maintenance" | "incentives" | "payment" | "review"
-  >("equipment");
+  >("equipment")
 
   // Modal state
-  const [activeModal, setActiveModalState] = useState<HotspotType | null>(null);
+  const [activeModal, setActiveModalState] = useState<HotspotType | null>(null)
   const setActiveModal = useCallback((v: HotspotType | null) => {
-    logAssessment(
-      "InteractiveHouseAssessment.tsx:setActiveModal",
-      "setActiveModal called",
-      { renderCount: assessmentRenderCountRef.current, value: v },
-      "A",
-    );
-    setActiveModalState((prev) => (prev === v ? prev : v));
-  }, []);
-  const [completedSections, setCompletedSections] = useState<Set<HotspotType>>(
-    new Set(),
-  );
+    logAssessment('InteractiveHouseAssessment.tsx:setActiveModal', 'setActiveModal called', { renderCount: assessmentRenderCountRef.current, value: v }, 'A')
+    setActiveModalState((prev) => (prev === v ? prev : v))
+  }, [])
+  const [completedSections, setCompletedSections] = useState<Set<HotspotType>>(new Set())
 
   // Data state
   const [customerData, setCustomerData] = useState<CustomerData>({
@@ -419,7 +336,7 @@ function InteractiveHouseAssessmentInner({
     city: "",
     state: "",
     zip: "",
-  });
+  })
 
   const [homeData, setHomeData] = useState<HomeData>({
     squareFootage: 2000,
@@ -429,7 +346,7 @@ function InteractiveHouseAssessmentInner({
     bathrooms: 2,
     hasAdditionsOrRemodeling: false,
     additionsHaveDuctwork: true,
-  });
+  })
 
   const [hvacData, setHvacData] = useState<HVACData>({
     currentSystem: "central_ac",
@@ -451,7 +368,7 @@ function InteractiveHouseAssessmentInner({
     nameplatePhoto: undefined,
     coolingType: undefined,
     tonnage: undefined,
-  });
+  })
 
   const [solarData, setSolarData] = useState<SolarData>({
     interested: false,
@@ -466,14 +383,14 @@ function InteractiveHouseAssessmentInner({
     batteryInterest: false,
     utilityCompany: "",
     peakUsageTime: "afternoon",
-  });
+  })
 
   const [electricalData, setElectricalData] = useState<ElectricalData>({
     panelSize: 200,
     hasCapacity: true,
     needsUpgrade: false,
     openBreakers: 4,
-  });
+  })
 
   const [preferencesData, setPreferencesData] = useState<PreferencesData>({
     priority: "comfort",
@@ -490,318 +407,177 @@ function InteractiveHouseAssessmentInner({
     homeOccupancy: "always",
     decisionMaker: "yes",
     competitorQuotes: false,
-  });
+  })
 
-  const [selectedEquipment, setSelectedEquipment] =
-    useState<SelectedEquipment | null>(null);
-  const [addOns, setAddOns] = useState<AddOn[]>(defaultAddOns);
-  const [paymentMethod, setPaymentMethod] = useState<
-    "cash" | "financing" | "leasing"
-  >("leasing");
-  const [selectedFinancingOption, setSelectedFinancingOption] =
-    useState<FinancingOption | null>(null);
-  const hasSetDefaultFinancingRef = useRef(false);
-  const addOnsSyncedFromContextRef = useRef(false);
-  const [showProposalActions, setShowProposalActions] = useState(false); // State to control proposal actions visibility
-  const [proposalId, setProposalId] = useState<string | null>(null); // Store proposal ID for edits
-  const [showFinanceForm, setShowFinanceForm] = useState(false); // State for finance application form
-  const [selectedFinanceApplicationId, setSelectedFinanceApplicationId] =
-    useState<string | null>(null); // Selected finance application to view
+  const [selectedEquipment, setSelectedEquipment] = useState<SelectedEquipment | null>(null)
+  const [addOns, setAddOns] = useState<AddOn[]>(defaultAddOns)
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "financing" | "leasing">("leasing")
+  const [selectedFinancingOption, setSelectedFinancingOption] = useState<FinancingOption | null>(null)
+  const hasSetDefaultFinancingRef = useRef(false)
+  const addOnsSyncedFromContextRef = useRef(false)
+  const [showProposalActions, setShowProposalActions] = useState(false) // State to control proposal actions visibility
+  const [proposalId, setProposalId] = useState<string | null>(null) // Store proposal ID for edits
+  const [showFinanceForm, setShowFinanceForm] = useState(false) // State for finance application form
+  const [selectedFinanceApplicationId, setSelectedFinanceApplicationId] = useState<string | null>(null) // Selected finance application to view
 
   // Auto-save state
-  const [isAutoSaving, setIsAutoSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Validation state
-  const [validationErrors, setValidationErrors] = useState<
-    Record<string, string>
-  >({});
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
   // Step navigation
-  const pricingSteps: string[] = [
-    "equipment",
-    "addons",
-    "maintenance",
-    "incentives",
-    "payment",
-    "review",
-  ];
+  const pricingSteps: string[] = ["equipment", "addons", "maintenance", "incentives", "payment", "review"]
   const stepLabels: Record<string, string> = {
     equipment: "Equipment",
     addons: "Add-ons",
     maintenance: "Maintenance",
     incentives: "Incentives",
     payment: "Payment",
-    review: "Review",
-  };
+    review: "Review"
+  }
   const estimatedTimes: Record<string, number> = {
     equipment: 3,
     addons: 2,
     maintenance: 2,
     incentives: 1,
     payment: 2,
-    review: 1,
-  };
+    review: 1
+  }
 
   // AI Analysis State
-  const [analyzingNameplate, setAnalyzingNameplate] = useState(false);
-  const [nameplateSignedUrl, setNameplateSignedUrl] = useState<string | null>(
-    null,
-  );
+  const [analyzingNameplate, setAnalyzingNameplate] = useState(false)
+  const [nameplateSignedUrl, setNameplateSignedUrl] = useState<string | null>(null)
   const [nameplateAnalysis, setNameplateAnalysis] = useState<{
-    brand?: string | null;
-    modelNumber?: string | null;
-    serialNumber?: string | null;
-    coolingCapacityBTU?: number | null;
-    heatingCapacityBTU?: number | null;
-    seerRating?: number | null;
-    voltage?: string | null;
-    refrigerantType?: string | null;
-    estimatedAge?: string | null;
-    unitType?: string | null;
-    tonnage?: number | null;
-    additionalNotes?: string | null;
-    salesRoast?: string | null;
-    replacementSuggestion?: string | null;
-    parseError?: boolean;
-    error?: string; // Added for general errors
-    rawText?: string; // Added for raw response from API
-  } | null>(null);
+    brand?: string | null
+    modelNumber?: string | null
+    serialNumber?: string | null
+    coolingCapacityBTU?: number | null
+    heatingCapacityBTU?: number | null
+    seerRating?: number | null
+    voltage?: string | null
+    refrigerantType?: string | null
+    estimatedAge?: string | null
+    unitType?: string | null
+    tonnage?: number | null
+    additionalNotes?: string | null
+    salesRoast?: string | null
+    replacementSuggestion?: string | null
+    parseError?: boolean
+    error?: string // Added for general errors
+    rawText?: string // Added for raw response from API
+  } | null>(null)
 
   // Contexts
-  const {
-    getTierPrice,
-    financingOptions,
-    calculateMonthlyPayment,
-    getCustomerPrice,
-    priceBook,
-    getAddOnSalesPrice,
-    loading: priceBookLoading,
-  } = usePriceBook();
-  const {
-    plans,
-    selectedPlan,
-    setSelectedPlan,
-    getPlanSalesPrice,
-    getPlanMonthlyPrice,
-  } = useMaintenance();
-  const {
-    incentives,
-    selectedIncentives,
-    toggleIncentive,
-    getTotalIncentives,
-  } = useIncentives();
+  const { getTierPrice, financingOptions, calculateMonthlyPayment, getCustomerPrice, priceBook, getAddOnSalesPrice, loading: priceBookLoading } = usePriceBook()
+  const { plans, selectedPlan, setSelectedPlan, getPlanSalesPrice, getPlanMonthlyPrice } = useMaintenance()
+  const { incentives, selectedIncentives, toggleIncentive, getTotalIncentives } = useIncentives()
 
   // Load add-ons from database (via context) once when pricebook is ready - avoid re-running and re-setting state.
   // Only run after pricebook has finished loading (avoids running with default data then again with Supabase data).
   useEffect(() => {
     // #region agent log
-    if (priceBookLoading) {
-      logAssessment(
-        "InteractiveHouseAssessment.tsx:addOnsEffect",
-        "addOns effect early return priceBookLoading",
-        { priceBookLoading },
-        "D",
-      );
-      return;
-    }
-    if (
-      !priceBook?.addOns ||
-      !Array.isArray(priceBook.addOns) ||
-      priceBook.addOns.length === 0
-    ) {
-      logAssessment(
-        "InteractiveHouseAssessment.tsx:addOnsEffect",
-        "addOns effect early return no addOns",
-        {},
-        "D",
-      );
-      return;
-    }
-    if (!getAddOnSalesPrice) {
-      logAssessment(
-        "InteractiveHouseAssessment.tsx:addOnsEffect",
-        "addOns effect early return no getAddOnSalesPrice",
-        {},
-        "D",
-      );
-      return;
-    }
-    if (addOnsSyncedFromContextRef.current) {
-      logAssessment(
-        "InteractiveHouseAssessment.tsx:addOnsEffect",
-        "addOns effect early return already synced",
-        {},
-        "D",
-      );
-      return;
-    }
-    logAssessment(
-      "InteractiveHouseAssessment.tsx:addOnsEffect",
-      "addOns effect calling setAddOns",
-      { addOnsCount: priceBook.addOns.length },
-      "D",
-    );
+    if (priceBookLoading) { logAssessment('InteractiveHouseAssessment.tsx:addOnsEffect', 'addOns effect early return priceBookLoading', { priceBookLoading }, 'D'); return }
+    if (!priceBook?.addOns || !Array.isArray(priceBook.addOns) || priceBook.addOns.length === 0) { logAssessment('InteractiveHouseAssessment.tsx:addOnsEffect', 'addOns effect early return no addOns', {}, 'D'); return }
+    if (!getAddOnSalesPrice) { logAssessment('InteractiveHouseAssessment.tsx:addOnsEffect', 'addOns effect early return no getAddOnSalesPrice', {}, 'D'); return }
+    if (addOnsSyncedFromContextRef.current) { logAssessment('InteractiveHouseAssessment.tsx:addOnsEffect', 'addOns effect early return already synced', {}, 'D'); return }
+    logAssessment('InteractiveHouseAssessment.tsx:addOnsEffect', 'addOns effect calling setAddOns', { addOnsCount: priceBook.addOns.length }, 'D')
     // #endregion
-    addOnsSyncedFromContextRef.current = true;
+    addOnsSyncedFromContextRef.current = true
 
     const transformedAddOns = priceBook.addOns
-      .filter((addon) => addon.enabled)
-      .map((addon) => ({
+      .filter(addon => addon.enabled)
+      .map(addon => ({
         id: addon.id,
         name: addon.name,
         price: getAddOnSalesPrice(addon),
         description: addon.description,
         selected: false,
-      }));
+      }))
 
-    setAddOns((prev) => {
-      const newAddOns = transformedAddOns.map((newAddon) => {
-        const existing = prev.find((p) => p.id === newAddon.id);
-        return existing
-          ? { ...newAddon, selected: existing.selected }
-          : newAddon;
-      });
-      const hasChanged =
-        newAddOns.length !== prev.length ||
+    setAddOns(prev => {
+      const newAddOns = transformedAddOns.map(newAddon => {
+        const existing = prev.find(p => p.id === newAddon.id)
+        return existing ? { ...newAddon, selected: existing.selected } : newAddon
+      })
+      const hasChanged = newAddOns.length !== prev.length ||
         newAddOns.some((newAddon, i) => {
-          const old = prev[i];
-          return !old || old.id !== newAddon.id || old.price !== newAddon.price;
-        });
-      return hasChanged ? newAddOns : prev;
-    });
-  }, [priceBookLoading, priceBook?.addOns, getAddOnSalesPrice]);
+          const old = prev[i]
+          return !old || old.id !== newAddon.id || old.price !== newAddon.price
+        })
+      return hasChanged ? newAddOns : prev
+    })
+  }, [priceBookLoading, priceBook?.addOns, getAddOnSalesPrice])
 
   // Set default financing option once when leasing and options are available - avoid re-running on every context re-render.
   // Only run after pricebook has finished loading so we don't run with default then real data.
   useEffect(() => {
     // #region agent log
-    if (priceBookLoading) {
-      logAssessment(
-        "InteractiveHouseAssessment.tsx:financingEffect",
-        "financing effect early return priceBookLoading",
-        {},
-        "D",
-      );
-      return;
-    }
-    if (hasSetDefaultFinancingRef.current) {
-      logAssessment(
-        "InteractiveHouseAssessment.tsx:financingEffect",
-        "financing effect early return already set",
-        {},
-        "D",
-      );
-      return;
-    }
-    if (paymentMethod !== "leasing" || selectedFinancingOption) {
-      logAssessment(
-        "InteractiveHouseAssessment.tsx:financingEffect",
-        "financing effect early return payment/option",
-        { paymentMethod, hasOption: !!selectedFinancingOption },
-        "D",
-      );
-      return;
-    }
-    if (!financingOptions?.length) {
-      logAssessment(
-        "InteractiveHouseAssessment.tsx:financingEffect",
-        "financing effect early return no options",
-        {},
-        "D",
-      );
-      return;
-    }
-    const leasingOptions = financingOptions.filter(
-      (opt) => opt.type === "lease" && opt.available,
-    );
-    if (leasingOptions.length === 0) {
-      logAssessment(
-        "InteractiveHouseAssessment.tsx:financingEffect",
-        "financing effect early return no leasing",
-        {},
-        "D",
-      );
-      return;
-    }
-    logAssessment(
-      "InteractiveHouseAssessment.tsx:financingEffect",
-      "financing effect calling setSelectedFinancingOption",
-      {},
-      "D",
-    );
+    if (priceBookLoading) { logAssessment('InteractiveHouseAssessment.tsx:financingEffect', 'financing effect early return priceBookLoading', {}, 'D'); return }
+    if (hasSetDefaultFinancingRef.current) { logAssessment('InteractiveHouseAssessment.tsx:financingEffect', 'financing effect early return already set', {}, 'D'); return }
+    if (paymentMethod !== "leasing" || selectedFinancingOption) { logAssessment('InteractiveHouseAssessment.tsx:financingEffect', 'financing effect early return payment/option', { paymentMethod, hasOption: !!selectedFinancingOption }, 'D'); return }
+    if (!financingOptions?.length) { logAssessment('InteractiveHouseAssessment.tsx:financingEffect', 'financing effect early return no options', {}, 'D'); return }
+    const leasingOptions = financingOptions.filter((opt) => opt.type === "lease" && opt.available)
+    if (leasingOptions.length === 0) { logAssessment('InteractiveHouseAssessment.tsx:financingEffect', 'financing effect early return no leasing', {}, 'D'); return }
+    logAssessment('InteractiveHouseAssessment.tsx:financingEffect', 'financing effect calling setSelectedFinancingOption', {}, 'D')
     // #endregion
-    hasSetDefaultFinancingRef.current = true;
+    hasSetDefaultFinancingRef.current = true
     const defaultLightreach = leasingOptions.find(
-      (opt) =>
-        opt.provider?.toLowerCase() === "lightreach" &&
-        opt.termMonths === 144 &&
-        opt.name?.includes("0.99%"),
-    );
-    setSelectedFinancingOption(defaultLightreach || leasingOptions[0]);
-  }, [
-    priceBookLoading,
-    paymentMethod,
-    financingOptions,
-    selectedFinancingOption,
-  ]);
+      (opt) => opt.provider?.toLowerCase() === "lightreach" && opt.termMonths === 144 && opt.name?.includes("0.99%"),
+    )
+    setSelectedFinancingOption(defaultLightreach || leasingOptions[0])
+  }, [priceBookLoading, paymentMethod, financingOptions, selectedFinancingOption])
 
   // Fetch signed URL when we have a storage path (private bucket); use when serving nameplate image
   useEffect(() => {
-    const path = hvacData.nameplatePhotoPath;
+    const path = hvacData.nameplatePhotoPath
     if (!path) {
-      setNameplateSignedUrl(null);
-      return;
+      setNameplateSignedUrl(null)
+      return
     }
-    let cancelled = false;
-    const params = new URLSearchParams({ bucket: "nameplates", path });
+    let cancelled = false
+    const params = new URLSearchParams({ bucket: "nameplates", path })
     fetch(`/api/storage/signed-url?${params}`)
-      .then((res) =>
-        res.ok
-          ? res.json()
-          : Promise.reject(new Error("Failed to get signed URL")),
-      )
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Failed to get signed URL"))))
       .then((data) => {
-        if (!cancelled && data?.url) setNameplateSignedUrl(data.url);
+        if (!cancelled && data?.url) setNameplateSignedUrl(data.url)
       })
       .catch(() => {
-        if (!cancelled) setNameplateSignedUrl(null);
-      });
+        if (!cancelled) setNameplateSignedUrl(null)
+      })
     return () => {
-      cancelled = true;
-    };
-  }, [hvacData.nameplatePhotoPath]);
+      cancelled = true
+    }
+  }, [hvacData.nameplatePhotoPath])
 
   // System design is required for saving proposals and for Comfort Plan (LightReach) applications
   const hasSystemDesignData = (): boolean => {
-    const sqft = homeData?.squareFootage ?? 0;
-    return sqft > 0 && !!selectedEquipment;
-  };
+    const sqft = homeData?.squareFootage ?? 0
+    return sqft > 0 && !!selectedEquipment
+  }
 
   const systemDesignErrorMessage = (): string | null => {
-    const sqft = homeData?.squareFootage ?? 0;
-    if (sqft <= 0) return "Please enter home square footage in Home Details.";
-    if (!selectedEquipment)
-      return "Please select equipment before saving or submitting a Comfort Plan application.";
-    return null;
-  };
+    const sqft = homeData?.squareFootage ?? 0
+    if (sqft <= 0) return 'Please enter home square footage in Home Details.'
+    if (!selectedEquipment) return 'Please select equipment before saving or submitting a Comfort Plan application.'
+    return null
+  }
 
   // Mark section complete
   const markComplete = (section: HotspotType) => {
-    if (section === "home") {
-      const sqft = homeData?.squareFootage ?? 0;
+    if (section === 'home') {
+      const sqft = homeData?.squareFootage ?? 0
       if (sqft <= 0) {
-        toast.error(
-          "Please set square footage (min 500 sq ft) before saving Home Details.",
-        );
-        return;
+        toast.error('Please set square footage (min 500 sq ft) before saving Home Details.')
+        return
       }
     }
-    setCompletedSections((prev) => new Set([...prev, section]));
-    setActiveModal(null);
-  };
+    setCompletedSections((prev) => new Set([...prev, section]))
+    setActiveModal(null)
+  }
 
   // Reset assessment data
   const resetAssessment = () => {
@@ -813,7 +589,7 @@ function InteractiveHouseAssessmentInner({
       bathrooms: 2,
       hasAdditionsOrRemodeling: false,
       additionsHaveDuctwork: true,
-    });
+    })
     setHvacData({
       // Updated to use new HVACData interface
       currentSystem: "central_ac",
@@ -834,7 +610,7 @@ function InteractiveHouseAssessmentInner({
       nameplatePhoto: undefined,
       coolingType: undefined,
       tonnage: undefined,
-    });
+    })
     setSolarData({
       interested: false,
       hasSolarInstalled: false,
@@ -848,13 +624,13 @@ function InteractiveHouseAssessmentInner({
       batteryInterest: false,
       utilityCompany: "",
       peakUsageTime: "afternoon",
-    });
+    })
     setElectricalData({
       panelSize: 200,
       hasCapacity: true,
       needsUpgrade: false,
       openBreakers: 4,
-    });
+    })
     setPreferencesData({
       priority: "comfort",
       financing: true,
@@ -870,174 +646,161 @@ function InteractiveHouseAssessmentInner({
       homeOccupancy: "always",
       decisionMaker: "yes",
       competitorQuotes: false,
-    });
-    setSelectedEquipment(null);
+    })
+    setSelectedEquipment(null)
     // Reset add-ons will be handled by useEffect that loads from context
-    setPaymentMethod("leasing");
-    setSelectedFinancingOption(null);
-    setSelectedPlan(null);
+    setPaymentMethod("leasing")
+    setSelectedFinancingOption(null)
+    setSelectedPlan(null)
     // Reset AI analysis state
-    setNameplateAnalysis(null);
-    setAnalyzingNameplate(false);
-  };
+    setNameplateAnalysis(null)
+    setAnalyzingNameplate(false)
+  }
 
   // /** CHANGE: Enhanced tonnage calculation considering insulation and climate */
   const calculateTonnage = (): number => {
-    const sqft = homeData.squareFootage;
+    const sqft = homeData.squareFootage
 
     // Base calculation
-    let baseTonnage = 2;
-    if (sqft <= 1200) baseTonnage = 2;
-    else if (sqft <= 1500) baseTonnage = 2.5;
-    else if (sqft <= 1800) baseTonnage = 3;
-    else if (sqft <= 2100) baseTonnage = 3.5;
-    else if (sqft <= 2400) baseTonnage = 4;
-    else if (sqft <= 3000) baseTonnage = 5;
-    else baseTonnage = 5;
+    let baseTonnage = 2
+    if (sqft <= 1200) baseTonnage = 2
+    else if (sqft <= 1500) baseTonnage = 2.5
+    else if (sqft <= 1800) baseTonnage = 3
+    else if (sqft <= 2100) baseTonnage = 3.5
+    else if (sqft <= 2400) baseTonnage = 4
+    else if (sqft <= 3000) baseTonnage = 5
+    else baseTonnage = 5
 
     // Adjustments based on insulation - assuming poor insulation adds load
     // This would need to be captured in homeData, but we can infer from age
     if (homeData.yearBuilt < 1990) {
-      baseTonnage += 0.5; // Older homes typically have poorer insulation
+      baseTonnage += 0.5 // Older homes typically have poorer insulation
     }
 
     // Adjustments based on stories (multi-story homes may need more capacity)
     if (homeData.stories > 2) {
-      baseTonnage += 0.5;
+      baseTonnage += 0.5
     }
 
     // Adjustments for additions/remodeling
     if (homeData.hasAdditionsOrRemodeling) {
-      baseTonnage += 0.5; // Assume additions add load
+      baseTonnage += 0.5 // Assume additions add load
     }
 
     // Adjustments for climate zone
-    const climateZone = Number.parseInt(hvacData.climateZone);
+    const climateZone = Number.parseInt(hvacData.climateZone)
     if (!isNaN(climateZone)) {
       if (climateZone >= 4) {
-        baseTonnage += 0.5; // Warmer climates might need more capacity
+        baseTonnage += 0.5 // Warmer climates might need more capacity
       }
       if (climateZone <= 2) {
-        baseTonnage += 0.5; // Hotter/more humid climates
+        baseTonnage += 0.5 // Hotter/more humid climates
       }
     }
 
     // Round to nearest 0.5
-    return Math.round(baseTonnage * 2) / 2;
-  };
+    return Math.round(baseTonnage * 2) / 2
+  }
 
   // /** CHANGE: New function to determine recommended tier based on all inputs */
   const getRecommendedTier = (): "good" | "better" | "best" => {
-    let score = 0;
+    let score = 0
 
     // Priority influence
-    if (preferencesData.priority === "efficiency") score += 2;
-    else if (preferencesData.priority === "comfort") score += 1;
-    else if (preferencesData.priority === "budget") score -= 1;
+    if (preferencesData.priority === "efficiency") score += 2
+    else if (preferencesData.priority === "comfort") score += 1
+    else if (preferencesData.priority === "budget") score -= 1
 
     // Budget range influence
-    const budget = preferencesData.budgetRange;
+    const budget = preferencesData.budgetRange
     if (budget === "under_8000")
-      score -= 2; // Adjusted from "<10000"
+      score -= 2 // Adjusted from "<10000"
     else if (budget === "8000-10000")
-      score -= 1; // Added new range
-    else if (budget === "10000-15000") score += 0;
-    else if (budget === "15000-20000") score += 1;
-    else if (budget === "over_20000") score += 2; // Adjusted from ">20000"
+      score -= 1 // Added new range
+    else if (budget === "10000-15000") score += 0
+    else if (budget === "15000-20000") score += 1
+    else if (budget === "over_20000") score += 2 // Adjusted from ">20000"
 
     // Environmental concern
-    if (preferencesData.environmentalConcern) score += 1;
+    if (preferencesData.environmentalConcern) score += 1
 
     // Solar integration - higher efficiency makes sense with solar
-    if (solarData.interested || solarData.hasSolarInstalled) score += 1;
+    if (solarData.interested || solarData.hasSolarInstalled) score += 1
 
     // High electric bill suggests efficiency focus
-    if (solarData.electricBill > 200) score += 1;
+    if (solarData.electricBill > 200) score += 1
 
     // Warranty importance
-    if (preferencesData.warrantyImportance === "very") score += 1;
+    if (preferencesData.warrantyImportance === "very") score += 1
 
     // Ductwork condition - poor ductwork might influence choice if not addressed
     if (hvacData.hasDuctwork && hvacData.ductworkCondition === "poor") {
-      score -= 1; // May need a more robust system if ductwork is bad and won't be fixed
+      score -= 1 // May need a more robust system if ductwork is bad and won't be fixed
     }
 
     // Map score to tier
-    if (score >= 3) return "best";
-    if (score >= 0) return "better";
-    return "good";
-  };
+    if (score >= 3) return "best"
+    if (score >= 0) return "better"
+    return "good"
+  }
 
   // /** CHANGE: New function to filter equipment tiers based on budget */
   const shouldShowTier = (tier: "good" | "better" | "best"): boolean => {
-    const budget = preferencesData.budgetRange;
+    const budget = preferencesData.budgetRange
 
     if (budget === "under_8000") {
       // Adjusted from "<10000"
-      return tier === "good";
+      return tier === "good"
     } else if (budget === "8000-10000") {
       // Added new range
-      return tier === "good";
+      return tier === "good"
     } else if (budget === "10000-15000") {
-      return tier === "good" || tier === "better";
+      return tier === "good" || tier === "better"
     }
     // For 15000-20000 and >20000, show all tiers
-    return true;
-  };
+    return true
+  }
 
   // /** CHANGE: Updated equipment tiers to use customer-facing prices with cash markup */
   const getEquipmentTiers = (tonnage: number): SelectedEquipment[] => {
     // const tonnage = calculateTonnage() // Tonnage is now a parameter
-    const recommendedTier = getRecommendedTier();
+    const recommendedTier = getRecommendedTier()
 
     // Placeholder for base cost - this would ideally come from a pricing API or database
-    const getBaseCost = (
-      tier: "good" | "better" | "best",
-      tonnage: number,
-    ): number => {
-      let base = 0;
+    const getBaseCost = (tier: "good" | "better" | "best", tonnage: number): number => {
+      let base = 0
       switch (tier) {
         case "good":
-          base = tonnage * 1200;
-          break;
+          base = tonnage * 1200
+          break
         case "better":
-          base = tonnage * 1500;
-          break;
+          base = tonnage * 1500
+          break
         case "best":
-          base = tonnage * 1800;
-          break;
+          base = tonnage * 1800
+          break
       }
       // Add a small variation based on tonnage
-      return base * (1 + (tonnage - 2) * 0.05);
-    };
+      return base * (1 + (tonnage - 2) * 0.05)
+    }
 
     const allTiers = [
       {
         tier: "good" as const,
         name: "Essential Comfort",
         salesPrice: getTierPrice("good", tonnage) || DEFAULT_TIER_PRICES.good,
-        price: getCustomerPrice(
-          getTierPrice("good", tonnage) || DEFAULT_TIER_PRICES.good,
-        ),
+        price: getCustomerPrice(getTierPrice("good", tonnage) || DEFAULT_TIER_PRICES.good),
         baseCost: getBaseCost("good", tonnage), // Added base cost
         seer: 16,
-        features: [
-          "16 SEER efficiency",
-          "Reliable performance",
-          "5-year warranty",
-          "Standard operation",
-        ],
+        features: ["16 SEER efficiency", "Reliable performance", "5-year warranty", "Standard operation"],
         recommended: recommendedTier === "good",
         tonnage: tonnage,
       },
       {
         tier: "better" as const,
         name: "Premium Comfort",
-        salesPrice:
-          getTierPrice("better", tonnage) || DEFAULT_TIER_PRICES.better,
-        price: getCustomerPrice(
-          getTierPrice("better", tonnage) || DEFAULT_TIER_PRICES.better,
-        ),
+        salesPrice: getTierPrice("better", tonnage) || DEFAULT_TIER_PRICES.better,
+        price: getCustomerPrice(getTierPrice("better", tonnage) || DEFAULT_TIER_PRICES.better),
         baseCost: getBaseCost("better", tonnage), // Added base cost
         seer: 18,
         features: [
@@ -1054,9 +817,7 @@ function InteractiveHouseAssessmentInner({
         tier: "best" as const,
         name: "Ultimate Comfort",
         salesPrice: getTierPrice("best", tonnage) || DEFAULT_TIER_PRICES.best,
-        price: getCustomerPrice(
-          getTierPrice("best", tonnage) || DEFAULT_TIER_PRICES.best,
-        ),
+        price: getCustomerPrice(getTierPrice("best", tonnage) || DEFAULT_TIER_PRICES.best),
         baseCost: getBaseCost("best", tonnage), // Added base cost
         seer: 20,
         features: [
@@ -1070,163 +831,137 @@ function InteractiveHouseAssessmentInner({
         recommended: recommendedTier === "best",
         tonnage: tonnage,
       },
-    ];
+    ]
 
     // Filter based on budget
-    return allTiers.filter((tier) => shouldShowTier(tier.tier));
-  };
+    return allTiers.filter((tier) => shouldShowTier(tier.tier))
+  }
 
   // /** CHANGE: New function to get recommendation reasons for display */
   const getRecommendationReason = (): string => {
-    const reasons: string[] = [];
+    const reasons: string[] = []
 
     if (preferencesData.priority === "efficiency") {
-      reasons.push("your focus on energy efficiency");
+      reasons.push("your focus on energy efficiency")
     } else if (preferencesData.priority === "comfort") {
-      reasons.push("your comfort priorities");
+      reasons.push("your comfort priorities")
     } else if (preferencesData.priority === "budget") {
-      reasons.push("your budget focus");
+      reasons.push("your budget focus")
     }
 
     if (solarData.interested || solarData.hasSolarInstalled) {
-      reasons.push("solar integration benefits");
+      reasons.push("solar integration benefits")
     }
 
     if (preferencesData.environmentalConcern) {
-      reasons.push("environmental goals");
+      reasons.push("environmental goals")
     }
 
     if (solarData.electricBill > 200) {
-      reasons.push("current energy costs");
+      reasons.push("current energy costs")
     }
 
     if (hvacData.hasDuctwork && hvacData.ductworkCondition === "poor") {
-      reasons.push("ductwork condition");
+      reasons.push("ductwork condition")
     }
 
-    if (reasons.length === 0) return "your home's needs";
-    if (reasons.length === 1) return reasons[0];
-    if (reasons.length === 2) return `${reasons[0]} and ${reasons[1]}`;
+    if (reasons.length === 0) return "your home's needs"
+    if (reasons.length === 1) return reasons[0]
+    if (reasons.length === 2) return `${reasons[0]} and ${reasons[1]}`
 
-    return `${reasons.slice(0, -1).join(", ")}, and ${reasons[reasons.length - 1]}`;
-  };
+    return `${reasons.slice(0, -1).join(", ")}, and ${reasons[reasons.length - 1]}`
+  }
 
   // /** CHANGE: Calculate totals using customer-facing prices */
-  const getAddOnsTotal = () =>
-    addOns
-      .filter((a) => a.selected)
-      .reduce((sum, a) => getCustomerPrice(a.price), 0);
+  const getAddOnsTotal = () => addOns.filter((a) => a.selected).reduce((sum, a) => getCustomerPrice(a.price), 0)
   const getMaintenanceTotal = () => {
-    if (!selectedPlan) return 0;
-    const salesPrice = getPlanSalesPrice(selectedPlan);
-    return getCustomerPrice(salesPrice);
-  };
-  const getSubtotal = () =>
-    (selectedEquipment?.price || 0) + getAddOnsTotal() + getMaintenanceTotal();
-  const getTotal = () => getSubtotal() - getTotalIncentives();
+    if (!selectedPlan) return 0
+    const salesPrice = getPlanSalesPrice(selectedPlan)
+    return getCustomerPrice(salesPrice)
+  }
+  const getSubtotal = () => (selectedEquipment?.price || 0) + getAddOnsTotal() + getMaintenanceTotal()
+  const getTotal = () => getSubtotal() - getTotalIncentives()
 
   // Toggle add-on selection
   const toggleAddOn = (id: string) => {
-    setAddOns((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, selected: !a.selected } : a)),
-    );
-  };
+    setAddOns((prev) => prev.map((a) => (a.id === id ? { ...a, selected: !a.selected } : a)))
+  }
 
   // Handle start over
   const handleStartOver = () => {
-    setShowPricing(false);
-    setPricingStep("equipment");
-    setCompletedSections(new Set());
-    setSelectedEquipment(null);
+    setShowPricing(false)
+    setPricingStep("equipment")
+    setCompletedSections(new Set())
+    setSelectedEquipment(null)
     // Reset add-ons will be handled by useEffect that loads from context
-    setSelectedPlan(null);
+    setSelectedPlan(null)
     // Reset payment method and financing selection
-    setPaymentMethod("leasing");
-    setSelectedFinancingOption(null);
-    setCustomerData({
-      name: "",
-      email: "",
-      phone: "",
-      address: "",
-      city: "",
-      state: "",
-      zip: "",
-    });
+    setPaymentMethod("leasing")
+    setSelectedFinancingOption(null)
+    setCustomerData({ name: "", email: "", phone: "", address: "", city: "", state: "", zip: "" })
     // Call the new reset function
-    resetAssessment();
-    setShowProposalActions(false); // Hide proposal actions when starting over
-  };
+    resetAssessment()
+    setShowProposalActions(false) // Hide proposal actions when starting over
+  }
 
   // Pure validation: returns errors without setting state (safe to call during render).
   const getValidationErrors = (step: string): Record<string, string> => {
-    const errors: Record<string, string> = {};
+    const errors: Record<string, string> = {}
     if (step === "equipment" && !selectedEquipment) {
-      errors.equipment = "Please select an equipment option";
+      errors.equipment = "Please select an equipment option"
     }
-    if (
-      step === "payment" &&
-      paymentMethod !== "cash" &&
-      !selectedFinancingOption
-    ) {
-      errors.payment = "Please select a financing option";
+    if (step === "payment" && paymentMethod !== "cash" && !selectedFinancingOption) {
+      errors.payment = "Please select a financing option"
     }
-    return errors;
-  };
+    return errors
+  }
 
   const validateStep = (step: string): boolean => {
-    const errors = getValidationErrors(step);
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
+    const errors = getValidationErrors(step)
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
 
   // Must not call setState (validateStep does). Use pure getValidationErrors for render.
   const canProceedToNextStep = (): boolean => {
-    return Object.keys(getValidationErrors(pricingStep)).length === 0;
-  };
+    return Object.keys(getValidationErrors(pricingStep)).length === 0
+  }
 
   // Step navigation functions
   const goToNextStep = () => {
-    if (!validateStep(pricingStep)) return;
-    const currentIndex = pricingSteps.indexOf(pricingStep);
+    if (!validateStep(pricingStep)) return
+    const currentIndex = pricingSteps.indexOf(pricingStep)
     if (currentIndex < pricingSteps.length - 1) {
-      setPricingStep(pricingSteps[currentIndex + 1]);
-      setValidationErrors({});
+      setPricingStep(pricingSteps[currentIndex + 1])
+      setValidationErrors({})
     }
-  };
+  }
 
   const goToPreviousStep = () => {
-    const currentIndex = pricingSteps.indexOf(pricingStep);
+    const currentIndex = pricingSteps.indexOf(pricingStep)
     if (currentIndex > 0) {
-      setPricingStep(pricingSteps[currentIndex - 1]);
-      setValidationErrors({});
+      setPricingStep(pricingSteps[currentIndex - 1])
+      setValidationErrors({})
     }
-  };
+  }
 
   const goToStep = (step: string) => {
-    const currentIndex = pricingSteps.indexOf(pricingStep);
-    const targetIndex = pricingSteps.indexOf(step);
+    const currentIndex = pricingSteps.indexOf(pricingStep)
+    const targetIndex = pricingSteps.indexOf(step)
     // Only allow jumping to completed steps or next step
     if (targetIndex <= currentIndex || targetIndex === currentIndex + 1) {
-      setPricingStep(
-        step as
-          | "equipment"
-          | "addons"
-          | "maintenance"
-          | "incentives"
-          | "payment"
-          | "review",
-      );
-      setValidationErrors({});
+      setPricingStep(step as "equipment" | "addons" | "maintenance" | "incentives" | "payment" | "review")
+      setValidationErrors({})
     }
-  };
+  }
 
   // Auto-save function
   const autoSave = useCallback(async () => {
-    if (!proposalId) return; // Don't auto-save if no proposal exists yet
-
-    setIsAutoSaving(true);
-    setSaveError(null);
-
+    if (!proposalId) return // Don't auto-save if no proposal exists yet
+    
+    setIsAutoSaving(true)
+    setSaveError(null)
+    
     try {
       const proposalData = {
         customerData,
@@ -1243,8 +978,7 @@ function InteractiveHouseAssessmentInner({
           method: paymentMethod,
           option: paymentMethod === "cash" ? null : selectedFinancingOption,
         },
-        financingOption:
-          paymentMethod === "cash" ? null : selectedFinancingOption,
+        financingOption: paymentMethod === "cash" ? null : selectedFinancingOption,
         totals: {
           equipment: selectedEquipment?.price || 0,
           addOns: getAddOnsTotal(),
@@ -1253,107 +987,80 @@ function InteractiveHouseAssessmentInner({
           total: getTotal(),
         },
         nameplateAnalysis: nameplateAnalysis,
-      };
+      }
 
       const response = await fetch(`/api/proposals/${proposalId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(proposalData),
-      });
+      })
 
       if (response.ok) {
-        setLastSaved(new Date());
-        setSaveError(null);
+        setLastSaved(new Date())
+        setSaveError(null)
       } else {
-        throw new Error("Failed to auto-save");
+        throw new Error('Failed to auto-save')
       }
     } catch (error) {
-      setSaveError("Auto-save failed");
+      setSaveError("Auto-save failed")
     } finally {
-      setIsAutoSaving(false);
+      setIsAutoSaving(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    proposalId,
-    customerData,
-    homeData,
-    hvacData,
-    solarData,
-    electricalData,
-    preferencesData,
-    selectedEquipment,
-    addOns,
-    selectedPlan,
-    selectedIncentives,
-    paymentMethod,
-    selectedFinancingOption,
-    nameplateAnalysis,
-  ]);
+  }, [proposalId, customerData, homeData, hvacData, solarData, electricalData, preferencesData, selectedEquipment, addOns, selectedPlan, selectedIncentives, paymentMethod, selectedFinancingOption, nameplateAnalysis])
 
   // Auto-save effect - debounced
   useEffect(() => {
     if (proposalId && showPricing) {
       // Clear existing timeout
       if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
+        clearTimeout(autoSaveTimeoutRef.current)
       }
-
+      
       // Set new timeout for auto-save
       autoSaveTimeoutRef.current = setTimeout(() => {
-        autoSave();
-      }, 3000); // Auto-save after 3 seconds of inactivity
+        autoSave()
+      }, 3000) // Auto-save after 3 seconds of inactivity
 
       return () => {
         if (autoSaveTimeoutRef.current) {
-          clearTimeout(autoSaveTimeoutRef.current);
+          clearTimeout(autoSaveTimeoutRef.current)
         }
-      };
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    proposalId,
-    showPricing,
-    customerData,
-    homeData,
-    hvacData,
-    selectedEquipment,
-    addOns,
-    selectedPlan,
-    selectedIncentives,
-    paymentMethod,
-    selectedFinancingOption,
-  ]);
+  }, [proposalId, showPricing, customerData, homeData, hvacData, selectedEquipment, addOns, selectedPlan, selectedIncentives, paymentMethod, selectedFinancingOption])
 
   // Keyboard shortcuts
   useEffect(() => {
-    if (!showPricing) return;
+    if (!showPricing) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl/Cmd + Arrow keys for navigation
-      if ((e.ctrlKey || e.metaKey) && e.key === "ArrowRight") {
-        e.preventDefault();
-        goToNextStep();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === "ArrowLeft") {
-        e.preventDefault();
-        goToPreviousStep();
+      if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowRight') {
+        e.preventDefault()
+        goToNextStep()
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowLeft') {
+        e.preventDefault()
+        goToPreviousStep()
       }
       // Ctrl/Cmd + S to save
-      else if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        handleSendToKin();
+      else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        handleSendToKin()
       }
-    };
+    }
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showPricing, pricingStep]);
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showPricing, pricingStep])
 
   // Handle send to Kin - Save proposal via API
   const handleSendToKin = async () => {
-    const msg = systemDesignErrorMessage();
+    const msg = systemDesignErrorMessage()
     if (msg) {
-      toast.error(msg);
-      return null;
+      toast.error(msg)
+      return null
     }
     const proposalData = {
       customerData,
@@ -1370,8 +1077,7 @@ function InteractiveHouseAssessmentInner({
         method: paymentMethod,
         option: paymentMethod === "cash" ? null : selectedFinancingOption,
       },
-      financingOption:
-        paymentMethod === "cash" ? null : selectedFinancingOption,
+      financingOption: paymentMethod === "cash" ? null : selectedFinancingOption,
       totals: {
         equipment: selectedEquipment?.price || 0,
         addOns: getAddOnsTotal(),
@@ -1380,84 +1086,79 @@ function InteractiveHouseAssessmentInner({
         total: getTotal(),
       },
       nameplateAnalysis: nameplateAnalysis,
-    };
+    }
 
     try {
-      setIsAutoSaving(true);
-      setSaveError(null);
-      let savedProposal: { id: string } | undefined;
+      setIsAutoSaving(true)
+      setSaveError(null)
+      let savedProposal: { id: string } | undefined
       if (proposalId) {
         // Update existing proposal
         const response = await fetch(`/api/proposals/${proposalId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(proposalData),
-        });
+        })
         if (response.ok) {
-          savedProposal = await response.json();
-          setLastSaved(new Date());
-          toast.success("Proposal updated successfully!");
+          savedProposal = await response.json()
+          setLastSaved(new Date())
+          toast.success("Proposal updated successfully!")
         } else {
-          throw new Error("Failed to update proposal");
+          throw new Error('Failed to update proposal')
         }
       } else {
         // Create new proposal
-        const response = await fetch("/api/proposals", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        const response = await fetch('/api/proposals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(proposalData),
-        });
+        })
         if (response.ok) {
-          savedProposal = await response.json();
-          setProposalId(savedProposal.id);
-          setLastSaved(new Date());
-          toast.success("Proposal saved successfully!");
+          savedProposal = await response.json()
+          setProposalId(savedProposal.id)
+          setLastSaved(new Date())
+          toast.success("Proposal saved successfully!")
           // Update proposalId in parent component
           if (onProposalIdChange) {
-            onProposalIdChange(savedProposal.id);
+            onProposalIdChange(savedProposal.id)
           }
         } else {
-          throw new Error("Failed to create proposal");
+          throw new Error('Failed to create proposal')
         }
       }
-      return savedProposal?.id ?? proposalId ?? null;
+      return savedProposal?.id ?? proposalId ?? null
     } catch (error) {
-      setSaveError("Failed to save proposal");
-      toast.error("Failed to save proposal");
-      return null;
+      setSaveError("Failed to save proposal")
+      toast.error("Failed to save proposal")
+      return null
     } finally {
-      setIsAutoSaving(false);
+      setIsAutoSaving(false)
     }
-  };
+  }
 
   // Keep latest save handler in a ref so we never need it as effect dep (avoids re-render loop)
-  const handleSendToKinRef = useRef(handleSendToKin);
-  handleSendToKinRef.current = handleSendToKin;
+  const handleSendToKinRef = useRef(handleSendToKin)
+  handleSendToKinRef.current = handleSendToKin
 
   // Expose save function to parent; pass stable wrapper so effect runs only when onSaveRef changes
   useEffect(() => {
     // #region agent log
-    logAssessment(
-      "InteractiveHouseAssessment.tsx:onSaveRefEffect",
-      "onSaveRef effect ran",
-      { hasOnSaveRef: !!onSaveRef },
-      "B",
-    );
+    logAssessment('InteractiveHouseAssessment.tsx:onSaveRefEffect', 'onSaveRef effect ran', { hasOnSaveRef: !!onSaveRef }, 'B')
     // #endregion
     if (onSaveRef) {
-      onSaveRef(() => handleSendToKinRef.current());
+      onSaveRef(() => handleSendToKinRef.current())
     }
-  }, [onSaveRef]);
+  }, [onSaveRef])
 
   // Handle admin access
   const handleAdminClick = () => {
-    const password = prompt("Enter admin password:");
+    const password = prompt("Enter admin password:")
     if (password === "fullsend") {
-      onAdminAccess();
+      onAdminAccess()
     } else if (password) {
-      toast.error("Invalid password");
+      toast.error("Invalid password")
     }
-  };
+  }
 
   // Get modal title
   const getModalTitle = (type: HotspotType): string => {
@@ -1468,9 +1169,9 @@ function InteractiveHouseAssessmentInner({
       solar: "Solar Interest",
       electrical: "Electrical Panel",
       preferences: "Customer Preferences",
-    };
-    return titles[type];
-  };
+    }
+    return titles[type]
+  }
 
   // Render modal content
   const renderModalContent = () => {
@@ -1484,9 +1185,7 @@ function InteractiveHouseAssessmentInner({
                 <Input
                   id="name"
                   value={customerData.name}
-                  onChange={(e) =>
-                    setCustomerData({ ...customerData, name: e.target.value })
-                  }
+                  onChange={(e) => setCustomerData({ ...customerData, name: e.target.value })}
                   placeholder="John Smith"
                 />
               </div>
@@ -1495,9 +1194,7 @@ function InteractiveHouseAssessmentInner({
                 <Input
                   id="phone"
                   value={customerData.phone}
-                  onChange={(e) =>
-                    setCustomerData({ ...customerData, phone: e.target.value })
-                  }
+                  onChange={(e) => setCustomerData({ ...customerData, phone: e.target.value })}
                   placeholder="(555) 123-4567"
                 />
               </div>
@@ -1508,9 +1205,7 @@ function InteractiveHouseAssessmentInner({
                 id="email"
                 type="email"
                 value={customerData.email}
-                onChange={(e) =>
-                  setCustomerData({ ...customerData, email: e.target.value })
-                }
+                onChange={(e) => setCustomerData({ ...customerData, email: e.target.value })}
                 placeholder="john@example.com"
               />
             </div>
@@ -1519,9 +1214,7 @@ function InteractiveHouseAssessmentInner({
               <Input
                 id="address"
                 value={customerData.address}
-                onChange={(e) =>
-                  setCustomerData({ ...customerData, address: e.target.value })
-                }
+                onChange={(e) => setCustomerData({ ...customerData, address: e.target.value })}
                 placeholder="123 Main Street"
               />
             </div>
@@ -1531,9 +1224,7 @@ function InteractiveHouseAssessmentInner({
                 <Input
                   id="city"
                   value={customerData.city}
-                  onChange={(e) =>
-                    setCustomerData({ ...customerData, city: e.target.value })
-                  }
+                  onChange={(e) => setCustomerData({ ...customerData, city: e.target.value })}
                   placeholder="City"
                 />
               </div>
@@ -1542,9 +1233,7 @@ function InteractiveHouseAssessmentInner({
                 <Input
                   id="state"
                   value={customerData.state}
-                  onChange={(e) =>
-                    setCustomerData({ ...customerData, state: e.target.value })
-                  }
+                  onChange={(e) => setCustomerData({ ...customerData, state: e.target.value })}
                   placeholder="FL"
                 />
               </div>
@@ -1553,21 +1242,16 @@ function InteractiveHouseAssessmentInner({
                 <Input
                   id="zip"
                   value={customerData.zip}
-                  onChange={(e) =>
-                    setCustomerData({ ...customerData, zip: e.target.value })
-                  }
+                  onChange={(e) => setCustomerData({ ...customerData, zip: e.target.value })}
                   placeholder="12345"
                 />
               </div>
             </div>
-            <Button
-              className="w-full bg-blue-500 hover:bg-blue-600"
-              onClick={() => markComplete("customer")}
-            >
+            <Button className="w-full bg-blue-500 hover:bg-blue-600" onClick={() => markComplete("customer")}>
               Save Customer Info
             </Button>
           </div>
-        );
+        )
 
       case "home":
         return (
@@ -1576,9 +1260,7 @@ function InteractiveHouseAssessmentInner({
               <Label>Square Footage: {homeData.squareFootage} sq ft</Label>
               <Slider
                 value={[homeData.squareFootage]}
-                onValueChange={([v]) =>
-                  setHomeData({ ...homeData, squareFootage: v })
-                }
+                onValueChange={([v]) => setHomeData({ ...homeData, squareFootage: v })}
                 min={500}
                 max={6000}
                 step={100}
@@ -1590,9 +1272,7 @@ function InteractiveHouseAssessmentInner({
                 <Label>Year Built: {homeData.yearBuilt}</Label>
                 <Slider
                   value={[homeData.yearBuilt]}
-                  onValueChange={([v]) =>
-                    setHomeData({ ...homeData, yearBuilt: v })
-                  }
+                  onValueChange={([v]) => setHomeData({ ...homeData, yearBuilt: v })}
                   min={1900}
                   max={2024}
                   step={1}
@@ -1603,9 +1283,7 @@ function InteractiveHouseAssessmentInner({
                 <Label>Stories: {homeData.stories}</Label>
                 <Slider
                   value={[homeData.stories]}
-                  onValueChange={([v]) =>
-                    setHomeData({ ...homeData, stories: v })
-                  }
+                  onValueChange={([v]) => setHomeData({ ...homeData, stories: v })}
                   min={1}
                   max={3}
                   step={1}
@@ -1618,9 +1296,7 @@ function InteractiveHouseAssessmentInner({
                 <Label>Bedrooms: {homeData.bedrooms}</Label>
                 <Slider
                   value={[homeData.bedrooms]}
-                  onValueChange={([v]) =>
-                    setHomeData({ ...homeData, bedrooms: v })
-                  }
+                  onValueChange={([v]) => setHomeData({ ...homeData, bedrooms: v })}
                   min={1}
                   max={8}
                   step={1}
@@ -1631,9 +1307,7 @@ function InteractiveHouseAssessmentInner({
                 <Label>Bathrooms: {homeData.bathrooms}</Label>
                 <Slider
                   value={[homeData.bathrooms]}
-                  onValueChange={([v]) =>
-                    setHomeData({ ...homeData, bathrooms: v })
-                  }
+                  onValueChange={([v]) => setHomeData({ ...homeData, bathrooms: v })}
                   min={1}
                   max={6}
                   step={0.5}
@@ -1654,9 +1328,7 @@ function InteractiveHouseAssessmentInner({
                     })
                   }
                 />
-                <Label htmlFor="hasAdditionsOrRemodeling">
-                  Home has additions or remodeled areas
-                </Label>
+                <Label htmlFor="hasAdditionsOrRemodeling">Home has additions or remodeled areas</Label>
               </div>
 
               {homeData.hasAdditionsOrRemodeling && (
@@ -1678,70 +1350,60 @@ function InteractiveHouseAssessmentInner({
               )}
             </div>
 
-            <Button
-              className="w-full bg-green-500 hover:bg-green-600"
-              onClick={() => markComplete("home")}
-            >
+            <Button className="w-full bg-green-500 hover:bg-green-600" onClick={() => markComplete("home")}>
               Save Home Details
             </Button>
           </div>
-        );
+        )
 
       case "hvac":
         // Updated: Upload to Supabase Storage, then analyze
-        const handleNameplateUpload = async (
-          event: React.ChangeEvent<HTMLInputElement>,
-        ) => {
-          const originalFile = event.target.files?.[0];
-          if (!originalFile) return;
+        const handleNameplateUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+          const originalFile = event.target.files?.[0]
+          if (!originalFile) return
 
           if (!proposalId) {
-            toast.error(
-              "Please save the proposal first before uploading a nameplate photo",
-            );
-            return;
+            toast.error("Please save the proposal first before uploading a nameplate photo")
+            return
           }
 
-          setAnalyzingNameplate(true);
-          setNameplateAnalysis(null);
+          setAnalyzingNameplate(true)
+          setNameplateAnalysis(null)
 
           try {
             // Resize/compress the image
-            const file = await resizeImageToJpeg(originalFile, 1600);
+            const file = await resizeImageToJpeg(originalFile, 1600)
 
             // Show preview immediately
-            const previewUrl = URL.createObjectURL(file);
-            setHvacData({ ...hvacData, nameplatePhoto: previewUrl });
+            const previewUrl = URL.createObjectURL(file)
+            setHvacData({ ...hvacData, nameplatePhoto: previewUrl })
 
             // Upload to Supabase Storage
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("proposalId", proposalId);
+            const formData = new FormData()
+            formData.append('file', file)
+            formData.append('proposalId', proposalId)
 
             const uploadResponse = await fetch("/api/nameplate/upload", {
               method: "POST",
               body: formData,
-            });
+            })
 
             if (!uploadResponse.ok) {
-              const uploadError = await uploadResponse.json();
-              throw new Error(uploadError.error || "Failed to upload photo");
+              const uploadError = await uploadResponse.json()
+              throw new Error(uploadError.error || "Failed to upload photo")
             }
 
-            const uploadData = await uploadResponse.json();
-            const path = uploadData.path;
+            const uploadData = await uploadResponse.json()
+            const path = uploadData.path
 
             // Update hvacData with storage path (signed URL fetched in effect for display)
-            setHvacData({ ...hvacData, nameplatePhotoPath: path });
+            setHvacData({ ...hvacData, nameplatePhotoPath: path })
 
             // Read file as base64 for AI analysis
-            const arrayBuffer = await file.arrayBuffer();
+            const arrayBuffer = await file.arrayBuffer()
             const base64Data = btoa(
-              new Uint8Array(arrayBuffer).reduce(
-                (data, byte) => data + String.fromCharCode(byte),
-                "",
-              ),
-            );
+              new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ""),
+            )
 
             // Analyze with OpenAI
             const analysisResponse = await fetch("/api/analyze-nameplate", {
@@ -1756,59 +1418,42 @@ function InteractiveHouseAssessmentInner({
                   filename: file.name,
                 },
               }),
-            });
+            })
 
-            const analysisData = await analysisResponse.json();
+            const analysisData = await analysisResponse.json()
 
             if (!analysisResponse.ok) {
-              throw new Error(
-                analysisData.error ||
-                  analysisData.detail ||
-                  `HTTP ${analysisResponse.status}`,
-              );
+              throw new Error(analysisData.error || analysisData.detail || `HTTP ${analysisResponse.status}`)
             }
 
             if (analysisData.success && analysisData.data) {
-              setNameplateAnalysis(analysisData.data);
+              setNameplateAnalysis(analysisData.data)
               setHvacData((prev) => ({
                 ...prev,
-                tonnage: analysisData.data.tonnage
-                  ? String(analysisData.data.tonnage)
-                  : prev.tonnage,
+                tonnage: analysisData.data.tonnage ? String(analysisData.data.tonnage) : prev.tonnage,
                 coolingType: analysisData.data.unitType || prev.coolingType,
                 nameplatePhotoPath: path,
-              }));
+              }))
             } else {
-              setNameplateAnalysis({
-                parseError: true,
-                rawText: analysisData.rawResponse,
-              });
+              setNameplateAnalysis({ parseError: true, rawText: analysisData.rawResponse })
             }
           } catch (error: unknown) {
-            console.error("Nameplate Upload/Analysis Failed:", error);
-            const errorMessage =
-              error instanceof Error ? error.message : "Unknown error";
-            toast.error(`Failed to upload nameplate: ${errorMessage}`);
+            console.error("Nameplate Upload/Analysis Failed:", error)
+            const errorMessage = error instanceof Error ? error.message : "Unknown error"
+            toast.error(`Failed to upload nameplate: ${errorMessage}`)
 
-            if (
-              errorMessage === "Load failed" ||
-              errorMessage === "Failed to fetch"
-            ) {
+            if (errorMessage === "Load failed" || errorMessage === "Failed to fetch") {
               setNameplateAnalysis({
                 parseError: true,
-                error:
-                  "The image upload failed - please try again with a closer, cropped photo of just the nameplate.",
-              });
+                error: "The image upload failed - please try again with a closer, cropped photo of just the nameplate.",
+              })
             } else {
-              setNameplateAnalysis({
-                parseError: true,
-                error: `API error: ${errorMessage}`,
-              });
+              setNameplateAnalysis({ parseError: true, error: `API error: ${errorMessage}` })
             }
           } finally {
-            setAnalyzingNameplate(false);
+            setAnalyzingNameplate(false)
           }
-        };
+        }
 
         return (
           <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
@@ -1819,8 +1464,7 @@ function InteractiveHouseAssessmentInner({
                 Upload HVAC Nameplate Photo (Optional)
               </Label>
               <p className="text-xs text-muted-foreground">
-                Take a photo of your unit's data plate - AI will automatically
-                extract system information
+                Take a photo of your unit's data plate - AI will automatically extract system information
               </p>
               <div className="flex items-center gap-2">
                 <Input
@@ -1831,17 +1475,13 @@ function InteractiveHouseAssessmentInner({
                   className="flex-1"
                 />
               </div>
-              {(hvacData.nameplatePhoto ||
-                hvacData.nameplatePhotoUrl ||
-                hvacData.nameplatePhotoPath) && (
+              {(hvacData.nameplatePhoto || hvacData.nameplatePhotoUrl || hvacData.nameplatePhotoPath) && (
                 <div className="mt-2 space-y-3">
                   <img
                     src={
                       hvacData.nameplatePhotoPath
-                        ? nameplateSignedUrl || "/placeholder.svg"
-                        : hvacData.nameplatePhotoUrl ||
-                          hvacData.nameplatePhoto ||
-                          "/placeholder.svg"
+                        ? (nameplateSignedUrl || "/placeholder.svg")
+                        : (hvacData.nameplatePhotoUrl || hvacData.nameplatePhoto || "/placeholder.svg")
                     }
                     alt="HVAC Nameplate"
                     className="max-w-full h-32 object-contain rounded border"
@@ -1861,57 +1501,48 @@ function InteractiveHouseAssessmentInner({
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         {nameplateAnalysis.brand && (
                           <div>
-                            <span className="font-medium">Brand:</span>{" "}
-                            {nameplateAnalysis.brand}
+                            <span className="font-medium">Brand:</span> {nameplateAnalysis.brand}
                           </div>
                         )}
                         {nameplateAnalysis.modelNumber && (
                           <div>
-                            <span className="font-medium">Model:</span>{" "}
-                            {nameplateAnalysis.modelNumber}
+                            <span className="font-medium">Model:</span> {nameplateAnalysis.modelNumber}
                           </div>
                         )}
                         {nameplateAnalysis.unitType && (
                           <div>
-                            <span className="font-medium">Type:</span>{" "}
-                            {nameplateAnalysis.unitType}
+                            <span className="font-medium">Type:</span> {nameplateAnalysis.unitType}
                           </div>
                         )}
                         {nameplateAnalysis.tonnage && (
                           <div>
-                            <span className="font-medium">Tonnage:</span>{" "}
-                            {nameplateAnalysis.tonnage} ton
+                            <span className="font-medium">Tonnage:</span> {nameplateAnalysis.tonnage} ton
                           </div>
                         )}
                         {nameplateAnalysis.seerRating && (
                           <div>
-                            <span className="font-medium">SEER:</span>{" "}
-                            {nameplateAnalysis.seerRating}
+                            <span className="font-medium">SEER:</span> {nameplateAnalysis.seerRating}
                           </div>
                         )}
                         {nameplateAnalysis.estimatedAge && (
                           <div>
-                            <span className="font-medium">Age:</span>{" "}
-                            {nameplateAnalysis.estimatedAge}
+                            <span className="font-medium">Age:</span> {nameplateAnalysis.estimatedAge}
                           </div>
                         )}
                         {nameplateAnalysis.refrigerantType && (
                           <div>
-                            <span className="font-medium">Refrigerant:</span>{" "}
-                            {nameplateAnalysis.refrigerantType}
+                            <span className="font-medium">Refrigerant:</span> {nameplateAnalysis.refrigerantType}
                           </div>
                         )}
                         {nameplateAnalysis.voltage && (
                           <div>
-                            <span className="font-medium">Voltage:</span>{" "}
-                            {nameplateAnalysis.voltage}
+                            <span className="font-medium">Voltage:</span> {nameplateAnalysis.voltage}
                           </div>
                         )}
                       </div>
                       {nameplateAnalysis.additionalNotes && (
                         <p className="text-xs text-muted-foreground mt-2">
-                          <span className="font-medium">Notes:</span>{" "}
-                          {nameplateAnalysis.additionalNotes}
+                          <span className="font-medium">Notes:</span> {nameplateAnalysis.additionalNotes}
                         </p>
                       )}
 
@@ -1942,20 +1573,15 @@ function InteractiveHouseAssessmentInner({
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
                       <p className="text-sm font-medium text-red-800 dark:text-red-200 flex items-center gap-2">
                         <Info className="w-4 h-4" />
-                        Could not parse nameplate data. Please ensure the image
-                        is clear.
+                        Could not parse nameplate data. Please ensure the image is clear.
                       </p>
                       {nameplateAnalysis.error && (
-                        <p className="text-xs text-red-600 mt-2">
-                          Error: {nameplateAnalysis.error}
-                        </p>
+                        <p className="text-xs text-red-600 mt-2">Error: {nameplateAnalysis.error}</p>
                       )}
                       {nameplateAnalysis.rawText && (
                         <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 bg-red-100 dark:bg-red-900/30 p-2 rounded">
                           <p className="font-medium">Raw Response:</p>
-                          <pre className="overflow-x-auto">
-                            {nameplateAnalysis.rawText}
-                          </pre>
+                          <pre className="overflow-x-auto">{nameplateAnalysis.rawText}</pre>
                         </div>
                       )}
                     </div>
@@ -1968,9 +1594,7 @@ function InteractiveHouseAssessmentInner({
               <Label>Current Cooling System</Label>
               <Select
                 value={hvacData.currentSystem}
-                onValueChange={(v) =>
-                  setHvacData({ ...hvacData, currentSystem: v })
-                }
+                onValueChange={(v) => setHvacData({ ...hvacData, currentSystem: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -1987,20 +1611,13 @@ function InteractiveHouseAssessmentInner({
 
             <div>
               <Label>Current Heating System</Label>
-              <Select
-                value={hvacData.heatingType}
-                onValueChange={(v) =>
-                  setHvacData({ ...hvacData, heatingType: v })
-                }
-              >
+              <Select value={hvacData.heatingType} onValueChange={(v) => setHvacData({ ...hvacData, heatingType: v })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="gas_furnace">Gas Furnace</SelectItem>
-                  <SelectItem value="electric_furnace">
-                    Electric Furnace
-                  </SelectItem>
+                  <SelectItem value="electric_furnace">Electric Furnace</SelectItem>
                   <SelectItem value="heat_pump">Heat Pump</SelectItem>
                   <SelectItem value="boiler">Boiler</SelectItem>
                   <SelectItem value="space_heaters">Space Heaters</SelectItem>
@@ -2011,12 +1628,7 @@ function InteractiveHouseAssessmentInner({
 
             <div>
               <Label>System Age</Label>
-              <Select
-                value={hvacData.systemAge}
-                onValueChange={(v) =>
-                  setHvacData({ ...hvacData, systemAge: v })
-                }
-              >
+              <Select value={hvacData.systemAge} onValueChange={(v) => setHvacData({ ...hvacData, systemAge: v })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select age range" />
                 </SelectTrigger>
@@ -2034,17 +1646,13 @@ function InteractiveHouseAssessmentInner({
               <Label>Last Professional Service</Label>
               <Select
                 value={hvacData.lastServiced}
-                onValueChange={(v) =>
-                  setHvacData({ ...hvacData, lastServiced: v })
-                }
+                onValueChange={(v) => setHvacData({ ...hvacData, lastServiced: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="less_than_year">
-                    Less than 1 year ago
-                  </SelectItem>
+                  <SelectItem value="less_than_year">Less than 1 year ago</SelectItem>
                   <SelectItem value="1-2_years">1-2 years ago</SelectItem>
                   <SelectItem value="2-5_years">2-5 years ago</SelectItem>
                   <SelectItem value="over_5_years">Over 5 years ago</SelectItem>
@@ -2058,9 +1666,7 @@ function InteractiveHouseAssessmentInner({
               <Checkbox
                 id="ductwork"
                 checked={hvacData.hasDuctwork}
-                onCheckedChange={(v) =>
-                  setHvacData({ ...hvacData, hasDuctwork: v as boolean })
-                }
+                onCheckedChange={(v) => setHvacData({ ...hvacData, hasDuctwork: v as boolean })}
               />
               <Label htmlFor="ductwork">Home has existing ductwork</Label>
             </div>
@@ -2071,26 +1677,16 @@ function InteractiveHouseAssessmentInner({
                   <Label>Ductwork Condition</Label>
                   <Select
                     value={hvacData.ductworkCondition}
-                    onValueChange={(v) =>
-                      setHvacData({ ...hvacData, ductworkCondition: v })
-                    }
+                    onValueChange={(v) => setHvacData({ ...hvacData, ductworkCondition: v })}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="excellent">
-                        Excellent - Recently installed/sealed
-                      </SelectItem>
-                      <SelectItem value="good">
-                        Good - No visible issues
-                      </SelectItem>
-                      <SelectItem value="fair">
-                        Fair - Some visible wear
-                      </SelectItem>
-                      <SelectItem value="poor">
-                        Poor - Leaks or damage
-                      </SelectItem>
+                      <SelectItem value="excellent">Excellent - Recently installed/sealed</SelectItem>
+                      <SelectItem value="good">Good - No visible issues</SelectItem>
+                      <SelectItem value="fair">Fair - Some visible wear</SelectItem>
+                      <SelectItem value="poor">Poor - Leaks or damage</SelectItem>
                       <SelectItem value="unknown">Unknown</SelectItem>
                     </SelectContent>
                   </Select>
@@ -2100,9 +1696,7 @@ function InteractiveHouseAssessmentInner({
                   <Label>Ductwork Age: {hvacData.ductworkAge} years</Label>
                   <Slider
                     value={[hvacData.ductworkAge]}
-                    onValueChange={([v]) =>
-                      setHvacData({ ...hvacData, ductworkAge: v })
-                    }
+                    onValueChange={([v]) => setHvacData({ ...hvacData, ductworkAge: v })}
                     min={0}
                     max={50}
                     step={1}
@@ -2117,44 +1711,24 @@ function InteractiveHouseAssessmentInner({
                 IECC Climate Zone
                 <Info className="w-4 h-4 text-muted-foreground" />
               </Label>
-              <Select
-                value={hvacData.climateZone}
-                onValueChange={(v) =>
-                  setHvacData({ ...hvacData, climateZone: v })
-                }
-              >
+              <Select value={hvacData.climateZone} onValueChange={(v) => setHvacData({ ...hvacData, climateZone: v })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">
-                    Zone 1 - Very Hot/Humid (South FL, HI)
-                  </SelectItem>
-                  <SelectItem value="2">
-                    Zone 2 - Hot/Humid (TX, LA, South)
-                  </SelectItem>
-                  <SelectItem value="3">
-                    Zone 3 - Warm/Humid (Southeast)
-                  </SelectItem>
-                  <SelectItem value="4">
-                    Zone 4 - Mixed (Mid-Atlantic, Lower Midwest)
-                  </SelectItem>
-                  <SelectItem value="5">
-                    Zone 5 - Cool (Upper Midwest, New England)
-                  </SelectItem>
-                  <SelectItem value="6">
-                    Zone 6 - Cold (Northern States)
-                  </SelectItem>
-                  <SelectItem value="7">
-                    Zone 7 - Very Cold (North Dakota, Minnesota)
-                  </SelectItem>
+                  <SelectItem value="1">Zone 1 - Very Hot/Humid (South FL, HI)</SelectItem>
+                  <SelectItem value="2">Zone 2 - Hot/Humid (TX, LA, South)</SelectItem>
+                  <SelectItem value="3">Zone 3 - Warm/Humid (Southeast)</SelectItem>
+                  <SelectItem value="4">Zone 4 - Mixed (Mid-Atlantic, Lower Midwest)</SelectItem>
+                  <SelectItem value="5">Zone 5 - Cool (Upper Midwest, New England)</SelectItem>
+                  <SelectItem value="6">Zone 6 - Cold (Northern States)</SelectItem>
+                  <SelectItem value="7">Zone 7 - Very Cold (North Dakota, Minnesota)</SelectItem>
                   <SelectItem value="unknown">Unknown</SelectItem>
                 </SelectContent>
               </Select>
               {Number.parseInt(hvacData.climateZone) >= 4 && (
                 <p className="text-xs text-orange-600 mt-1">
-                  Zone 4+: Enhanced capacity heat pumps and/or dual fuel
-                  recommended
+                  Zone 4+: Enhanced capacity heat pumps and/or dual fuel recommended
                 </p>
               )}
             </div>
@@ -2163,9 +1737,7 @@ function InteractiveHouseAssessmentInner({
               <Label>Current Thermostat Type</Label>
               <Select
                 value={hvacData.thermostatType}
-                onValueChange={(v) =>
-                  setHvacData({ ...hvacData, thermostatType: v })
-                }
+                onValueChange={(v) => setHvacData({ ...hvacData, thermostatType: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -2182,9 +1754,7 @@ function InteractiveHouseAssessmentInner({
               <Label>Number of Zones: {hvacData.zonesCount}</Label>
               <Slider
                 value={[hvacData.zonesCount]}
-                onValueChange={([v]) =>
-                  setHvacData({ ...hvacData, zonesCount: v })
-                }
+                onValueChange={([v]) => setHvacData({ ...hvacData, zonesCount: v })}
                 min={1}
                 max={5}
                 step={1}
@@ -2196,37 +1766,22 @@ function InteractiveHouseAssessmentInner({
               <Checkbox
                 id="humidity"
                 checked={hvacData.humidity}
-                onCheckedChange={(v) =>
-                  setHvacData({ ...hvacData, humidity: v as boolean })
-                }
+                onCheckedChange={(v) => setHvacData({ ...hvacData, humidity: v as boolean })}
               />
-              <Label htmlFor="humidity">
-                Has humidity control (humidifier/dehumidifier)
-              </Label>
+              <Label htmlFor="humidity">Has humidity control (humidifier/dehumidifier)</Label>
             </div>
 
             <div>
               <Label>Current Air Quality</Label>
-              <Select
-                value={hvacData.airQuality}
-                onValueChange={(v) =>
-                  setHvacData({ ...hvacData, airQuality: v })
-                }
-              >
+              <Select value={hvacData.airQuality} onValueChange={(v) => setHvacData({ ...hvacData, airQuality: v })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="excellent">
-                    Excellent - No issues
-                  </SelectItem>
+                  <SelectItem value="excellent">Excellent - No issues</SelectItem>
                   <SelectItem value="good">Good - Minor dust</SelectItem>
-                  <SelectItem value="average">
-                    Average - Some concerns
-                  </SelectItem>
-                  <SelectItem value="poor">
-                    Poor - Significant issues
-                  </SelectItem>
+                  <SelectItem value="average">Average - Some concerns</SelectItem>
+                  <SelectItem value="poor">Poor - Significant issues</SelectItem>
                   <SelectItem value="none">No concerns</SelectItem>
                 </SelectContent>
               </Select>
@@ -2234,28 +1789,15 @@ function InteractiveHouseAssessmentInner({
 
             <div>
               <Label>Current System Noise Level</Label>
-              <Select
-                value={hvacData.noiseLevel}
-                onValueChange={(v) =>
-                  setHvacData({ ...hvacData, noiseLevel: v })
-                }
-              >
+              <Select value={hvacData.noiseLevel} onValueChange={(v) => setHvacData({ ...hvacData, noiseLevel: v })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="quiet">
-                    Quiet - Barely noticeable
-                  </SelectItem>
-                  <SelectItem value="average">
-                    Average - Normal operation
-                  </SelectItem>
-                  <SelectItem value="loud">
-                    Loud - Noticeably disruptive
-                  </SelectItem>
-                  <SelectItem value="very_loud">
-                    Very Loud - Concerning
-                  </SelectItem>
+                  <SelectItem value="quiet">Quiet - Barely noticeable</SelectItem>
+                  <SelectItem value="average">Average - Normal operation</SelectItem>
+                  <SelectItem value="loud">Loud - Noticeably disruptive</SelectItem>
+                  <SelectItem value="very_loud">Very Loud - Concerning</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2279,17 +1821,9 @@ function InteractiveHouseAssessmentInner({
                       checked={hvacData.issues.includes(issue.id)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setHvacData({
-                            ...hvacData,
-                            issues: [...hvacData.issues, issue.id],
-                          });
+                          setHvacData({ ...hvacData, issues: [...hvacData.issues, issue.id] })
                         } else {
-                          setHvacData({
-                            ...hvacData,
-                            issues: hvacData.issues.filter(
-                              (i) => i !== issue.id,
-                            ),
-                          });
+                          setHvacData({ ...hvacData, issues: hvacData.issues.filter((i) => i !== issue.id) })
                         }
                       }}
                     />
@@ -2305,12 +1839,7 @@ function InteractiveHouseAssessmentInner({
               <Label>Equipment Type Preference</Label>
               <Select
                 value={hvacData.equipmentType}
-                onValueChange={(v) =>
-                  setHvacData({
-                    ...hvacData,
-                    equipmentType: v as HVACData["equipmentType"],
-                  })
-                }
+                onValueChange={(v) => setHvacData({ ...hvacData, equipmentType: v as HVACData["equipmentType"] })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -2318,27 +1847,18 @@ function InteractiveHouseAssessmentInner({
                 <SelectContent>
                   <SelectItem value="auto">Auto (Recommended)</SelectItem>
                   <SelectItem value="central">Central AC/Heat Pump</SelectItem>
-                  <SelectItem value="mini-split">
-                    Mini Split/Ductless
-                  </SelectItem>
-                  <SelectItem value="package-rooftop">
-                    Package Unit - Rooftop
-                  </SelectItem>
-                  <SelectItem value="package-ground">
-                    Package Unit - Ground Level
-                  </SelectItem>
+                  <SelectItem value="mini-split">Mini Split/Ductless</SelectItem>
+                  <SelectItem value="package-rooftop">Package Unit - Rooftop</SelectItem>
+                  <SelectItem value="package-ground">Package Unit - Ground Level</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <Button
-              className="w-full bg-orange-500 hover:bg-orange-600"
-              onClick={() => markComplete("hvac")}
-            >
+            <Button className="w-full bg-orange-500 hover:bg-orange-600" onClick={() => markComplete("hvac")}>
               Save HVAC Info
             </Button>
           </div>
-        );
+        )
 
       case "solar":
         return (
@@ -2348,33 +1868,22 @@ function InteractiveHouseAssessmentInner({
               <Checkbox
                 id="hasSolarInstalled"
                 checked={solarData.hasSolarInstalled}
-                onCheckedChange={(v) =>
-                  setSolarData({
-                    ...solarData,
-                    hasSolarInstalled: v as boolean,
-                  })
-                }
+                onCheckedChange={(v) => setSolarData({ ...solarData, hasSolarInstalled: v as boolean })}
               />
-              <Label htmlFor="hasSolarInstalled">
-                Already have solar installed
-              </Label>
+              <Label htmlFor="hasSolarInstalled">Already have solar installed</Label>
             </div>
 
             <div>
               <Label>Roof Condition</Label>
               <Select
                 value={solarData.roofCondition}
-                onValueChange={(v) =>
-                  setSolarData({ ...solarData, roofCondition: v })
-                }
+                onValueChange={(v) => setSolarData({ ...solarData, roofCondition: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="excellent">
-                    Excellent (0-5 years old)
-                  </SelectItem>
+                  <SelectItem value="excellent">Excellent (0-5 years old)</SelectItem>
                   <SelectItem value="good">Good (5-15 years old)</SelectItem>
                   <SelectItem value="fair">Fair (15-20 years old)</SelectItem>
                   <SelectItem value="poor">Needs Replacement Soon</SelectItem>
@@ -2386,9 +1895,7 @@ function InteractiveHouseAssessmentInner({
               <Label>Roof Age: {solarData.roofAge} years</Label>
               <Slider
                 value={[solarData.roofAge]}
-                onValueChange={([v]) =>
-                  setSolarData({ ...solarData, roofAge: v })
-                }
+                onValueChange={([v]) => setSolarData({ ...solarData, roofAge: v })}
                 min={0}
                 max={30}
                 step={1}
@@ -2400,9 +1907,7 @@ function InteractiveHouseAssessmentInner({
               <Label>Roof Material</Label>
               <Select
                 value={solarData.roofMaterial}
-                onValueChange={(v) =>
-                  setSolarData({ ...solarData, roofMaterial: v })
-                }
+                onValueChange={(v) => setSolarData({ ...solarData, roofMaterial: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -2422,9 +1927,7 @@ function InteractiveHouseAssessmentInner({
               <Label>Primary Roof Direction</Label>
               <Select
                 value={solarData.roofDirection}
-                onValueChange={(v) =>
-                  setSolarData({ ...solarData, roofDirection: v })
-                }
+                onValueChange={(v) => setSolarData({ ...solarData, roofDirection: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -2443,39 +1946,24 @@ function InteractiveHouseAssessmentInner({
 
             <div>
               <Label>Roof Shading</Label>
-              <Select
-                value={solarData.shading}
-                onValueChange={(v) =>
-                  setSolarData({ ...solarData, shading: v })
-                }
-              >
+              <Select value={solarData.shading} onValueChange={(v) => setSolarData({ ...solarData, shading: v })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No Shading</SelectItem>
-                  <SelectItem value="minimal">
-                    Minimal (small trees/structures)
-                  </SelectItem>
-                  <SelectItem value="moderate">
-                    Moderate (some shade during day)
-                  </SelectItem>
-                  <SelectItem value="significant">
-                    Significant (large trees nearby)
-                  </SelectItem>
+                  <SelectItem value="minimal">Minimal (small trees/structures)</SelectItem>
+                  <SelectItem value="moderate">Moderate (some shade during day)</SelectItem>
+                  <SelectItem value="significant">Significant (large trees nearby)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label>
-                Average Monthly Electric Bill: ${solarData.electricBill}
-              </Label>
+              <Label>Average Monthly Electric Bill: ${solarData.electricBill}</Label>
               <Slider
                 value={[solarData.electricBill]}
-                onValueChange={([v]) =>
-                  setSolarData({ ...solarData, electricBill: v })
-                }
+                onValueChange={([v]) => setSolarData({ ...solarData, electricBill: v })}
                 min={50}
                 max={1000}
                 step={25}
@@ -2488,9 +1976,7 @@ function InteractiveHouseAssessmentInner({
               <Input
                 id="utility"
                 value={solarData.utilityCompany}
-                onChange={(e) =>
-                  setSolarData({ ...solarData, utilityCompany: e.target.value })
-                }
+                onChange={(e) => setSolarData({ ...solarData, utilityCompany: e.target.value })}
                 placeholder="e.g., FPL, Duke Energy"
               />
             </div>
@@ -2499,23 +1985,17 @@ function InteractiveHouseAssessmentInner({
               <Label>Peak Energy Usage Time</Label>
               <Select
                 value={solarData.peakUsageTime}
-                onValueChange={(v) =>
-                  setSolarData({ ...solarData, peakUsageTime: v })
-                }
+                onValueChange={(v) => setSolarData({ ...solarData, peakUsageTime: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="morning">Morning (6am-12pm)</SelectItem>
-                  <SelectItem value="afternoon">
-                    Afternoon (12pm-6pm)
-                  </SelectItem>
+                  <SelectItem value="afternoon">Afternoon (12pm-6pm)</SelectItem>
                   <SelectItem value="evening">Evening (6pm-10pm)</SelectItem>
                   <SelectItem value="night">Night (10pm-6am)</SelectItem>
-                  <SelectItem value="all_day">
-                    All Day (Home always occupied)
-                  </SelectItem>
+                  <SelectItem value="all_day">All Day (Home always occupied)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2524,29 +2004,18 @@ function InteractiveHouseAssessmentInner({
               <Checkbox
                 id="batteryInterest"
                 checked={solarData.batteryInterest}
-                onCheckedChange={(v) =>
-                  setSolarData({ ...solarData, batteryInterest: v as boolean })
-                }
+                onCheckedChange={(v) => setSolarData({ ...solarData, batteryInterest: v as boolean })}
               />
-              <Label htmlFor="batteryInterest">
-                Interested in battery storage
-              </Label>
+              <Label htmlFor="batteryInterest">Interested in battery storage</Label>
             </div>
 
             <div className="flex items-center gap-2">
               <Checkbox
                 id="previousQuotes"
                 checked={solarData.hasPreviousQuotes}
-                onCheckedChange={(v) =>
-                  setSolarData({
-                    ...solarData,
-                    hasPreviousQuotes: v as boolean,
-                  })
-                }
+                onCheckedChange={(v) => setSolarData({ ...solarData, hasPreviousQuotes: v as boolean })}
               />
-              <Label htmlFor="previousQuotes">
-                Have received other solar quotes
-              </Label>
+              <Label htmlFor="previousQuotes">Have received other solar quotes</Label>
             </div>
 
             <Button
@@ -2556,7 +2025,7 @@ function InteractiveHouseAssessmentInner({
               Save Solar Info
             </Button>
           </div>
-        );
+        )
 
       case "electrical":
         return (
@@ -2565,12 +2034,7 @@ function InteractiveHouseAssessmentInner({
               <Label>Panel Size (Amps)</Label>
               <Select
                 value={electricalData.panelSize.toString()}
-                onValueChange={(v) =>
-                  setElectricalData({
-                    ...electricalData,
-                    panelSize: Number.parseInt(v),
-                  })
-                }
+                onValueChange={(v) => setElectricalData({ ...electricalData, panelSize: Number.parseInt(v) })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -2586,14 +2050,10 @@ function InteractiveHouseAssessmentInner({
 
             {/* CHANGE: Added open breakers field */}
             <div>
-              <Label>
-                Number of Open Breaker Spaces: {electricalData.openBreakers}
-              </Label>
+              <Label>Number of Open Breaker Spaces: {electricalData.openBreakers}</Label>
               <Slider
                 value={[electricalData.openBreakers]}
-                onValueChange={([v]) =>
-                  setElectricalData({ ...electricalData, openBreakers: v })
-                }
+                onValueChange={([v]) => setElectricalData({ ...electricalData, openBreakers: v })}
                 min={0}
                 max={20}
                 step={1}
@@ -2605,40 +2065,25 @@ function InteractiveHouseAssessmentInner({
               <Checkbox
                 id="capacity"
                 checked={electricalData.hasCapacity}
-                onCheckedChange={(v) =>
-                  setElectricalData({
-                    ...electricalData,
-                    hasCapacity: v as boolean,
-                  })
-                }
+                onCheckedChange={(v) => setElectricalData({ ...electricalData, hasCapacity: v as boolean })}
               />
-              <Label htmlFor="capacity">
-                Panel has available capacity for HVAC
-              </Label>
+              <Label htmlFor="capacity">Panel has available capacity for HVAC</Label>
             </div>
 
             <div className="flex items-center gap-2">
               <Checkbox
                 id="upgrade"
                 checked={electricalData.needsUpgrade}
-                onCheckedChange={(v) =>
-                  setElectricalData({
-                    ...electricalData,
-                    needsUpgrade: v as boolean,
-                  })
-                }
+                onCheckedChange={(v) => setElectricalData({ ...electricalData, needsUpgrade: v as boolean })}
               />
               <Label htmlFor="upgrade">Panel needs upgrade</Label>
             </div>
 
-            <Button
-              className="w-full bg-purple-500 hover:bg-purple-600"
-              onClick={() => markComplete("electrical")}
-            >
+            <Button className="w-full bg-purple-500 hover:bg-purple-600" onClick={() => markComplete("electrical")}>
               Save Electrical Info
             </Button>
           </div>
-        );
+        )
 
       case "preferences":
         return (
@@ -2648,10 +2093,7 @@ function InteractiveHouseAssessmentInner({
               <Select
                 value={preferencesData.priority}
                 onValueChange={(v) =>
-                  setPreferencesData({
-                    ...preferencesData,
-                    priority: v as PreferencesData["priority"],
-                  })
+                  setPreferencesData({ ...preferencesData, priority: v as PreferencesData["priority"] })
                 }
               >
                 <SelectTrigger>
@@ -2669,9 +2111,7 @@ function InteractiveHouseAssessmentInner({
               <Label>Budget Range</Label>
               <Select
                 value={preferencesData.budgetRange}
-                onValueChange={(v) =>
-                  setPreferencesData({ ...preferencesData, budgetRange: v })
-                }
+                onValueChange={(v) => setPreferencesData({ ...preferencesData, budgetRange: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -2692,9 +2132,7 @@ function InteractiveHouseAssessmentInner({
               <Label>Brand Preference</Label>
               <Select
                 value={preferencesData.brandPreference}
-                onValueChange={(v) =>
-                  setPreferencesData({ ...preferencesData, brandPreference: v })
-                }
+                onValueChange={(v) => setPreferencesData({ ...preferencesData, brandPreference: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -2711,20 +2149,13 @@ function InteractiveHouseAssessmentInner({
               <Label>Warranty Importance</Label>
               <Select
                 value={preferencesData.warrantyImportance}
-                onValueChange={(v) =>
-                  setPreferencesData({
-                    ...preferencesData,
-                    warrantyImportance: v,
-                  })
-                }
+                onValueChange={(v) => setPreferencesData({ ...preferencesData, warrantyImportance: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="very">
-                    Very Important - Want longest warranty
-                  </SelectItem>
+                  <SelectItem value="very">Very Important - Want longest warranty</SelectItem>
                   <SelectItem value="somewhat">Somewhat Important</SelectItem>
                   <SelectItem value="not">Not a Major Factor</SelectItem>
                 </SelectContent>
@@ -2735,12 +2166,7 @@ function InteractiveHouseAssessmentInner({
               <Checkbox
                 id="financing"
                 checked={preferencesData.financing}
-                onCheckedChange={(v) =>
-                  setPreferencesData({
-                    ...preferencesData,
-                    financing: v as boolean,
-                  })
-                }
+                onCheckedChange={(v) => setPreferencesData({ ...preferencesData, financing: v as boolean })}
               />
               <Label htmlFor="financing">Interested in financing options</Label>
             </div>
@@ -2749,9 +2175,7 @@ function InteractiveHouseAssessmentInner({
               <Label>Installation Timeline</Label>
               <Select
                 value={preferencesData.timeline}
-                onValueChange={(v) =>
-                  setPreferencesData({ ...preferencesData, timeline: v })
-                }
+                onValueChange={(v) => setPreferencesData({ ...preferencesData, timeline: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -2760,9 +2184,7 @@ function InteractiveHouseAssessmentInner({
                   <SelectItem value="asap">ASAP / Emergency</SelectItem>
                   <SelectItem value="1-2 weeks">1-2 Weeks</SelectItem>
                   <SelectItem value="1 month">Within a Month</SelectItem>
-                  <SelectItem value="flexible">
-                    Flexible / Planning Ahead
-                  </SelectItem>
+                  <SelectItem value="flexible">Flexible / Planning Ahead</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2771,28 +2193,16 @@ function InteractiveHouseAssessmentInner({
               <Checkbox
                 id="environmental"
                 checked={preferencesData.environmentalConcern}
-                onCheckedChange={(v) =>
-                  setPreferencesData({
-                    ...preferencesData,
-                    environmentalConcern: v as boolean,
-                  })
-                }
+                onCheckedChange={(v) => setPreferencesData({ ...preferencesData, environmentalConcern: v as boolean })}
               />
-              <Label htmlFor="environmental">
-                Environmental impact is important to me
-              </Label>
+              <Label htmlFor="environmental">Environmental impact is important to me</Label>
             </div>
 
             <div className="flex items-center gap-2">
               <Checkbox
                 id="smartHome"
                 checked={preferencesData.smartHomeIntegration}
-                onCheckedChange={(v) =>
-                  setPreferencesData({
-                    ...preferencesData,
-                    smartHomeIntegration: v as boolean,
-                  })
-                }
+                onCheckedChange={(v) => setPreferencesData({ ...preferencesData, smartHomeIntegration: v as boolean })}
               />
               <Label htmlFor="smartHome">Want smart home integration</Label>
             </div>
@@ -2801,9 +2211,7 @@ function InteractiveHouseAssessmentInner({
               <Label>Noise Tolerance</Label>
               <Select
                 value={preferencesData.noiseTolerrance}
-                onValueChange={(v) =>
-                  setPreferencesData({ ...preferencesData, noiseTolerrance: v })
-                }
+                onValueChange={(v) => setPreferencesData({ ...preferencesData, noiseTolerrance: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -2811,9 +2219,7 @@ function InteractiveHouseAssessmentInner({
                 <SelectContent>
                   <SelectItem value="very_quiet">Must be very quiet</SelectItem>
                   <SelectItem value="average">Average noise is fine</SelectItem>
-                  <SelectItem value="not_concerned">
-                    Not concerned about noise
-                  </SelectItem>
+                  <SelectItem value="not_concerned">Not concerned about noise</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2822,25 +2228,16 @@ function InteractiveHouseAssessmentInner({
               <Checkbox
                 id="allergies"
                 checked={preferencesData.allergies}
-                onCheckedChange={(v) =>
-                  setPreferencesData({
-                    ...preferencesData,
-                    allergies: v as boolean,
-                  })
-                }
+                onCheckedChange={(v) => setPreferencesData({ ...preferencesData, allergies: v as boolean })}
               />
-              <Label htmlFor="allergies">
-                Household members have allergies/asthma
-              </Label>
+              <Label htmlFor="allergies">Household members have allergies/asthma</Label>
             </div>
 
             <div className="flex items-center gap-2">
               <Checkbox
                 id="pets"
                 checked={preferencesData.pets}
-                onCheckedChange={(v) =>
-                  setPreferencesData({ ...preferencesData, pets: v as boolean })
-                }
+                onCheckedChange={(v) => setPreferencesData({ ...preferencesData, pets: v as boolean })}
               />
               <Label htmlFor="pets">Have pets in the home</Label>
             </div>
@@ -2849,23 +2246,15 @@ function InteractiveHouseAssessmentInner({
               <Label>Home Occupancy</Label>
               <Select
                 value={preferencesData.homeOccupancy}
-                onValueChange={(v) =>
-                  setPreferencesData({ ...preferencesData, homeOccupancy: v })
-                }
+                onValueChange={(v) => setPreferencesData({ ...preferencesData, homeOccupancy: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="always">
-                    Always occupied (work from home)
-                  </SelectItem>
-                  <SelectItem value="mostly">
-                    Mostly occupied (family)
-                  </SelectItem>
-                  <SelectItem value="daytime_empty">
-                    Empty during work hours
-                  </SelectItem>
+                  <SelectItem value="always">Always occupied (work from home)</SelectItem>
+                  <SelectItem value="mostly">Mostly occupied (family)</SelectItem>
+                  <SelectItem value="daytime_empty">Empty during work hours</SelectItem>
                   <SelectItem value="variable">Variable schedule</SelectItem>
                 </SelectContent>
               </Select>
@@ -2875,20 +2264,14 @@ function InteractiveHouseAssessmentInner({
               <Label>Are you the decision maker?</Label>
               <Select
                 value={preferencesData.decisionMaker}
-                onValueChange={(v) =>
-                  setPreferencesData({ ...preferencesData, decisionMaker: v })
-                }
+                onValueChange={(v) => setPreferencesData({ ...preferencesData, decisionMaker: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="yes">
-                    Yes, I can make the decision
-                  </SelectItem>
-                  <SelectItem value="spouse">
-                    Need to consult spouse/partner
-                  </SelectItem>
+                  <SelectItem value="yes">Yes, I can make the decision</SelectItem>
+                  <SelectItem value="spouse">Need to consult spouse/partner</SelectItem>
                   <SelectItem value="other">Need to consult others</SelectItem>
                 </SelectContent>
               </Select>
@@ -2898,31 +2281,21 @@ function InteractiveHouseAssessmentInner({
               <Checkbox
                 id="competitorQuotes"
                 checked={preferencesData.competitorQuotes}
-                onCheckedChange={(v) =>
-                  setPreferencesData({
-                    ...preferencesData,
-                    competitorQuotes: v as boolean,
-                  })
-                }
+                onCheckedChange={(v) => setPreferencesData({ ...preferencesData, competitorQuotes: v as boolean })}
               />
-              <Label htmlFor="competitorQuotes">
-                Have quotes from other companies
-              </Label>
+              <Label htmlFor="competitorQuotes">Have quotes from other companies</Label>
             </div>
 
-            <Button
-              className="w-full bg-pink-500 hover:bg-pink-600"
-              onClick={() => markComplete("preferences")}
-            >
+            <Button className="w-full bg-pink-500 hover:bg-pink-600" onClick={() => markComplete("preferences")}>
               Save Preferences
             </Button>
           </div>
-        );
+        )
 
       default:
-        return null;
+        return null
     }
-  };
+  }
 
   // Render equipment selection
   const renderEquipmentStep = () => {
@@ -2932,13 +2305,13 @@ function InteractiveHouseAssessmentInner({
         <div className="p-4 text-center">
           <p>Loading pricing information...</p>
         </div>
-      );
+      )
     }
 
-    const tonnage = selectedEquipment?.tonnage || calculateTonnage();
-    const tiers = getEquipmentTiers(tonnage);
-    const recommendedTier = getRecommendedTier();
-    const recommendationReason = getRecommendationReason();
+    const tonnage = selectedEquipment?.tonnage || calculateTonnage()
+    const tiers = getEquipmentTiers(tonnage)
+    const recommendedTier = getRecommendedTier()
+    const recommendationReason = getRecommendationReason()
 
     return (
       <div className="bg-card/10 backdrop-blur-sm rounded-lg p-4 md:p-6 border shadow-lg">
@@ -2949,18 +2322,9 @@ function InteractiveHouseAssessmentInner({
             <HelpTooltip content="Choose the equipment tier that best fits your needs. Higher SEER ratings mean better energy efficiency and lower operating costs." />
           </div>
           {recommendedTier && (
-            <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg mb-4">
-              <p className="text-sm text-primary">
-                <strong>Recommendation:</strong> Based on {recommendationReason}
-                , we recommend the{" "}
-                <strong>
-                  {recommendedTier === "best"
-                    ? "Ultimate Comfort"
-                    : recommendedTier === "better"
-                      ? "Premium Comfort"
-                      : "Essential Comfort"}
-                </strong>{" "}
-                tier.
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg mb-4">
+              <p className="text-sm text-green-800">
+                <strong>Recommendation:</strong> Based on {recommendationReason}, we recommend the <strong>{recommendedTier === "best" ? "Ultimate Comfort" : recommendedTier === "better" ? "Premium Comfort" : "Essential Comfort"}</strong> tier.
               </p>
             </div>
           )}
@@ -2976,21 +2340,21 @@ function InteractiveHouseAssessmentInner({
                 tabIndex={0}
                 onClick={() => setSelectedEquipment(tier)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setSelectedEquipment(tier);
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setSelectedEquipment(tier)
                   }
                 }}
                 className={`p-4 md:p-6 rounded-xl border-2 text-left transition-all relative cursor-pointer ${
                   selectedEquipment?.tier === tier.tier
                     ? "border-primary bg-primary/5"
                     : tier.recommended
-                      ? "border-primary bg-primary/5"
+                      ? "border-green-500 bg-green-50 dark:bg-green-950/20"
                       : "border-border hover:border-primary/50"
                 }`}
               >
                 {tier.recommended && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap shadow-lg">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap shadow-lg">
                     ⭐ Recommended for You
                   </div>
                 )}
@@ -3005,38 +2369,33 @@ function InteractiveHouseAssessmentInner({
                           : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
                     }`}
                   >
-                    {tier.tier === "best"
-                      ? "BEST VALUE"
-                      : tier.tier === "better"
-                        ? "POPULAR"
-                        : "BUDGET"}
+                    {tier.tier === "best" ? "BEST VALUE" : tier.tier === "better" ? "POPULAR" : "BUDGET"}
                   </span>
-                  {selectedEquipment?.tier === tier.tier && (
-                    <Check className="w-5 h-5 text-primary" />
-                  )}
+                  {selectedEquipment?.tier === tier.tier && <Check className="w-5 h-5 text-primary" />}
                 </div>
                 <h3 className="text-lg font-semibold mb-1">{tier.name}</h3>
-                <p className="text-2xl font-bold text-primary mb-1">
-                  ${Math.round(tier.price).toLocaleString()}
-                </p>
+                <p className="text-2xl font-bold text-primary mb-1">${tier.price.toLocaleString()}</p>
+                <div className="mb-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <span>Cost: ${tier.baseCost.toLocaleString()}</span>
+                    <span className="text-green-600 dark:text-green-400 font-medium">
+                      +${(tier.price - tier.baseCost).toLocaleString()} margin (
+                      {Math.round(((tier.price - tier.baseCost) / tier.baseCost) * 100)}%)
+                    </span>
+                  </div>
+                </div>
+                {/* </CHANGE> */}
                 <div className="flex items-center gap-2 mb-3">
-                  <p className="text-sm text-muted-foreground">
-                    {tier.seer} SEER Rating
-                  </p>
-                  <span
-                    onClick={(e) => e.stopPropagation()}
-                    role="presentation"
-                  >
-                    <HelpTooltip
-                      content={`SEER (Seasonal Energy Efficiency Ratio) measures cooling efficiency. ${tier.seer} SEER means this system is ${tier.seer >= 18 ? "highly" : tier.seer >= 16 ? "moderately" : "basically"} efficient. Higher SEER = lower energy bills.`}
-                    />
+                  <p className="text-sm text-muted-foreground">{tier.seer} SEER Rating</p>
+                  <span onClick={(e) => e.stopPropagation()} role="presentation">
+                    <HelpTooltip content={`SEER (Seasonal Energy Efficiency Ratio) measures cooling efficiency. ${tier.seer} SEER means this system is ${tier.seer >= 18 ? 'highly' : tier.seer >= 16 ? 'moderately' : 'basically'} efficient. Higher SEER = lower energy bills.`} />
                   </span>
                 </div>
 
                 <ul className="space-y-1">
                   {tier.features.map((feature, i) => (
                     <li key={i} className="text-sm flex items-start gap-2">
-                      <Check className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
+                      <Check className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -3044,9 +2403,8 @@ function InteractiveHouseAssessmentInner({
 
                 {tier.seer >= 16 && (
                   <div className="mt-3 pt-3 border-t border-border">
-                    <p className="text-xs text-primary font-medium">
-                      Save up to {Math.round(((tier.seer - 14) / 14) * 30)}% on
-                      cooling costs
+                    <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                      Save up to {Math.round(((tier.seer - 14) / 14) * 30)}% on cooling costs
                     </p>
                   </div>
                 )}
@@ -3059,9 +2417,7 @@ function InteractiveHouseAssessmentInner({
             <div className="flex items-start gap-3">
               <Sun className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
               <div>
-                <h4 className="font-semibold text-sm mb-1">
-                  Solar Integration Benefits
-                </h4>
+                <h4 className="font-semibold text-sm mb-1">Solar Integration Benefits</h4>
                 <p className="text-xs text-muted-foreground">
                   {solarData.hasSolarInstalled
                     ? "Your existing solar system pairs perfectly with high-efficiency HVAC. Higher SEER ratings maximize your solar investment."
@@ -3072,76 +2428,55 @@ function InteractiveHouseAssessmentInner({
           </div>
         )}
       </div>
-    );
-  };
+    )
+  }
 
   // Render add-ons step
   const renderAddOnsStep = () => (
-    <div className="space-y-4">
+    <div className="bg-card/10 backdrop-blur-sm rounded-lg p-4 md:p-6 border shadow-lg">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {addOns.map((addOn, index) => (
+        {addOns.map((addOn) => (
           <button
             key={addOn.id}
             onClick={() => toggleAddOn(addOn.id)}
-            className={`group relative p-5 rounded-2xl border-2 text-left transition-all duration-300 bg-card/80 backdrop-blur-sm ${
-              addOn.selected
-                ? "border-primary bg-primary/5 shadow-lg"
-                : "border-border hover:border-primary/50 hover:shadow-md hover:-translate-y-0.5"
+            className={`p-4 rounded-lg border-2 text-left transition-all bg-card/10 backdrop-blur-sm ${
+              addOn.selected ? "border-green-500 bg-green-500/10" : "border-border hover:border-green-300"
             }`}
-            style={{ animationDelay: `${index * 50}ms` }}
           >
-            <div className="flex items-start justify-between mb-3">
-              <h3 className="font-semibold text-lg text-foreground">
-                {addOn.name}
-              </h3>
-              <div
-                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                  addOn.selected
-                    ? "border-primary bg-primary"
-                    : "border-muted-foreground/30"
-                }`}
-              >
-                {addOn.selected && <Check className="w-4 h-4 text-white" />}
-              </div>
+            <div className="flex items-start justify-between mb-2">
+              <h3 className={`font-semibold ${addOn.selected ? "text-white" : ""}`}>{addOn.name}</h3>
+              {addOn.selected && <Check className="w-5 h-5 text-green-500" />}
             </div>
-            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-              {addOn.description !== addOn.name
-                ? addOn.description
-                : `Enhance your system with ${addOn.name.toLowerCase()}`}
+            <p className={`text-sm mb-2 ${addOn.selected ? "text-gray-200" : "text-muted-foreground"}`}>
+              {addOn.description}
             </p>
-            <p
-              className={`text-2xl font-bold ${addOn.selected ? "text-primary" : "text-foreground"}`}
-            >
-              ${Math.round(getCustomerPrice(addOn.price)).toLocaleString()}
+            <p className={`text-lg font-bold ${addOn.selected ? "text-green-400" : "text-primary"}`}>
+              ${getCustomerPrice(addOn.price).toLocaleString()}
             </p>
           </button>
         ))}
       </div>
     </div>
-  );
+  )
 
   // Render maintenance step
   const renderMaintenanceStep = () => (
     <div className="bg-card/10 backdrop-blur-sm rounded-lg p-4 md:p-6 border shadow-lg">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {plans.map((plan) => {
-          const salesPrice = getPlanSalesPrice(plan);
-          const customerPrice = Math.round(getCustomerPrice(salesPrice));
-          const monthlyPrice = getPlanMonthlyPrice(plan);
-          const customerMonthlyPrice = Math.round(
-            getCustomerPrice(monthlyPrice),
-          );
+          const salesPrice = getPlanSalesPrice(plan)
+          const customerPrice = getCustomerPrice(salesPrice)
+          const monthlyPrice = getPlanMonthlyPrice(plan)
+          const customerMonthlyPrice = getCustomerPrice(monthlyPrice)
 
-          const isSelected = selectedPlan?.id === plan.id;
+          const isSelected = selectedPlan?.id === plan.id
 
           return (
             <button
               key={plan.id}
               onClick={() => setSelectedPlan(plan)}
               className={`p-4 md:p-6 rounded-xl border-2 text-left transition-all bg-card/10 backdrop-blur-sm ${
-                isSelected
-                  ? "border-primary bg-primary/10"
-                  : "border-border hover:border-primary/50"
+                isSelected ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
               }`}
             >
               <div className="flex items-center justify-between mb-3">
@@ -3157,269 +2492,313 @@ function InteractiveHouseAssessmentInner({
                 {isSelected && <Check className="w-5 h-5 text-primary" />}
               </div>
 
-              <h3
-                className={`text-lg font-semibold mb-1 ${isSelected ? "text-white" : ""}`}
-              >
-                {plan.name}
-              </h3>
+              <h3 className={`text-lg font-semibold mb-1 ${isSelected ? "text-white" : ""}`}>{plan.name}</h3>
               <div className="mb-3">
-                <p
-                  className={`text-2xl font-bold ${isSelected ? "text-primary" : "text-primary"}`}
-                >
+                <p className={`text-2xl font-bold ${isSelected ? "text-primary" : "text-primary"}`}>
                   ${customerPrice.toLocaleString()}/year
                 </p>
-                <p
-                  className={`text-sm ${isSelected ? "text-gray-200" : "text-muted-foreground"}`}
-                >
-                  or ${customerMonthlyPrice}/month
+                <p className={`text-sm ${isSelected ? "text-gray-200" : "text-muted-foreground"}`}>
+                  or ${customerMonthlyPrice.toFixed(2)}/month
                 </p>
-                <p
-                  className={`text-xs mt-1 ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
-                >
+                <p className={`text-xs mt-1 ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}>
                   {plan.visitsPerYear} visits per year
                 </p>
               </div>
 
               <ul className="space-y-1">
                 {plan.features.slice(0, 5).map((feature, i) => (
-                  <li
-                    key={i}
-                    className={`text-sm flex items-start gap-2 ${isSelected ? "text-gray-200" : ""}`}
-                  >
+                  <li key={i} className={`text-sm flex items-start gap-2 ${isSelected ? "text-gray-200" : ""}`}>
                     <Check className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
                     <span>{feature}</span>
                   </li>
                 ))}
                 {plan.features.length > 5 && (
-                  <li
-                    className={`text-sm ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
-                  >
+                  <li className={`text-sm ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}>
                     +{plan.features.length - 5} more...
                   </li>
                 )}
               </ul>
             </button>
-          );
+          )
         })}
       </div>
     </div>
-  );
+  )
 
   // Render incentives step
   const renderIncentivesStep = () => (
-    <div className="space-y-4">
-      {incentives
-        .filter((i) => i.available)
-        .map((incentive, index) => {
-          const isSelected = selectedIncentives.some(
-            (s) => s.id === incentive.id,
-          );
-          return (
-            <button
-              key={incentive.id}
-              onClick={() => toggleIncentive(incentive)}
-              className={`group w-full p-5 md:p-6 rounded-2xl border-2 text-left transition-all duration-300 bg-card/80 backdrop-blur-sm ${
-                isSelected
-                  ? "border-primary bg-primary/5 shadow-lg"
-                  : "border-border hover:border-primary/50 hover:shadow-md"
-              }`}
-              style={{ animationDelay: `${index * 75}ms` }}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-semibold text-lg text-foreground">
-                      {incentive.name}
-                    </h3>
-                    <span
-                      className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${
-                        incentive.type === "tax_credit"
-                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                          : incentive.type === "rebate"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-                            : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-                      }`}
-                    >
-                      {incentive.type === "tax_credit"
-                        ? "Tax Credit"
-                        : incentive.type === "rebate"
-                          ? "Rebate"
-                          : "Discount"}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    {incentive.description}
-                  </p>
-                  <div className="space-y-1">
-                    {incentive.requirements.map((req, i) => (
-                      <p
-                        key={i}
-                        className="text-xs text-muted-foreground flex items-center gap-1.5"
+    <div className="bg-white/10 backdrop-blur-sm border-2 border-green-300 rounded-2xl p-6 md:p-8 shadow-lg">
+      <div className="space-y-4">
+        {incentives
+          .filter((i) => i.available)
+          .map((incentive) => {
+            const isSelected = selectedIncentives.some((s) => s.id === incentive.id)
+            return (
+              <button
+                key={incentive.id}
+                onClick={() => toggleIncentive(incentive)}
+                className={`w-full p-4 md:p-6 rounded-xl border-2 text-left transition-all ${
+                  isSelected ? "border-green-500 bg-green-50" : "border-border hover:border-green-300"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold">{incentive.name}</h3>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded ${
+                          incentive.type === "tax_credit"
+                            ? "bg-blue-100 text-blue-800"
+                            : incentive.type === "rebate"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-purple-100 text-purple-800"
+                        }`}
                       >
-                        <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-                        {req}
-                      </p>
-                    ))}
+                        {incentive.type === "tax_credit"
+                          ? "Tax Credit"
+                          : incentive.type === "rebate"
+                            ? "Rebate"
+                            : "Discount"}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3">{incentive.description}</p>
+                    <div className="space-y-1">
+                      {incentive.requirements.map((req, i) => (
+                        <p key={i} className="text-xs text-muted-foreground flex items-center gap-1">
+                          <span className="w-1 h-1 rounded-full bg-muted-foreground" />
+                          {req}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-xl font-bold text-green-600">-${incentive.amount.toLocaleString()}</p>
+                    {isSelected && <Check className="w-5 h-5 text-green-500 ml-auto mt-1" />}
                   </div>
                 </div>
-                <div className="text-right flex-shrink-0 flex flex-col items-end gap-2">
-                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                    -${incentive.amount.toLocaleString()}
-                  </p>
-                  <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                      isSelected
-                        ? "border-primary bg-primary"
-                        : "border-muted-foreground/30"
-                    }`}
-                  >
-                    {isSelected && <Check className="w-4 h-4 text-white" />}
-                  </div>
-                </div>
-              </div>
-            </button>
-          );
-        })}
+              </button>
+            )
+          })}
+      </div>
 
       {incentives.filter((i) => i.available).length === 0 && (
-        <div className="text-center py-8 text-muted-foreground bg-card/50 rounded-2xl border border-dashed">
-          No incentives currently available
-        </div>
+        <div className="text-center py-8 text-muted-foreground">No incentives currently available</div>
       )}
     </div>
-  );
+  )
 
-  // Render payment step - uses new PaymentStep component
+  // Render payment step
   const renderPaymentStep = () => {
-    if (!selectedEquipment) return null;
+    if (!selectedEquipment) return null
 
-    const equipmentCustomerPrice = selectedEquipment.price;
-    const addOnsCustomerPrice = addOns
-      .filter((a) => a.selected)
-      .reduce((sum, a) => sum + getCustomerPrice(a.price), 0);
-    const maintenanceCustomerPrice = selectedPlan
-      ? getCustomerPrice(getPlanSalesPrice(selectedPlan))
-      : 0;
-    const incentivesTotal = selectedIncentives.reduce(
-      (sum, i) => sum + i.amount,
-      0,
-    );
-    const totalCustomerPrice =
-      equipmentCustomerPrice +
-      addOnsCustomerPrice +
-      maintenanceCustomerPrice -
-      incentivesTotal;
-
-    // Transform financing options to payment component format
-    const paymentFinancingOptions: PaymentFinancingOption[] = (
-      financingOptions || []
-    ).map((opt) => ({
-      id: opt.id,
-      name: opt.name,
-      type: opt.type as "finance" | "lease",
-      provider: opt.provider,
-      termMonths: opt.termMonths,
-      apr: opt.apr,
-      description: opt.description,
-      available: opt.available,
-      escalatorRate: opt.name.includes("1.99%")
-        ? 1.99
-        : opt.name.includes("0.99%")
-          ? 0.99
-          : 0,
-    }));
-
-    // Handle financing option change from PaymentStep
-    const handleFinancingOptionChange = (
-      option: PaymentFinancingOption | null,
-    ) => {
-      if (option) {
-        // Find matching original option or use the synthetic one
-        const originalOption = financingOptions?.find(
-          (o) => o.id === option.id,
-        );
-        setSelectedFinancingOption(
-          originalOption || (option as FinancingOption),
-        );
-      } else {
-        setSelectedFinancingOption(null);
-      }
-    };
-
-    // Handle showing finance form
-    const handleShowFinanceForm = async () => {
-      const msg = systemDesignErrorMessage();
-      if (msg) {
-        toast.error(msg);
-        return;
-      }
-      const id = proposalId ?? (await handleSendToKin()) ?? null;
-      if (id) setShowFinanceForm(true);
-      else if (!proposalId)
-        toast.error("Save the proposal first, then try again.");
-    };
+    const equipmentCustomerPrice = selectedEquipment.price
+    const addOnsCustomerPrice = addOns.filter((a) => a.selected).reduce((sum, a) => sum + getCustomerPrice(a.price), 0)
+    const maintenanceCustomerPrice = selectedPlan ? getCustomerPrice(getPlanSalesPrice(selectedPlan)) : 0
+    const incentivesTotal = selectedIncentives.reduce((sum, i) => sum + i.amount, 0)
+    const totalCustomerPrice = equipmentCustomerPrice + addOnsCustomerPrice + maintenanceCustomerPrice - incentivesTotal
 
     return (
       <div className="bg-card/10 backdrop-blur-sm rounded-lg p-4 md:p-6 border shadow-lg">
-        <PaymentStep
-          totalPrice={totalCustomerPrice}
-          customerState={customerData.state || "CA"}
-          financingOptions={paymentFinancingOptions}
-          selectedPaymentMethod={paymentMethod as PaymentMethodType}
-          selectedFinancingOption={
-            selectedFinancingOption
-              ? {
-                  ...selectedFinancingOption,
-                  type: selectedFinancingOption.type as "finance" | "lease",
-                  escalatorRate: selectedFinancingOption.name?.includes("1.99%")
-                    ? 1.99
-                    : selectedFinancingOption.name?.includes("0.99%")
-                      ? 0.99
-                      : 0,
-                }
-              : null
-          }
-          onPaymentMethodChange={(method) =>
-            setPaymentMethod(method as "cash" | "financing" | "leasing")
-          }
-          onFinancingOptionChange={handleFinancingOptionChange}
-          proposalId={proposalId || undefined}
-          onShowFinanceForm={handleShowFinanceForm}
-        />
+        {/* Payment Method Selector */}
+        <div className="grid grid-cols-3 gap-2 mb-6">
+          <Button
+            variant={paymentMethod === "cash" ? "default" : "outline"}
+            onClick={() => setPaymentMethod("cash")}
+            className="w-full"
+          >
+            Cash
+          </Button>
+          <Button
+            variant={paymentMethod === "financing" ? "default" : "outline"}
+            onClick={() => setPaymentMethod("financing")}
+            className="w-full"
+          >
+            Financing
+          </Button>
+          <Button
+            variant={paymentMethod === "leasing" ? "default" : "outline"}
+            onClick={() => setPaymentMethod("leasing")}
+            className="w-full"
+          >
+            Leasing
+          </Button>
+        </div>
 
-        {/* Finance Application Section - Show if Comfort Plan selected and proposal saved */}
-        {proposalId &&
-          paymentMethod === "leasing" &&
-          selectedFinancingOption?.provider?.toLowerCase() === "lightreach" && (
-            <div className="mt-6 p-4 border-2 border-primary/20 rounded-lg bg-primary/5">
-              <h3 className="text-lg font-semibold mb-3">
-                Comfort Plan Finance Application
-              </h3>
-              {selectedFinanceApplicationId ? (
-                <div className="space-y-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedFinanceApplicationId(null)}
-                  >
-                    ← Back to Applications
-                  </Button>
-                  <FinanceApplicationStatus
-                    applicationId={selectedFinanceApplicationId}
-                    autoRefresh
-                  />
-                </div>
-              ) : (
-                <FinanceApplicationList
-                  proposalId={proposalId}
-                  onNewApplication={handleShowFinanceForm}
-                />
-              )}
+        {/* Cash Options */}
+        {paymentMethod === "cash" && (
+          <div className="space-y-4">
+            <div className="p-6 border-2 border-primary rounded-xl bg-primary/5">
+              <h3 className="text-xl font-bold mb-2">Pay in Full</h3>
+              <p className="text-3xl font-bold text-primary mb-2">${totalCustomerPrice.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground">One-time payment - own your system outright</p>
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Financing Options */}
+        {paymentMethod === "financing" && financingOptions && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground mb-3">
+              Select a financing term below. Monthly payments are based on system price of $
+              {totalCustomerPrice.toLocaleString()}
+            </p>
+            {financingOptions
+              .filter((opt) => opt.type === "finance" && opt.available)
+              .map((option) => {
+                const monthlyPayment = calculateMonthlyPayment(totalCustomerPrice, option)
+                const isSelected = selectedFinancingOption?.id === option.id
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => setSelectedFinancingOption(option)}
+                    className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                      isSelected ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className={`font-semibold ${isSelected ? "text-white" : ""}`}>{option.name}</h3>
+                      {isSelected && <Check className="w-5 h-5 text-primary" />}
+                    </div>
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className={`text-2xl font-bold ${isSelected ? "text-primary" : "text-primary"}`}>
+                        ${monthlyPayment.toFixed(2)}
+                      </span>
+                      <span className={`text-sm ${isSelected ? "text-gray-200" : "text-muted-foreground"}`}>
+                        /month
+                      </span>
+                    </div>
+                    <p className={`text-sm ${isSelected ? "text-gray-200" : "text-muted-foreground"}`}>
+                      {option.description}
+                    </p>
+                    {option.apr > 0 && (
+                      <p className={`text-xs mt-1 ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}>
+                        {option.apr}% APR
+                      </p>
+                    )}
+                  </button>
+                )
+              })}
+          </div>
+        )}
+
+        {/* Leasing Options */}
+        {paymentMethod === "leasing" && financingOptions && (
+          <div className="space-y-6">
+            <p className="text-sm text-muted-foreground mb-3">
+              Select a lease term below. Monthly payments are based on system price of $
+              {totalCustomerPrice.toLocaleString()}
+            </p>
+            
+            {/* Finance Application Section - Show if Comfort Plan selected and proposal saved */}
+            {proposalId && selectedFinancingOption?.provider?.toLowerCase() === "lightreach" && (
+              <div className="mt-6 p-4 border-2 border-primary/20 rounded-lg bg-primary/5">
+                <h3 className="text-lg font-semibold mb-3">Comfort Plan Finance Application</h3>
+                {selectedFinanceApplicationId ? (
+                  <div className="space-y-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedFinanceApplicationId(null)}
+                    >
+                      ← Back to Applications
+                    </Button>
+                    <FinanceApplicationStatus applicationId={selectedFinanceApplicationId} autoRefresh />
+                  </div>
+                ) : (
+                  <FinanceApplicationList
+                    proposalId={proposalId}
+                    onNewApplication={async () => {
+                      const msg = systemDesignErrorMessage()
+                      if (msg) {
+                        toast.error(msg)
+                        return
+                      }
+                      const id = proposalId ?? (await handleSendToKin()) ?? null
+                      if (id) setShowFinanceForm(true)
+                      else if (!proposalId) toast.error("Save the proposal first, then try again.")
+                    }}
+                  />
+                )}
+              </div>
+            )}
+            {Object.entries(
+              financingOptions
+                .filter(
+                  (opt) => opt.type === "lease" && opt.available && (opt.termMonths === 120 || opt.termMonths === 144),
+                )
+                .reduce(
+                  (acc, option) => {
+                    const term = option.termMonths
+                    if (!acc[term]) {
+                      acc[term] = []
+                    }
+                    acc[term].push(option)
+                    return acc
+                  },
+                  {} as Record<number, typeof financingOptions>,
+                ),
+            )
+              .sort((a, b) => Number(a[0]) - Number(b[0]))
+              .map(([termMonths, options]) => {
+                return (
+                  <div key={termMonths}>
+                    <h4 className="font-semibold mb-3">
+                      {Math.floor(Number(termMonths) / 12)} Year
+                      {Math.floor(Number(termMonths) / 12) !== 1 ? "s" : ""}
+                    </h4>
+                    <div className="space-y-2">
+                      {options.map((option) => {
+                        const monthlyPayment = calculateMonthlyPayment(totalCustomerPrice, option)
+                        const escalator = option.name.includes("1.99%")
+                          ? "1.99%"
+                          : option.name.includes("0.99%")
+                            ? "0.99%"
+                            : "0%"
+                        const isSelected = selectedFinancingOption?.id === option.id
+                        return (
+                          <button
+                            key={option.id}
+                            onClick={() => setSelectedFinancingOption(option)}
+                            className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                              isSelected ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <h3 className={`font-semibold ${isSelected ? "text-white" : ""}`}>
+                                  {option.provider} Lease
+                                </h3>
+                                <span className={`text-xs ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}>
+                                  {escalator} Escalator
+                                </span>
+                              </div>
+                              {isSelected && <Check className="w-5 h-5 text-primary" />}
+                            </div>
+                            <div className="flex items-baseline gap-2 mb-1">
+                              <span className={`text-2xl font-bold ${isSelected ? "text-primary" : "text-primary"}`}>
+                                ${monthlyPayment.toFixed(2)}
+                              </span>
+                              <span className={`text-sm ${isSelected ? "text-gray-200" : "text-muted-foreground"}`}>
+                                /month
+                              </span>
+                            </div>
+                            {escalator !== "0%" && (
+                              <p className={`text-xs ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}>
+                                Year 1, increases {escalator} annually
+                              </p>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
+        )}
       </div>
-    );
-  };
+    )
+  }
 
   // Render proposal step
   const renderProposalStep = () => {
@@ -3428,50 +2807,44 @@ function InteractiveHouseAssessmentInner({
         ? selectedFinancingOption
         : paymentMethod === "leasing"
           ? selectedFinancingOption
-          : null;
+          : null
 
-    let monthlyPayment = 0;
+    let monthlyPayment = 0
     if (selectedFinancing) {
-      const equipmentCustomerPrice = selectedEquipment?.price || 0;
+      const equipmentCustomerPrice = selectedEquipment?.price || 0
       const addOnsCustomerPrice = addOns
         .filter((a) => a.selected)
-        .reduce((sum, a) => sum + getCustomerPrice(a.price), 0);
-      const maintenanceCustomerPrice = selectedPlan
-        ? getCustomerPrice(getPlanSalesPrice(selectedPlan))
-        : 0;
-      const totalCustomerPrice =
-        equipmentCustomerPrice + addOnsCustomerPrice + maintenanceCustomerPrice;
-      monthlyPayment = calculateMonthlyPayment(
-        totalCustomerPrice,
-        selectedFinancing,
-      );
+        .reduce((sum, a) => sum + getCustomerPrice(a.price), 0)
+      const maintenanceCustomerPrice = selectedPlan ? getCustomerPrice(getPlanSalesPrice(selectedPlan)) : 0
+      const totalCustomerPrice = equipmentCustomerPrice + addOnsCustomerPrice + maintenanceCustomerPrice
+      monthlyPayment = calculateMonthlyPayment(totalCustomerPrice, selectedFinancing)
     }
 
     const getBrandName = (tier: string) => {
       switch (tier) {
         case "best":
-          return "Daikin";
+          return "Daikin"
         case "better":
-          return "Goodman";
+          return "Goodman"
         case "good":
-          return "Goodman";
+          return "Goodman"
         default:
-          return "Quality";
+          return "Quality"
       }
-    };
+    }
 
     const getEquipmentDescription = (tier: string, seer: number) => {
       switch (tier) {
         case "best":
-          return `Premium ${seer}-SEER high-efficiency system with advanced comfort features, quiet operation, and superior energy savings. Includes multi-stage cooling, enhanced humidity control, and smart thermostat compatibility.`;
+          return `Premium ${seer}-SEER high-efficiency system with advanced comfort features, quiet operation, and superior energy savings. Includes multi-stage cooling, enhanced humidity control, and smart thermostat compatibility.`
         case "better":
-          return `High-performance ${seer}-SEER system offering excellent efficiency and reliability. Features include two-stage cooling for improved comfort, quiet operation, and significant energy savings over standard models.`;
+          return `High-performance ${seer}-SEER system offering excellent efficiency and reliability. Features include two-stage cooling for improved comfort, quiet operation, and significant energy savings over standard models.`
         case "good":
-          return `Dependable ${seer}-SEER system providing reliable comfort and improved efficiency. Single-stage cooling with quality construction and excellent warranty coverage for peace of mind.`;
+          return `Dependable ${seer}-SEER system providing reliable comfort and improved efficiency. Single-stage cooling with quality construction and excellent warranty coverage for peace of mind.`
         default:
-          return `High-efficiency HVAC system designed for comfort and energy savings.`;
+          return `High-efficiency HVAC system designed for comfort and energy savings.`
       }
-    };
+    }
 
     const getAddonDescription = (addonName: string) => {
       const descriptions: Record<string, string> = {
@@ -3487,12 +2860,9 @@ function InteractiveHouseAssessmentInner({
           "Comprehensive extended warranty coverage providing 5 additional years of parts and labor protection beyond the manufacturer's warranty for complete peace of mind.",
         "Zoning System":
           "Multi-zone climate control system allowing independent temperature management for different areas of your home, maximizing comfort and efficiency while reducing energy costs.",
-      };
-      return (
-        descriptions[addonName] ||
-        "Premium add-on enhancing your HVAC system performance and comfort."
-      );
-    };
+      }
+      return descriptions[addonName] || "Premium add-on enhancing your HVAC system performance and comfort."
+    }
 
     return (
       <div
@@ -3507,9 +2877,7 @@ function InteractiveHouseAssessmentInner({
       >
         {/* Header with Edit button */}
         <div className="text-center border-b border-white/20 pb-6 relative">
-          <h2 className="text-3xl md:text-4xl font-bold mb-2 text-white">
-            Your Custom HVAC Solution
-          </h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-2 text-white">Your Custom HVAC Solution</h2>
           <p className="text-gray-300 text-lg">KIN HOME</p>
           <div className="absolute top-0 right-0 flex gap-2">
             <Button
@@ -3539,9 +2907,7 @@ function InteractiveHouseAssessmentInner({
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
                 <Wind className="w-8 h-8 text-primary" />
-                <h3 className="text-2xl font-bold text-white">
-                  Complete HVAC System
-                </h3>
+                <h3 className="text-2xl font-bold text-white">Complete HVAC System</h3>
               </div>
               <div className="flex items-center gap-2 mb-4">
                 <span className="px-3 py-1 bg-primary/10 rounded-full text-sm font-semibold">
@@ -3556,17 +2922,12 @@ function InteractiveHouseAssessmentInner({
               </div>
             </div>
             <div className="text-right">
-              <p className="text-3xl font-bold text-primary">
-                ${Math.round(selectedEquipment?.price || 0).toLocaleString()}
-              </p>
+              <p className="text-3xl font-bold text-primary">${(selectedEquipment?.price || 0).toLocaleString()}</p>
             </div>
           </div>
 
           <p className="text-gray-300 mb-4 leading-relaxed">
-            {getEquipmentDescription(
-              selectedEquipment?.tier || "good",
-              selectedEquipment?.seer || 16,
-            )}
+            {getEquipmentDescription(selectedEquipment?.tier || "good", selectedEquipment?.seer || 16)}
           </p>
 
           <div className="bg-muted/50 rounded-lg p-4">
@@ -3576,10 +2937,7 @@ function InteractiveHouseAssessmentInner({
             </h4>
             <ul className="grid md:grid-cols-2 gap-2">
               {selectedEquipment?.features.map((feature, idx) => (
-                <li
-                  key={idx}
-                  className="flex items-start gap-2 text-sm text-gray-300"
-                >
+                <li key={idx} className="flex items-start gap-2 text-sm text-gray-300">
                   <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                   <span>{feature}</span>
                 </li>
@@ -3590,9 +2948,9 @@ function InteractiveHouseAssessmentInner({
 
         {/* Add-ons */}
         {addOns.some((a) => a.selected) && (
-          <div className="bg-card/10 backdrop-blur-sm border-2 border-primary/20 rounded-2xl p-6 md:p-8 shadow-lg">
+          <div className="bg-card/10 backdrop-blur-sm border-2 border-blue-200 rounded-2xl p-6 md:p-8 shadow-lg">
             <div className="flex items-center gap-3 mb-6">
-              <Sparkles className="w-7 h-7 text-primary" />
+              <Sparkles className="w-7 h-7 text-blue-600" />
               <h3 className="text-2xl font-bold text-white">Premium Add-Ons</h3>
             </div>
             <div className="space-y-6">
@@ -3603,21 +2961,15 @@ function InteractiveHouseAssessmentInner({
                     key={addon.id}
                     className="flex items-start gap-4 pb-6 border-b border-white/10 last:border-b-0 last:pb-0"
                   >
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Package className="w-6 h-6 text-primary" />
+                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                      <Package className="w-6 h-6 text-blue-600" />
                     </div>
                     <div className="flex-1">
                       <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-semibold text-lg text-white">
-                          {addon.name}
-                        </h4>
-                        <span className="text-xl font-bold text-primary">
-                          ${Math.round(addon.price).toLocaleString()}
-                        </span>
+                        <h4 className="font-semibold text-lg text-white">{addon.name}</h4>
+                        <span className="text-xl font-bold text-blue-600">${addon.price}</span>
                       </div>
-                      <p className="text-sm text-gray-300 leading-relaxed">
-                        {getAddonDescription(addon.name)}
-                      </p>
+                      <p className="text-sm text-gray-300 leading-relaxed">{getAddonDescription(addon.name)}</p>
                     </div>
                   </div>
                 ))}
@@ -3627,53 +2979,43 @@ function InteractiveHouseAssessmentInner({
 
         {/* Maintenance Plan - Show service details instead of cost */}
         {selectedPlan && (
-          <div className="bg-card/10 backdrop-blur-sm border-2 border-primary/20 rounded-2xl p-6 md:p-8 shadow-lg">
+          <div className="bg-card/10 backdrop-blur-sm border-2 border-purple-200 rounded-2xl p-6 md:p-8 shadow-lg">
             <div className="flex items-center gap-3 mb-6">
-              <Shield className="w-7 h-7 text-primary" />
-              <h3 className="text-2xl font-bold text-white">
-                Maintenance & Care Plan
-              </h3>
+              <Shield className="w-7 h-7 text-purple-600" />
+              <h3 className="text-2xl font-bold text-white">Maintenance & Care Plan</h3>
             </div>
 
             <div className="flex items-start justify-between mb-6">
               <div>
-                <h4 className="text-xl font-semibold mb-1 text-white">
-                  {selectedPlan.name}
-                </h4>
-                <p className="text-muted-foreground text-gray-300">
-                  {selectedPlan.description}
-                </p>
+                <h4 className="text-xl font-semibold mb-1 text-white">{selectedPlan.name}</h4>
+                <p className="text-muted-foreground text-gray-300">{selectedPlan.description}</p>
               </div>
               <div className="text-right">
-                <span className="px-4 py-2 bg-primary/10 text-primary rounded-lg text-lg font-bold inline-block">
-                  {selectedPlan.visitsPerYear}{" "}
-                  {selectedPlan.visitsPerYear === 1 ? "Visit" : "Visits"}/Year
+                <span className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg text-lg font-bold inline-block">
+                  {selectedPlan.visitsPerYear} {selectedPlan.visitsPerYear === 1 ? "Visit" : "Visits"}/Year
                 </span>
               </div>
             </div>
 
             <div className="bg-muted/50 rounded-lg p-5">
               <h5 className="font-semibold mb-4 flex items-center gap-2 text-white">
-                <Wrench className="w-5 h-5 text-primary" />
+                <Wrench className="w-5 h-5 text-purple-600" />
                 Service Includes:
               </h5>
               <ul className="grid md:grid-cols-2 gap-3">
                 {selectedPlan.features.map((feature, idx) => (
-                  <li
-                    key={idx}
-                    className="flex items-start gap-2 text-sm text-gray-300"
-                  >
-                    <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                  <li key={idx} className="flex items-start gap-2 text-sm text-gray-300">
+                    <Check className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
                     <span>{feature}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="mt-4 p-4 bg-primary/5 rounded-lg">
-              <p className="text-sm text-primary font-medium">
-                💡 Regular maintenance extends equipment life by up to 40% and
-                maintains peak efficiency, saving you money on energy bills.
+            <div className="mt-4 p-4 bg-purple-50 rounded-lg">
+              <p className="text-sm text-purple-900 font-medium">
+                💡 Regular maintenance extends equipment life by up to 40% and maintains peak efficiency, saving you
+                money on energy bills.
               </p>
             </div>
           </div>
@@ -3681,30 +3023,21 @@ function InteractiveHouseAssessmentInner({
 
         {/* Incentives */}
         {selectedIncentives.length > 0 && (
-          <div className="bg-white/10 backdrop-blur-sm border-2 border-primary/20 rounded-2xl p-6 md:p-8 shadow-lg">
+          <div className="bg-white/10 backdrop-blur-sm border-2 border-green-300 rounded-2xl p-6 md:p-8 shadow-lg">
             <div className="flex items-center gap-3 mb-6">
-              <DollarSign className="w-7 h-7 text-primary" />
-              <h3 className="text-2xl font-bold text-foreground">
-                Your Savings & Incentives
-              </h3>
+              <DollarSign className="w-7 h-7 text-green-700" />
+              <h3 className="text-2xl font-bold text-green-900">Your Savings & Incentives</h3>
             </div>
             <div className="space-y-3">
               {selectedIncentives.map((incentive) => (
-                <div
-                  key={incentive.id}
-                  className="flex justify-between items-center bg-white/70 rounded-lg p-4"
-                >
+                <div key={incentive.id} className="flex justify-between items-center bg-white/70 rounded-lg p-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Check className="w-6 h-6 text-primary" />
+                    <div className="w-10 h-10 rounded-full bg-green-200 flex items-center justify-center">
+                      <Check className="w-6 h-6 text-green-700" />
                     </div>
-                    <span className="font-medium text-lg text-white">
-                      {incentive.name}
-                    </span>
+                    <span className="font-medium text-lg text-white">{incentive.name}</span>
                   </div>
-                  <span className="text-2xl font-bold text-emerald-600">
-                    -${incentive.amount.toLocaleString()}
-                  </span>
+                  <span className="text-2xl font-bold text-green-700">-${incentive.amount.toLocaleString()}</span>
                 </div>
               ))}
             </div>
@@ -3716,37 +3049,30 @@ function InteractiveHouseAssessmentInner({
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="text-center md:text-left">
               <p className="text-slate-400 text-lg mb-2">Total Investment</p>
-              <p className="text-5xl md:text-6xl font-bold">
-                ${Math.round(getTotal()).toLocaleString()}
-              </p>
+              <p className="text-5xl md:text-6xl font-bold">${getTotal().toLocaleString()}</p>
             </div>
 
             {selectedFinancing && (
               <div className="text-center md:text-right border-l-0 md:border-l-2 border-t-2 md:border-t-0 border-slate-600 pt-6 md:pt-0 md:pl-10">
                 <p className="text-slate-400 mb-2">Or as low as</p>
-                <p className="text-4xl md:text-5xl font-bold text-primary">
-                  ${Math.round(monthlyPayment)}
+                <p className="text-4xl md:text-5xl font-bold text-green-400">
+                  ${monthlyPayment.toFixed(2)}
                   <span className="text-2xl">/month</span>
                 </p>
-                {selectedFinancing.name && (
-                  <p className="text-sm text-slate-400 mt-2">
-                    {selectedFinancing.name}
-                  </p>
-                )}
+                {selectedFinancing.name && <p className="text-sm text-slate-400 mt-2">{selectedFinancing.name}</p>}
               </div>
             )}
           </div>
 
           <div className="mt-8 pt-6 border-t border-slate-700 text-center">
             <p className="text-slate-300 text-sm">
-              Professional installation by certified technicians • Full warranty
-              coverage • Satisfaction guaranteed
+              Professional installation by certified technicians • Full warranty coverage • Satisfaction guaranteed
             </p>
           </div>
         </div>
       </div>
-    );
-  };
+    )
+  }
 
   // Main render
   if (showPricing) {
@@ -3755,15 +3081,11 @@ function InteractiveHouseAssessmentInner({
       return (
         <div className="min-h-screen flex items-center justify-center bg-background">
           <div className="text-center">
-            <p className="text-lg font-semibold mb-2">
-              Loading pricing information...
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Please wait while we prepare your options.
-            </p>
+            <p className="text-lg font-semibold mb-2">Loading pricing information...</p>
+            <p className="text-sm text-muted-foreground">Please wait while we prepare your options.</p>
           </div>
         </div>
-      );
+      )
     }
 
     return (
@@ -3780,11 +3102,10 @@ function InteractiveHouseAssessmentInner({
         <div className="p-3 border-b bg-card/40 backdrop-blur-sm">
           <div className="flex items-center justify-center gap-2 text-xs">
             {pricingSteps.map((step, i) => {
-              const currentIndex = pricingSteps.indexOf(pricingStep);
-              const isActive = step === pricingStep;
-              const isCompleted = i < currentIndex;
-              const canClick =
-                isCompleted || i === currentIndex || i === currentIndex + 1;
+              const currentIndex = pricingSteps.indexOf(pricingStep)
+              const isActive = step === pricingStep
+              const isCompleted = i < currentIndex
+              const canClick = isCompleted || i === currentIndex || i === currentIndex + 1
 
               return (
                 <div key={step} className="flex items-center">
@@ -3795,24 +3116,26 @@ function InteractiveHouseAssessmentInner({
                       isActive
                         ? "bg-primary text-primary-foreground scale-110"
                         : isCompleted
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                          ? "bg-green-500 text-white hover:bg-green-600 cursor-pointer"
                           : canClick
                             ? "bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer"
                             : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
                     }`}
                     title={stepLabels[step]}
                   >
-                    {isCompleted ? <Check className="w-3 h-3" /> : i + 1}
+                    {isCompleted ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      i + 1
+                    )}
                   </button>
                   {i < pricingSteps.length - 1 && (
-                    <div
-                      className={`w-4 md:w-8 h-0.5 transition-colors ${
-                        isCompleted ? "bg-primary" : "bg-muted"
-                      }`}
-                    />
+                    <div className={`w-4 md:w-8 h-0.5 transition-colors ${
+                      isCompleted ? "bg-green-500" : "bg-muted"
+                    }`} />
                   )}
                 </div>
-              );
+              )
             })}
           </div>
           {/* Auto-save indicator */}
@@ -3861,7 +3184,11 @@ function InteractiveHouseAssessmentInner({
           )}
           {pricingStep === "addons" && renderAddOnsStep()}
           {pricingStep === "maintenance" && renderMaintenanceStep()}
-          {pricingStep === "incentives" && renderIncentivesStep()}
+          {pricingStep === "incentives" && (
+            <div className="bg-white/10 backdrop-blur-sm border-2 border-green-300 rounded-2xl p-6 md:p-8 shadow-lg">
+              {renderIncentivesStep()}
+            </div>
+          )}
           {pricingStep === "payment" && (
             <div className="bg-card/10 backdrop-blur-sm rounded-lg p-4 md:p-6 border shadow-lg">
               {renderPaymentStep()}
@@ -3875,27 +3202,24 @@ function InteractiveHouseAssessmentInner({
                   <Button
                     variant="outline"
                     onClick={async () => {
-                      const element =
-                        document.getElementById("proposal-content");
-                      if (!element) return;
+                      const element = document.getElementById("proposal-content")
+                      if (!element) return
 
                       try {
                         // Import libraries dynamically
-                        const html2canvas = (await import("html2canvas"))
-                          .default;
-                        const jsPDF = (await import("jspdf")).default;
+                        const html2canvas = (await import("html2canvas")).default
+                        const jsPDF = (await import("jspdf")).default
 
                         // Clone the element to avoid modifying the original
-                        const clone = element.cloneNode(true) as HTMLElement;
-                        clone.style.position = "absolute";
-                        clone.style.left = "-9999px";
-                        clone.style.top = "0";
-                        document.body.appendChild(clone);
+                        const clone = element.cloneNode(true) as HTMLElement
+                        clone.style.position = "absolute"
+                        clone.style.left = "-9999px"
+                        clone.style.top = "0"
+                        document.body.appendChild(clone)
 
                         // Function to convert oklch to rgba
                         const convertOklchToRgba = (element: HTMLElement) => {
-                          const computedStyle =
-                            window.getComputedStyle(element);
+                          const computedStyle = window.getComputedStyle(element)
 
                           // Convert color properties
                           const colorProps = [
@@ -3909,37 +3233,34 @@ function InteractiveHouseAssessmentInner({
                             "outlineColor",
                             "fill",
                             "stroke",
-                          ];
+                          ]
 
                           colorProps.forEach((prop) => {
-                            const value = computedStyle.getPropertyValue(prop);
+                            const value = computedStyle.getPropertyValue(prop)
                             if (value && value.includes("oklch")) {
                               // Get the computed RGB value
-                              const tempDiv = document.createElement("div");
-                              tempDiv.style.color = value;
-                              document.body.appendChild(tempDiv);
-                              const computed =
-                                window.getComputedStyle(tempDiv).color;
-                              document.body.removeChild(tempDiv);
+                              const tempDiv = document.createElement("div")
+                              tempDiv.style.color = value
+                              document.body.appendChild(tempDiv)
+                              const computed = window.getComputedStyle(tempDiv).color
+                              document.body.removeChild(tempDiv)
 
                               // Apply the computed value
-                              (element.style as any)[prop] = computed;
+                              ;(element.style as any)[prop] = computed
                             }
-                          });
+                          })
 
                           // Recursively process children
                           Array.from(element.children).forEach((child) => {
-                            convertOklchToRgba(child as HTMLElement);
-                          });
-                        };
+                            convertOklchToRgba(child as HTMLElement)
+                          })
+                        }
 
                         // Convert all oklch colors in the clone
-                        convertOklchToRgba(clone);
+                        convertOklchToRgba(clone)
 
                         // Wait a brief moment for styles to apply
-                        await new Promise((resolve) =>
-                          setTimeout(resolve, 100),
-                        );
+                        await new Promise((resolve) => setTimeout(resolve, 100))
 
                         // Capture the cloned element as canvas
                         const canvas = await html2canvas(clone, {
@@ -3949,38 +3270,34 @@ function InteractiveHouseAssessmentInner({
                           backgroundColor: "#1a1a1a",
                           foreignObjectRendering: false,
                           allowTaint: true,
-                        });
+                        })
 
                         // Remove the clone
-                        document.body.removeChild(clone);
+                        document.body.removeChild(clone)
 
                         // Convert to PDF
-                        const imgData = canvas.toDataURL("image/png");
+                        const imgData = canvas.toDataURL("image/png")
                         const pdf = new jsPDF({
                           orientation: "portrait",
                           unit: "mm",
                           format: "a4",
-                        });
+                        })
 
-                        const imgWidth = 210; // A4 width in mm
-                        const imgHeight =
-                          (canvas.height * imgWidth) / canvas.width;
+                        const imgWidth = 210 // A4 width in mm
+                        const imgHeight = (canvas.height * imgWidth) / canvas.width
 
-                        pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
-                        pdf.save("hvac-proposal.pdf");
+                        pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight)
+                        pdf.save("hvac-proposal.pdf")
                       } catch (error) {
-                        console.error("Error generating PDF:", error);
-                        alert("Failed to generate PDF. Please try again.");
+                        console.error("Error generating PDF:", error)
+                        alert("Failed to generate PDF. Please try again.")
                       }
                     }}
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Download PDF
                   </Button>
-                  <Button
-                    className="flex-1 bg-pink-500 hover:bg-pink-600"
-                    onClick={handleSendToKin}
-                  >
+                  <Button className="flex-1 bg-pink-500 hover:bg-pink-600" onClick={handleSendToKin}>
                     <Send className="w-4 h-4 mr-2" />
                     Send to Kin
                   </Button>
@@ -3994,141 +3311,107 @@ function InteractiveHouseAssessmentInner({
         {pricingStep === "review" && showProposalActions && (
           <div className="p-3 md:p-4 bg-card/15 sticky bottom-0 backdrop-blur-sm border-t z-10 relative">
             <div className="flex flex-col sm:flex-row gap-3 max-w-5xl mx-auto">
-              {paymentMethod === "leasing" &&
-                selectedFinancingOption?.provider?.toLowerCase() ===
-                  "lightreach" && (
-                  <Button
-                    variant="default"
-                    className="bg-primary"
-                    disabled={isAutoSaving || !hasSystemDesignData()}
-                    title={
-                      !hasSystemDesignData()
-                        ? (systemDesignErrorMessage() ?? undefined)
-                        : undefined
+              {paymentMethod === "leasing" && selectedFinancingOption?.provider?.toLowerCase() === "lightreach" && (
+                <Button
+                  variant="default"
+                  className="bg-primary"
+                  disabled={isAutoSaving || !hasSystemDesignData()}
+                  title={!hasSystemDesignData() ? systemDesignErrorMessage() ?? undefined : undefined}
+                  onClick={async () => {
+                    const msg = systemDesignErrorMessage()
+                    if (msg) {
+                      toast.error(msg)
+                      return
                     }
-                    onClick={async () => {
-                      const msg = systemDesignErrorMessage();
-                      if (msg) {
-                        toast.error(msg);
-                        return;
-                      }
-                      const id =
-                        proposalId ?? (await handleSendToKin()) ?? null;
-                      if (id) setShowFinanceForm(true);
-                      else if (!proposalId)
-                        toast.error("Save the proposal first, then try again.");
-                    }}
-                  >
-                    <ClipboardList className="w-4 h-4 mr-2" />
-                    {proposalId
-                      ? "Apply for Comfort Plan"
-                      : "Save & Apply for Comfort Plan"}
-                  </Button>
-                )}
+                    const id = proposalId ?? (await handleSendToKin()) ?? null
+                    if (id) setShowFinanceForm(true)
+                    else if (!proposalId) toast.error("Save the proposal first, then try again.")
+                  }}
+                >
+                  <ClipboardList className="w-4 h-4 mr-2" />
+                  {proposalId ? "Apply for Comfort Plan" : "Save & Apply for Comfort Plan"}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={async () => {
-                  const element = document.getElementById("proposal-content");
-                  if (!element) return;
+                  const element = document.getElementById("proposal-content")
+                  if (!element) return
 
                   try {
-                    const html2canvas = (await import("html2canvas")).default;
-                    const jsPDF = (await import("jspdf")).default;
+                    const html2canvas = (await import("html2canvas")).default
+                    const jsPDF = (await import("jspdf")).default
 
-                    const clone = element.cloneNode(true) as HTMLElement;
-                    clone.style.position = "absolute";
-                    clone.style.left = "-9999px";
-                    clone.style.top = "0";
-                    document.body.appendChild(clone);
+                    const clone = element.cloneNode(true) as HTMLElement
+                    clone.style.position = "absolute"
+                    clone.style.left = "-9999px"
+                    clone.style.top = "0"
+                    document.body.appendChild(clone)
 
                     const convertOklchToRgba = (element: HTMLElement) => {
-                      const computedStyle = window.getComputedStyle(element);
+                      const computedStyle = window.getComputedStyle(element)
                       const colorProps = [
-                        "color",
-                        "backgroundColor",
-                        "borderColor",
-                        "borderTopColor",
-                        "borderRightColor",
-                        "borderBottomColor",
-                        "borderLeftColor",
-                        "outlineColor",
-                        "fill",
-                        "stroke",
-                      ];
+                        "color", "backgroundColor", "borderColor",
+                        "borderTopColor", "borderRightColor", "borderBottomColor",
+                        "borderLeftColor", "outlineColor", "fill", "stroke",
+                      ]
 
                       colorProps.forEach((prop) => {
-                        const value = computedStyle.getPropertyValue(prop);
+                        const value = computedStyle.getPropertyValue(prop)
                         if (value && value.includes("oklch")) {
-                          const tempDiv = document.createElement("div");
-                          tempDiv.style.color = value;
-                          document.body.appendChild(tempDiv);
-                          const computed =
-                            window.getComputedStyle(tempDiv).color;
-                          document.body.removeChild(tempDiv);
-                          clone.style.setProperty(prop, computed, "important");
+                          const tempDiv = document.createElement("div")
+                          tempDiv.style.color = value
+                          document.body.appendChild(tempDiv)
+                          const computed = window.getComputedStyle(tempDiv).color
+                          document.body.removeChild(tempDiv)
+                          clone.style.setProperty(prop, computed, "important")
                         }
-                      });
+                      })
 
                       Array.from(clone.children).forEach((child) => {
-                        convertOklchToRgba(child as HTMLElement);
-                      });
-                    };
+                        convertOklchToRgba(child as HTMLElement)
+                      })
+                    }
 
-                    convertOklchToRgba(clone);
-                    await new Promise((resolve) => setTimeout(resolve, 500));
+                    convertOklchToRgba(clone)
+                    await new Promise((resolve) => setTimeout(resolve, 500))
 
                     const canvas = await html2canvas(clone, {
                       scale: 2,
                       useCORS: true,
                       logging: false,
-                    });
+                    })
 
-                    document.body.removeChild(clone);
+                    document.body.removeChild(clone)
 
-                    const imgData = canvas.toDataURL("image/png");
+                    const imgData = canvas.toDataURL("image/png")
                     const pdf = new jsPDF({
                       orientation: "portrait",
                       unit: "mm",
                       format: "a4",
-                    });
+                    })
 
-                    const imgWidth = 210;
-                    const pageHeight = 297;
-                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                    let heightLeft = imgHeight;
-                    let position = 0;
+                    const imgWidth = 210
+                    const pageHeight = 297
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width
+                    let heightLeft = imgHeight
+                    let position = 0
 
-                    pdf.addImage(
-                      imgData,
-                      "PNG",
-                      0,
-                      position,
-                      imgWidth,
-                      imgHeight,
-                    );
-                    heightLeft -= pageHeight;
+                    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
+                    heightLeft -= pageHeight
 
                     while (heightLeft >= 0) {
-                      position = heightLeft - imgHeight;
-                      pdf.addPage();
-                      pdf.addImage(
-                        imgData,
-                        "PNG",
-                        0,
-                        position,
-                        imgWidth,
-                        imgHeight,
-                      );
-                      heightLeft -= pageHeight;
+                      position = heightLeft - imgHeight
+                      pdf.addPage()
+                      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight)
+                      heightLeft -= pageHeight
                     }
 
-                    pdf.save(
-                      `proposal-${customerData.name || "customer"}-${new Date().toISOString().split("T")[0]}.pdf`,
-                    );
-                    toast.success("PDF downloaded successfully!");
+                    pdf.save(`proposal-${customerData.name || "customer"}-${new Date().toISOString().split("T")[0]}.pdf`)
+                    toast.success("PDF downloaded successfully!")
                   } catch (error) {
-                    console.error("Error generating PDF:", error);
-                    toast.error("Failed to generate PDF. Please try again.");
+                    console.error("Error generating PDF:", error)
+                    toast.error("Failed to generate PDF. Please try again.")
                   }
                 }}
                 className="w-full sm:w-auto"
@@ -4136,8 +3419,8 @@ function InteractiveHouseAssessmentInner({
                 <Download className="w-4 h-4 mr-2" />
                 Download PDF
               </Button>
-              <Button
-                className="flex-1 bg-pink-500 hover:bg-pink-600"
+              <Button 
+                className="flex-1 bg-pink-500 hover:bg-pink-600" 
                 onClick={handleSendToKin}
                 disabled={isAutoSaving}
               >
@@ -4158,50 +3441,45 @@ function InteractiveHouseAssessmentInner({
           </div>
         )}
       </div>
-    );
+    )
   }
 
   // Determine if all hotspots are completed
-  const allHotspotsCompleted = completedSections.size === hotspots.length;
+  const allHotspotsCompleted = completedSections.size === hotspots.length
 
   // Get missing sections for completion card
   const getMissingSections = (): string[] => {
-    const missing: string[] = [];
+    const missing: string[] = []
     const sectionLabels: Record<string, string> = {
       customer: "Customer Information",
       home: "Home Details",
       hvac: "HVAC System",
       solar: "Solar Interest",
       electrical: "Electrical Panel",
-      preferences: "Customer Preferences",
-    };
-
-    hotspots.forEach((hotspot) => {
+      preferences: "Customer Preferences"
+    }
+    
+    hotspots.forEach(hotspot => {
       if (!completedSections.has(hotspot.id)) {
-        missing.push(sectionLabels[hotspot.id] || hotspot.label);
+        missing.push(sectionLabels[hotspot.id] || hotspot.label)
       }
-    });
-
-    return missing;
-  };
+    })
+    
+    return missing
+  }
 
   // Handle hotspot click
   const handleHotspotClick = (hotspotId: string) => {
-    setActiveModal(hotspotId as HotspotType);
-  };
+    setActiveModal(hotspotId as HotspotType)
+  }
 
   // #region agent log
-  logAssessment(
-    "InteractiveHouseAssessment.tsx:render",
-    "Assessment render",
-    {
-      renderCount: assessmentRenderCountRef.current,
-      showPricing,
-      activeModal,
-      pricingStep,
-    },
-    "A",
-  );
+  logAssessment('InteractiveHouseAssessment.tsx:render', 'Assessment render', {
+    renderCount: assessmentRenderCountRef.current,
+    showPricing,
+    activeModal,
+    pricingStep,
+  }, 'A')
   // #endregion
 
   // House view with hotspots
@@ -4209,21 +3487,15 @@ function InteractiveHouseAssessmentInner({
     <div className="h-screen flex flex-col bg-background">
       {/* House image with hotspots */}
       <div className="flex-1 relative overflow-hidden max-h-[calc(100vh-80px)] md:max-h-none">
-        <Image
+        <img
           src="/house-assessment.png"
           alt="House"
-          fill
-          priority
-          sizes="100vw"
-          className="object-contain md:object-cover hidden portrait:hidden md:block"
+          className="w-full h-full object-contain md:object-cover hidden portrait:hidden md:block"
         />
-        <Image
+        <img
           src="/modern-home-portrait.png"
           alt="House"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover block portrait:block md:hidden"
+          className="w-full h-full object-cover block portrait:block md:hidden"
         />
 
         {/* Hotspots */}
@@ -4254,13 +3526,7 @@ function InteractiveHouseAssessmentInner({
         <button
           onClick={handleAdminClick}
           className="absolute opacity-0 hover:opacity-10 hover:bg-white transition-opacity cursor-default"
-          style={{
-            bottom: "8%",
-            right: "5%",
-            width: "17.5%",
-            height: "24.5%",
-            minHeight: "80px",
-          }}
+          style={{ bottom: "8%", right: "5%", width: "17.5%", height: "24.5%", minHeight: "80px" }}
           aria-label="Admin access"
         />
 
@@ -4278,13 +3544,11 @@ function InteractiveHouseAssessmentInner({
           onContinue={() => {
             if (allHotspotsCompleted) {
               if (!homeData?.squareFootage || homeData.squareFootage <= 0) {
-                toast.error(
-                  "Please enter home square footage in Home Details before going to pricing.",
-                );
-                return;
+                toast.error('Please enter home square footage in Home Details before going to pricing.')
+                return
               }
-              setShowPricing(true);
-              setShowProposalActions(true);
+              setShowPricing(true)
+              setShowProposalActions(true)
             }
           }}
           missingSections={getMissingSections()}
@@ -4300,22 +3564,16 @@ function InteractiveHouseAssessmentInner({
           onClick={() => {
             if (allHotspotsCompleted) {
               if (!homeData?.squareFootage || homeData.squareFootage <= 0) {
-                toast.error(
-                  "Please enter home square footage in Home Details before going to pricing.",
-                );
-                return;
+                toast.error('Please enter home square footage in Home Details before going to pricing.')
+                return
               }
-              setShowPricing(true);
-              setShowProposalActions(true);
+              setShowPricing(true)
+              setShowProposalActions(true)
             }
           }}
         >
-          {allHotspotsCompleted && (
-            <Check className="w-4 h-4 mr-2 text-green-500" />
-          )}
-          {allHotspotsCompleted
-            ? "Go to Pricing"
-            : `Complete ${hotspots.length - completedSections.size} more section${hotspots.length - completedSections.size !== 1 ? "s" : ""}`}
+          {allHotspotsCompleted && <Check className="w-4 h-4 mr-2 text-green-500" />}
+          {allHotspotsCompleted ? "Go to Pricing" : `Complete ${hotspots.length - completedSections.size} more section${hotspots.length - completedSections.size !== 1 ? 's' : ''}`}
           <ChevronRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
@@ -4325,14 +3583,12 @@ function InteractiveHouseAssessmentInner({
         <Dialog
           open={true}
           onOpenChange={(open) => {
-            if (!open) setActiveModal(null);
+            if (!open) setActiveModal(null)
           }}
         >
           <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
             <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">
-                {getModalTitle(activeModal)}
-              </DialogTitle>
+              <DialogTitle className="text-lg sm:text-xl">{getModalTitle(activeModal)}</DialogTitle>
             </DialogHeader>
             <div className="max-h-[calc(90vh-100px)] overflow-y-auto">
               {renderModalContent()}
@@ -4354,13 +3610,9 @@ function InteractiveHouseAssessmentInner({
                   : "border-border hover:border-primary"
               }`}
             >
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  completedSections.has(hotspot.id)
-                    ? "bg-green-500"
-                    : "bg-primary"
-                }`}
-              >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                completedSections.has(hotspot.id) ? "bg-green-500" : "bg-primary"
+              }`}>
                 {completedSections.has(hotspot.id) ? (
                   <Check className="w-5 h-5 text-white" />
                 ) : (
@@ -4380,64 +3632,42 @@ function InteractiveHouseAssessmentInner({
       </div>
 
       {/* Finance Application Form Dialog. Only mount when open to avoid Radix onOpenChange-during-render loop. */}
-      {proposalId &&
-        selectedFinancingOption?.provider?.toLowerCase() === "lightreach" &&
-        showFinanceForm && (
-          <Dialog
-            open={true}
-            onOpenChange={(open) => {
-              if (!open) setShowFinanceForm(false);
-            }}
-          >
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  Submit Comfort Plan Finance Application
-                </DialogTitle>
-              </DialogHeader>
-              <FinanceApplicationForm
-                proposalId={proposalId}
-                systemPrice={(() => {
-                  const equipmentPrice = selectedEquipment?.price || 0;
-                  const addOnsPrice = addOns
-                    .filter((a) => a.selected)
-                    .reduce((sum, a) => sum + getCustomerPrice(a.price), 0);
-                  const maintenancePrice = selectedPlan
-                    ? getCustomerPrice(getPlanSalesPrice(selectedPlan))
-                    : 0;
-                  const incentivesTotal = selectedIncentives.reduce(
-                    (sum, i) => sum + i.amount,
-                    0,
-                  );
-                  return (
-                    equipmentPrice +
-                    addOnsPrice +
-                    maintenancePrice -
-                    incentivesTotal
-                  );
-                })()}
-                initialData={{
-                  firstName: customerData.name?.split(" ")[0] || "",
-                  lastName:
-                    customerData.name?.split(" ").slice(1).join(" ") || "",
-                  email: customerData.email || "",
-                  phone: customerData.phone || "",
-                  address: customerData.address || "",
-                  city: customerData.city || "",
-                  state: customerData.state || "",
-                  zip: customerData.zip || "",
-                }}
-                onSuccess={(applicationId) => {
-                  setShowFinanceForm(false);
-                  setSelectedFinanceApplicationId(applicationId);
-                }}
-                onCancel={() => setShowFinanceForm(false)}
-              />
-            </DialogContent>
-          </Dialog>
-        )}
+      {proposalId && selectedFinancingOption?.provider?.toLowerCase() === "lightreach" && showFinanceForm && (
+        <Dialog open={true} onOpenChange={(open) => { if (!open) setShowFinanceForm(false) }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Submit Comfort Plan Finance Application</DialogTitle>
+            </DialogHeader>
+            <FinanceApplicationForm
+              proposalId={proposalId}
+              systemPrice={(() => {
+                const equipmentPrice = selectedEquipment?.price || 0
+                const addOnsPrice = addOns.filter((a) => a.selected).reduce((sum, a) => sum + getCustomerPrice(a.price), 0)
+                const maintenancePrice = selectedPlan ? getCustomerPrice(getPlanSalesPrice(selectedPlan)) : 0
+                const incentivesTotal = selectedIncentives.reduce((sum, i) => sum + i.amount, 0)
+                return equipmentPrice + addOnsPrice + maintenancePrice - incentivesTotal
+              })()}
+              initialData={{
+                firstName: customerData.name?.split(' ')[0] || '',
+                lastName: customerData.name?.split(' ').slice(1).join(' ') || '',
+                email: customerData.email || '',
+                phone: customerData.phone || '',
+                address: customerData.address || '',
+                city: customerData.city || '',
+                state: customerData.state || '',
+                zip: customerData.zip || '',
+              }}
+              onSuccess={(applicationId) => {
+                setShowFinanceForm(false)
+                setSelectedFinanceApplicationId(applicationId)
+              }}
+              onCancel={() => setShowFinanceForm(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
-  );
+  )
 }
 
-export const InteractiveHouseAssessment = memo(InteractiveHouseAssessmentInner);
+export const InteractiveHouseAssessment = memo(InteractiveHouseAssessmentInner)
