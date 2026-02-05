@@ -623,6 +623,7 @@ export function FinanceApplicationForm({
                 onAcceptanceChange={handleDisclosureChange}
                 language="English"
                 disabled={isSubmitting}
+                customerState={formData.state}
               />
             </div>
           )}
