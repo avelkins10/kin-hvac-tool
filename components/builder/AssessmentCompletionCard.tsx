@@ -1,28 +1,34 @@
-"use client"
+"use client";
 
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Check, ChevronRight, AlertCircle } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Check, ChevronRight, AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface AssessmentCompletionCardProps {
-  completedSections: Set<string>
-  totalSections: number
-  onContinue: () => void
-  missingSections?: string[]
+  completedSections: Set<string>;
+  totalSections: number;
+  onContinue: () => void;
+  missingSections?: string[];
 }
 
 export function AssessmentCompletionCard({
   completedSections,
   totalSections,
   onContinue,
-  missingSections = []
+  missingSections = [],
 }: AssessmentCompletionCardProps) {
-  const allCompleted = completedSections.size === totalSections
-  const completionPercentage = (completedSections.size / totalSections) * 100
+  const allCompleted = completedSections.size === totalSections;
+  const completionPercentage = (completedSections.size / totalSections) * 100;
 
   return (
-    <Card className="fixed bottom-4 right-4 z-50 shadow-xl border-2 max-w-sm animate-in slide-in-from-bottom-5">
+    <Card className="fixed bottom-4 right-4 z-50 shadow-2xl border-2 max-w-md animate-in slide-in-from-bottom-5">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           {allCompleted ? (
@@ -42,22 +48,22 @@ export function AssessmentCompletionCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="w-full bg-gray-200 rounded-full h-3">
           <div
             className={cn(
-              "h-2 rounded-full transition-all duration-500",
-              allCompleted ? "bg-green-600" : "bg-amber-500"
+              "h-3 rounded-full transition-all duration-500",
+              allCompleted ? "bg-green-600" : "bg-amber-500",
             )}
             style={{ width: `${completionPercentage}%` }}
           />
         </div>
 
         {!allCompleted && missingSections.length > 0 && (
-          <div className="text-sm text-gray-600">
+          <div className="text-base text-gray-700 dark:text-gray-300">
             <p className="font-medium mb-1">Still need to complete:</p>
             <ul className="list-disc list-inside space-y-1">
               {missingSections.map((section) => (
-                <li key={section} className="text-xs">
+                <li key={section} className="text-sm">
                   {section}
                 </li>
               ))}
@@ -70,7 +76,7 @@ export function AssessmentCompletionCard({
           disabled={!allCompleted}
           className={cn(
             "w-full",
-            allCompleted && "bg-green-600 hover:bg-green-700"
+            allCompleted && "bg-green-600 hover:bg-green-700",
           )}
         >
           {allCompleted ? (
@@ -84,5 +90,5 @@ export function AssessmentCompletionCard({
         </Button>
       </CardContent>
     </Card>
-  )
+  );
 }

@@ -2963,7 +2963,7 @@ function InteractiveHouseAssessmentInner({
     const recommendationReason = getRecommendationReason();
 
     return (
-      <div className="bg-card/10 backdrop-blur-sm rounded-lg p-4 md:p-6 border shadow-lg">
+      <div className="bg-card/80 backdrop-blur-md rounded-lg p-4 md:p-6 border shadow-lg">
         {/* Header with help */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
@@ -2972,7 +2972,7 @@ function InteractiveHouseAssessmentInner({
           </div>
           {recommendedTier && (
             <div className="p-3 bg-green-50 border border-green-200 rounded-lg mb-4">
-              <p className="text-sm text-green-800">
+              <p className="text-base text-green-800">
                 <strong>Recommendation:</strong> Based on {recommendationReason}
                 , we recommend the{" "}
                 <strong>
@@ -3005,21 +3005,21 @@ function InteractiveHouseAssessmentInner({
                 }}
                 className={`p-4 md:p-6 rounded-xl border-2 text-left transition-all relative cursor-pointer ${
                   selectedEquipment?.tier === tier.tier
-                    ? "border-primary bg-primary/5"
+                    ? "border-primary bg-primary/20 ring-2 ring-primary/40"
                     : tier.recommended
                       ? "border-green-500 bg-green-50 dark:bg-green-950/20"
                       : "border-border hover:border-primary/50"
                 }`}
               >
                 {tier.recommended && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-500 text-white text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap shadow-lg">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-green-500 text-white text-sm font-bold px-4 py-1.5 rounded-full whitespace-nowrap shadow-lg">
                     ⭐ Recommended for You
                   </div>
                 )}
 
                 <div className="flex items-center justify-between mb-3">
                   <span
-                    className={`text-xs font-medium px-2 py-1 rounded ${
+                    className={`text-sm font-semibold px-3 py-1 rounded ${
                       tier.tier === "best"
                         ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
                         : tier.tier === "better"
@@ -3042,7 +3042,7 @@ function InteractiveHouseAssessmentInner({
                   {formatCurrency(tier.price)}
                 </p>
                 <div className="flex items-center gap-2 mb-3">
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-base text-muted-foreground">
                     {tier.seer} SEER Rating
                   </p>
                   <span
@@ -3057,8 +3057,8 @@ function InteractiveHouseAssessmentInner({
 
                 <ul className="space-y-1">
                   {tier.features.map((feature, i) => (
-                    <li key={i} className="text-sm flex items-start gap-2">
-                      <Check className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                    <li key={i} className="text-base flex items-start gap-2">
+                      <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -3066,7 +3066,7 @@ function InteractiveHouseAssessmentInner({
 
                 {tier.seer >= 16 && (
                   <div className="mt-3 pt-3 border-t border-border">
-                    <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                    <p className="text-sm text-green-600 dark:text-green-400 font-medium">
                       Save up to {Math.round(((tier.seer - 14) / 14) * 30)}% on
                       cooling costs
                     </p>
@@ -3081,10 +3081,10 @@ function InteractiveHouseAssessmentInner({
             <div className="flex items-start gap-3">
               <Sun className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
               <div>
-                <h4 className="font-semibold text-sm mb-1">
+                <h4 className="font-semibold text-base mb-1">
                   Solar Integration Benefits
                 </h4>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   {solarData.hasSolarInstalled
                     ? "Your existing solar system pairs perfectly with high-efficiency HVAC. Higher SEER ratings maximize your solar investment."
                     : "Planning solar? Higher efficiency HVAC systems reduce your overall energy needs, allowing for a smaller solar system and faster payback."}
@@ -3099,10 +3099,10 @@ function InteractiveHouseAssessmentInner({
 
   // Render add-ons step
   const renderAddOnsStep = () => (
-    <div className="bg-card/10 backdrop-blur-sm rounded-lg p-4 md:p-6 border shadow-lg">
+    <div className="bg-card/80 backdrop-blur-md rounded-lg p-4 md:p-6 border shadow-lg">
       <div className="mb-6">
         <h2 className="text-2xl font-bold">Enhance Your System</h2>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-base text-muted-foreground mt-1">
           Choose any add-ons to include with your installation.
         </p>
       </div>
@@ -3111,10 +3111,10 @@ function InteractiveHouseAssessmentInner({
           <button
             key={addOn.id}
             onClick={() => toggleAddOn(addOn.id)}
-            className={`p-4 rounded-lg border-2 text-left transition-all bg-card/10 backdrop-blur-sm ${
+            className={`p-4 rounded-lg border-2 text-left transition-all ${
               addOn.selected
-                ? "border-green-500 bg-green-500/10"
-                : "border-border hover:border-green-300"
+                ? "border-green-500 bg-green-600/90 shadow-lg shadow-green-900/20"
+                : "bg-card/60 border-border hover:border-green-300"
             }`}
           >
             <div className="flex items-start justify-between mb-2">
@@ -3123,15 +3123,15 @@ function InteractiveHouseAssessmentInner({
               >
                 {addOn.name}
               </h3>
-              {addOn.selected && <Check className="w-5 h-5 text-green-500" />}
+              {addOn.selected && <Check className="w-5 h-5 text-white" />}
             </div>
             <p
-              className={`text-sm mb-2 ${addOn.selected ? "text-gray-200" : "text-muted-foreground"}`}
+              className={`text-base mb-2 ${addOn.selected ? "text-green-50" : "text-muted-foreground"}`}
             >
               {addOn.description}
             </p>
             <p
-              className={`text-lg font-bold ${addOn.selected ? "text-green-400" : "text-primary"}`}
+              className={`text-xl font-bold ${addOn.selected ? "text-white" : "text-primary"}`}
             >
               {formatCurrency(getCustomerPrice(addOn.price))}
             </p>
@@ -3143,10 +3143,10 @@ function InteractiveHouseAssessmentInner({
 
   // Render maintenance step
   const renderMaintenanceStep = () => (
-    <div className="bg-card/10 backdrop-blur-sm rounded-lg p-4 md:p-6 border shadow-lg">
+    <div className="bg-card/80 backdrop-blur-md rounded-lg p-4 md:p-6 border shadow-lg">
       <div className="mb-6">
         <h2 className="text-2xl font-bold">Choose a Maintenance Plan</h2>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-base text-muted-foreground mt-1">
           Protect your investment with scheduled professional maintenance.
         </p>
       </div>
@@ -3163,15 +3163,15 @@ function InteractiveHouseAssessmentInner({
             <button
               key={plan.id}
               onClick={() => setSelectedPlan(plan)}
-              className={`p-4 md:p-6 rounded-xl border-2 text-left transition-all bg-card/10 backdrop-blur-sm ${
+              className={`p-4 md:p-6 rounded-xl border-2 text-left transition-all ${
                 isSelected
-                  ? "border-primary bg-primary/10"
-                  : "border-border hover:border-primary/50"
+                  ? "border-primary bg-slate-800 ring-2 ring-primary/50 shadow-lg"
+                  : "bg-card/60 border-border hover:border-primary/50"
               }`}
             >
               <div className="flex items-center justify-between mb-3">
                 <span
-                  className={`text-xs font-medium px-2 py-1 rounded ${
+                  className={`text-sm font-semibold px-3 py-1 rounded ${
                     plan.tier === "premium"
                       ? "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200"
                       : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200"
@@ -3199,7 +3199,7 @@ function InteractiveHouseAssessmentInner({
                   or {formatCurrency(customerMonthlyPrice)}/month
                 </p>
                 <p
-                  className={`text-xs mt-1 ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
+                  className={`text-sm mt-1 ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
                 >
                   {plan.visitsPerYear} visits per year
                 </p>
@@ -3209,15 +3209,15 @@ function InteractiveHouseAssessmentInner({
                 {plan.features.slice(0, 5).map((feature, i) => (
                   <li
                     key={i}
-                    className={`text-sm flex items-start gap-2 ${isSelected ? "text-gray-200" : ""}`}
+                    className={`text-base flex items-start gap-2 ${isSelected ? "text-gray-200" : ""}`}
                   >
-                    <Check className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
+                    <Check className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                     <span>{feature}</span>
                   </li>
                 ))}
                 {plan.features.length > 5 && (
                   <li
-                    className={`text-sm ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
+                    className={`text-base ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
                   >
                     +{plan.features.length - 5} more...
                   </li>
@@ -3232,12 +3232,12 @@ function InteractiveHouseAssessmentInner({
 
   // Render incentives step
   const renderIncentivesStep = () => (
-    <div className="bg-white/10 backdrop-blur-sm border-2 border-green-300 rounded-2xl p-6 md:p-8 shadow-lg">
+    <div className="bg-card/80 backdrop-blur-md border-2 border-green-400 rounded-2xl p-6 md:p-8 shadow-lg">
       <div className="mb-6">
         <h2 className="text-2xl font-bold">
           Available Savings &amp; Incentives
         </h2>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-base text-muted-foreground mt-1">
           Select the incentives that apply to your situation.
         </p>
       </div>
@@ -3254,16 +3254,20 @@ function InteractiveHouseAssessmentInner({
                 onClick={() => toggleIncentive(incentive)}
                 className={`w-full p-4 md:p-6 rounded-xl border-2 text-left transition-all ${
                   isSelected
-                    ? "border-green-500 bg-green-50"
-                    : "border-border hover:border-green-300"
+                    ? "border-green-500 bg-green-600/90 shadow-lg shadow-green-900/20"
+                    : "bg-card/60 border-border hover:border-green-300"
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold">{incentive.name}</h3>
+                      <h3
+                        className={`font-semibold ${isSelected ? "text-white" : ""}`}
+                      >
+                        {incentive.name}
+                      </h3>
                       <span
-                        className={`text-xs px-2 py-0.5 rounded ${
+                        className={`text-sm font-semibold px-3 py-1 rounded ${
                           incentive.type === "tax_credit"
                             ? "bg-blue-100 text-blue-800"
                             : incentive.type === "rebate"
@@ -3278,27 +3282,33 @@ function InteractiveHouseAssessmentInner({
                             : "Discount"}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-3">
+                    <p
+                      className={`text-base mb-3 ${isSelected ? "text-green-50" : "text-muted-foreground"}`}
+                    >
                       {incentive.description}
                     </p>
                     <div className="space-y-1">
                       {incentive.requirements.map((req, i) => (
                         <p
                           key={i}
-                          className="text-xs text-muted-foreground flex items-center gap-1"
+                          className={`text-sm flex items-center gap-1 ${isSelected ? "text-green-100" : "text-muted-foreground"}`}
                         >
-                          <span className="w-1 h-1 rounded-full bg-muted-foreground" />
+                          <span
+                            className={`w-1 h-1 rounded-full ${isSelected ? "bg-green-200" : "bg-muted-foreground"}`}
+                          />
                           {req}
                         </p>
                       ))}
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-xl font-bold text-green-600">
+                    <p
+                      className={`text-xl font-bold ${isSelected ? "text-white" : "text-green-600"}`}
+                    >
                       -{formatCurrency(incentive.amount)}
                     </p>
                     {isSelected && (
-                      <Check className="w-5 h-5 text-green-500 ml-auto mt-1" />
+                      <Check className="w-5 h-5 text-white ml-auto mt-1" />
                     )}
                   </div>
                 </div>
@@ -3337,10 +3347,10 @@ function InteractiveHouseAssessmentInner({
       incentivesTotal;
 
     return (
-      <div className="bg-card/10 backdrop-blur-sm rounded-lg p-4 md:p-6 border shadow-lg">
+      <div className="bg-card/80 backdrop-blur-md rounded-lg p-4 md:p-6 border shadow-lg">
         <div className="mb-6">
           <h2 className="text-2xl font-bold">Choose Your Payment Option</h2>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-base text-muted-foreground mt-1">
             Select how you&apos;d like to pay for your new system.
           </p>
         </div>
@@ -3377,7 +3387,7 @@ function InteractiveHouseAssessmentInner({
               <p className="text-3xl font-bold text-primary mb-2">
                 {formatCurrency(totalCustomerPrice)}
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-base text-muted-foreground">
                 One-time payment - own your system outright
               </p>
             </div>
@@ -3387,7 +3397,7 @@ function InteractiveHouseAssessmentInner({
         {/* Financing Options */}
         {paymentMethod === "financing" && financingOptions && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground mb-3">
+            <p className="text-base text-muted-foreground mb-3">
               Select a financing term below. Monthly payments are based on
               system price of {formatCurrency(totalCustomerPrice)}
             </p>
@@ -3405,8 +3415,8 @@ function InteractiveHouseAssessmentInner({
                     onClick={() => setSelectedFinancingOption(option)}
                     className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
                       isSelected
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:border-primary/50"
+                        ? "border-primary bg-slate-800 ring-2 ring-primary/50 shadow-lg"
+                        : "bg-card/60 border-border hover:border-primary/50"
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -3436,7 +3446,7 @@ function InteractiveHouseAssessmentInner({
                     </p>
                     {option.apr > 0 && (
                       <p
-                        className={`text-xs mt-1 ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
+                        className={`text-sm mt-1 ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
                       >
                         {option.apr}% APR
                       </p>
@@ -3450,7 +3460,7 @@ function InteractiveHouseAssessmentInner({
         {/* Leasing Options */}
         {paymentMethod === "leasing" && financingOptions && (
           <div className="space-y-6">
-            <p className="text-sm text-muted-foreground mb-3">
+            <p className="text-base text-muted-foreground mb-3">
               Select a lease term below. Monthly payments are based on system
               price of {formatCurrency(totalCustomerPrice)}
             </p>
@@ -3532,8 +3542,8 @@ function InteractiveHouseAssessmentInner({
                             onClick={() => setSelectedFinancingOption(option)}
                             className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
                               isSelected
-                                ? "border-primary bg-primary/10"
-                                : "border-border hover:border-primary/50"
+                                ? "border-primary bg-slate-800 ring-2 ring-primary/50 shadow-lg"
+                                : "bg-card/60 border-border hover:border-primary/50"
                             }`}
                           >
                             <div className="flex items-center justify-between mb-2">
@@ -3547,7 +3557,7 @@ function InteractiveHouseAssessmentInner({
                                     : `${escalator} Escalator`}
                                 </h3>
                                 <span
-                                  className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+                                  className={`inline-block mt-1 text-sm font-medium px-2 py-0.5 rounded-full ${
                                     escalator === "0%"
                                       ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200"
                                       : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200"
@@ -3576,13 +3586,13 @@ function InteractiveHouseAssessmentInner({
                             </div>
                             {escalator === "0%" ? (
                               <p
-                                className={`text-xs ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
+                                className={`text-sm ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
                               >
                                 Predictable payments – no annual increases
                               </p>
                             ) : (
                               <p
-                                className={`text-xs ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
+                                className={`text-sm ${isSelected ? "text-gray-300" : "text-muted-foreground"}`}
                               >
                                 Year 1, increases {escalator} annually
                               </p>
@@ -3675,7 +3685,7 @@ function InteractiveHouseAssessmentInner({
 
     return (
       <div
-        className="bg-card/10 backdrop-blur-sm rounded-lg p-6 md:p-10 shadow-2xl max-w-5xl mx-auto space-y-8"
+        className="bg-card/80 backdrop-blur-md rounded-lg p-6 md:p-10 shadow-2xl max-w-5xl mx-auto space-y-8"
         id="proposal-content"
         style={{
           backgroundImage: "url(/proposal-background.jpg)",
@@ -3704,7 +3714,7 @@ function InteractiveHouseAssessmentInner({
         </div>
 
         {/* Equipment Details with Edit */}
-        <div className="bg-card/10 backdrop-blur-sm border-2 border-primary/20 rounded-2xl p-6 md:p-8 shadow-lg relative group">
+        <div className="bg-card/80 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-6 md:p-8 shadow-lg relative group">
           <Button
             variant="ghost"
             size="sm"
@@ -3757,7 +3767,7 @@ function InteractiveHouseAssessmentInner({
               {selectedEquipment?.features.map((feature, idx) => (
                 <li
                   key={idx}
-                  className="flex items-start gap-2 text-sm text-gray-300"
+                  className="flex items-start gap-2 text-base text-gray-200"
                 >
                   <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                   <span>{feature}</span>
@@ -3769,7 +3779,7 @@ function InteractiveHouseAssessmentInner({
 
         {/* Add-ons */}
         {addOns.some((a) => a.selected) && (
-          <div className="bg-card/10 backdrop-blur-sm border-2 border-blue-200 rounded-2xl p-6 md:p-8 shadow-lg">
+          <div className="bg-card/80 backdrop-blur-md border-2 border-blue-200 rounded-2xl p-6 md:p-8 shadow-lg">
             <div className="flex items-center gap-3 mb-6">
               <Sparkles className="w-7 h-7 text-blue-600" />
               <h3 className="text-2xl font-bold text-white">Premium Add-Ons</h3>
@@ -3794,7 +3804,7 @@ function InteractiveHouseAssessmentInner({
                           {formatCurrency(getCustomerPrice(addon.price))}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-300 leading-relaxed">
+                      <p className="text-base text-gray-200 leading-relaxed">
                         {getAddonDescription(addon.name)}
                       </p>
                     </div>
@@ -3806,7 +3816,7 @@ function InteractiveHouseAssessmentInner({
 
         {/* Maintenance Plan - Show service details instead of cost */}
         {selectedPlan && (
-          <div className="bg-card/10 backdrop-blur-sm border-2 border-purple-200 rounded-2xl p-6 md:p-8 shadow-lg">
+          <div className="bg-card/80 backdrop-blur-md border-2 border-purple-200 rounded-2xl p-6 md:p-8 shadow-lg">
             <div className="flex items-center gap-3 mb-6">
               <Shield className="w-7 h-7 text-purple-600" />
               <h3 className="text-2xl font-bold text-white">
@@ -3853,7 +3863,7 @@ function InteractiveHouseAssessmentInner({
                 {selectedPlan.features.map((feature, idx) => (
                   <li
                     key={idx}
-                    className="flex items-start gap-2 text-sm text-gray-300"
+                    className="flex items-start gap-2 text-base text-gray-200"
                   >
                     <Check className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
                     <span>{feature}</span>
@@ -3873,10 +3883,10 @@ function InteractiveHouseAssessmentInner({
 
         {/* Incentives */}
         {selectedIncentives.length > 0 && (
-          <div className="bg-white/10 backdrop-blur-sm border-2 border-green-300 rounded-2xl p-6 md:p-8 shadow-lg">
+          <div className="bg-card/80 backdrop-blur-md border-2 border-green-300 rounded-2xl p-6 md:p-8 shadow-lg">
             <div className="flex items-center gap-3 mb-6">
-              <DollarSign className="w-7 h-7 text-green-700" />
-              <h3 className="text-2xl font-bold text-green-900">
+              <DollarSign className="w-7 h-7 text-green-400" />
+              <h3 className="text-2xl font-bold text-green-400">
                 Your Savings & Incentives
               </h3>
             </div>
@@ -3884,17 +3894,17 @@ function InteractiveHouseAssessmentInner({
               {selectedIncentives.map((incentive) => (
                 <div
                   key={incentive.id}
-                  className="flex justify-between items-center bg-white/70 rounded-lg p-4"
+                  className="flex justify-between items-center bg-slate-800/90 rounded-lg p-4"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-green-200 flex items-center justify-center">
-                      <Check className="w-6 h-6 text-green-700" />
+                    <div className="w-10 h-10 rounded-full bg-green-600 flex items-center justify-center">
+                      <Check className="w-6 h-6 text-white" />
                     </div>
                     <span className="font-medium text-lg text-white">
                       {incentive.name}
                     </span>
                   </div>
-                  <span className="text-2xl font-bold text-green-700">
+                  <span className="text-2xl font-bold text-green-400">
                     -{formatCurrency(incentive.amount)}
                   </span>
                 </div>
@@ -3930,7 +3940,7 @@ function InteractiveHouseAssessmentInner({
           </div>
 
           <div className="mt-8 pt-6 border-t border-slate-700 text-center">
-            <p className="text-slate-300 text-sm">
+            <p className="text-slate-300 text-base">
               Professional installation by certified technicians • Full warranty
               coverage • Satisfaction guaranteed
             </p>
@@ -3941,7 +3951,7 @@ function InteractiveHouseAssessmentInner({
         {selectedFinanceApplicationId &&
           paymentMethod === "leasing" &&
           selectedFinancingOption?.provider?.toLowerCase() === "lightreach" && (
-            <div className="bg-card/10 backdrop-blur-sm border-2 border-primary/20 rounded-2xl p-6 md:p-8 shadow-lg">
+            <div className="bg-card/80 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-6 md:p-8 shadow-lg">
               <FinanceApplicationStatus
                 applicationId={selectedFinanceApplicationId}
                 autoRefresh
@@ -3982,7 +3992,7 @@ function InteractiveHouseAssessmentInner({
       >
         {/* Progress bar with clickable steps */}
         <div className="p-3 border-b bg-card/40 backdrop-blur-sm">
-          <div className="flex items-center justify-center gap-2 text-xs">
+          <div className="flex items-center justify-center gap-3 text-sm">
             {pricingSteps.map((step, i) => {
               const currentIndex = pricingSteps.indexOf(pricingStep);
               const isActive = step === pricingStep;
@@ -3995,7 +4005,7 @@ function InteractiveHouseAssessmentInner({
                   <button
                     onClick={() => canClick && goToStep(step)}
                     disabled={!canClick}
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all ${
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
                       isActive
                         ? "bg-primary text-primary-foreground scale-110"
                         : isCompleted
@@ -4006,11 +4016,11 @@ function InteractiveHouseAssessmentInner({
                     }`}
                     title={stepLabels[step]}
                   >
-                    {isCompleted ? <Check className="w-3 h-3" /> : i + 1}
+                    {isCompleted ? <Check className="w-4 h-4" /> : i + 1}
                   </button>
                   {i < pricingSteps.length - 1 && (
                     <div
-                      className={`w-4 md:w-8 h-0.5 transition-colors ${
+                      className={`w-6 md:w-10 h-1 transition-colors ${
                         isCompleted ? "bg-green-500" : "bg-muted"
                       }`}
                     />
@@ -4427,6 +4437,9 @@ function InteractiveHouseAssessmentInner({
                 hotspot.icon
               )}
             </button>
+            <span className="block text-center text-xs md:text-sm font-semibold text-white mt-1 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] pointer-events-none whitespace-nowrap">
+              {hotspot.label}
+            </span>
           </div>
         ))}
 
@@ -4444,7 +4457,7 @@ function InteractiveHouseAssessmentInner({
         />
 
         {/* Progress indicator */}
-        <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm z-10">
+        <div className="absolute top-4 right-4 bg-black/70 text-white px-4 py-2 rounded-full text-base font-semibold shadow-lg z-10">
           {completedSections.size}/{hotspots.length} complete
         </div>
       </div>
@@ -4473,7 +4486,7 @@ function InteractiveHouseAssessmentInner({
       {/* Bottom bar with Go to Pricing button - Mobile optimized */}
       <div className="p-3 md:p-4 bg-card/95 sticky bottom-0 backdrop-blur-sm border-t">
         <Button
-          className={`w-full transition-all ${!allHotspotsCompleted ? "opacity-50 cursor-not-allowed" : ""}`}
+          className={`w-full transition-all text-base font-semibold ${!allHotspotsCompleted ? "opacity-70 cursor-not-allowed" : ""}`}
           size="lg"
           disabled={!allHotspotsCompleted}
           onClick={() => {
@@ -4507,9 +4520,9 @@ function InteractiveHouseAssessmentInner({
             if (!open) setActiveModal(null);
           }}
         >
-          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
             <DialogHeader>
-              <DialogTitle className="text-lg sm:text-xl">
+              <DialogTitle className="text-xl sm:text-2xl">
                 {getModalTitle(activeModal)}
               </DialogTitle>
             </DialogHeader>
