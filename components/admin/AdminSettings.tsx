@@ -1,20 +1,20 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Switch } from "@/components/ui/switch"
-import { Slider } from "@/components/ui/slider"
-import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
-import { PriceBookProvider } from "@/src/contexts/PriceBookContext"
-import { MaintenanceProvider } from "@/src/contexts/MaintenanceContext"
-import { IncentivesProvider } from "@/src/contexts/IncentivesContext"
-import { usePriceBook } from "@/src/contexts/PriceBookContext"
-import { useRouter } from "next/navigation"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { PriceBookProvider } from "@/src/contexts/PriceBookContext";
+import { MaintenanceProvider } from "@/src/contexts/MaintenanceContext";
+import { IncentivesProvider } from "@/src/contexts/IncentivesContext";
+import { usePriceBook } from "@/src/contexts/PriceBookContext";
+import { useRouter } from "next/navigation";
 import {
   Plus,
   Trash2,
@@ -33,39 +33,40 @@ import {
   Eye,
   Building2,
   Users,
-} from "lucide-react"
-import { toast } from "sonner"
-import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbPage } from "@/components/ui/breadcrumb"
-import { CompanySettings } from "./CompanySettings"
-import { HVACSystemsManager } from "./HVACSystemsManager"
-import { AddOnsManager } from "./AddOnsManager"
-import { MaintenancePlansManager } from "./MaintenancePlansManager"
-import { IncentivesManager } from "./IncentivesManager"
-import { FinancingOptionsManager } from "./FinancingOptionsManager"
-import { PriceBookManager } from "./PriceBookManager"
-import { APIRoutesManager } from "./APIRoutesManager"
+} from "lucide-react";
+import { toast } from "sonner";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbPage,
+} from "@/components/ui/breadcrumb";
+import { CompanySettings } from "./CompanySettings";
+import { HVACSystemsManager } from "./HVACSystemsManager";
+import { AddOnsManager } from "./AddOnsManager";
+import { MaintenancePlansManager } from "./MaintenancePlansManager";
+import { IncentivesManager } from "./IncentivesManager";
+import { FinancingOptionsManager } from "./FinancingOptionsManager";
+import { PriceBookManager } from "./PriceBookManager";
+import { APIRoutesManager } from "./APIRoutesManager";
 
-function AdminSettingsContent() {
-  const router = useRouter()
-  const {
-    priceBook,
-    updateSettings,
-    refreshPriceBook,
-  } = usePriceBook()
+export function AdminSettingsContent() {
+  const router = useRouter();
+  const { priceBook, updateSettings, refreshPriceBook } = usePriceBook();
 
-  const [activeTab, setActiveTab] = useState("company")
-  const [priceBookSubTab, setPriceBookSubTab] = useState("units")
+  const [activeTab, setActiveTab] = useState("company");
+  const [priceBookSubTab, setPriceBookSubTab] = useState("units");
 
   // Export all data
   const handleExport = () => {
     // This would export all admin data
-    toast.info("Export functionality coming soon")
-  }
+    toast.info("Export functionality coming soon");
+  };
 
   // Import data
   const handleImport = () => {
-    toast.info("Import functionality coming soon")
-  }
+    toast.info("Import functionality coming soon");
+  };
 
   return (
     <div className="container mx-auto px-6 py-8">
@@ -82,7 +83,9 @@ function AdminSettingsContent() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Admin Settings</h1>
-            <p className="text-gray-500 mt-1">Manage company configuration, pricing, and system settings</p>
+            <p className="text-gray-500 mt-1">
+              Manage company configuration, pricing, and system settings
+            </p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleExport}>
@@ -108,7 +111,9 @@ function AdminSettingsContent() {
               </div>
               <div>
                 <h3 className="font-semibold">Margin Visibility</h3>
-                <p className="text-sm text-gray-500">Show margins in proposals</p>
+                <p className="text-sm text-gray-500">
+                  Show margins in proposals
+                </p>
               </div>
             </div>
             <Switch
@@ -127,14 +132,18 @@ function AdminSettingsContent() {
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold">Cash Price Markup</h3>
-                <p className="text-sm text-gray-500">Default markup percentage</p>
+                <p className="text-sm text-gray-500">
+                  Default markup percentage
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-4">
               <Input
                 type="number"
                 value={priceBook.settings.cashMarkup}
-                onChange={(e) => updateSettings({ cashMarkup: Number(e.target.value) })}
+                onChange={(e) =>
+                  updateSettings({ cashMarkup: Number(e.target.value) })
+                }
                 className="w-20 text-center"
               />
               <span className="text-sm text-gray-500">%</span>
@@ -195,8 +204,8 @@ function AdminSettingsContent() {
 
         {/* Price Book Tab */}
         <TabsContent value="pricebook" className="mt-6">
-          <PriceBookManager 
-            activeSubTab={priceBookSubTab} 
+          <PriceBookManager
+            activeSubTab={priceBookSubTab}
             onSubTabChange={setPriceBookSubTab}
           />
         </TabsContent>
@@ -232,7 +241,7 @@ function AdminSettingsContent() {
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }
 
 export function AdminSettings() {
@@ -244,5 +253,5 @@ export function AdminSettings() {
         </IncentivesProvider>
       </MaintenanceProvider>
     </PriceBookProvider>
-  )
+  );
 }
