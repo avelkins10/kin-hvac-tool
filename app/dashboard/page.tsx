@@ -1,53 +1,60 @@
-import { requireAuth } from '@/lib/auth-helpers'
-import { prisma } from '@/lib/db'
-import { MetricCard } from '@/components/dashboard/MetricCard'
-import { OutcomesSummary } from '@/components/dashboard/OutcomesSummary'
-import { RecentProposals } from '@/components/dashboard/RecentProposals'
-import { QuickStats } from '@/components/dashboard/QuickStats'
-import { QuickActions } from '@/components/dashboard/QuickActions'
-import { NavCard } from '@/components/dashboard/NavCard'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Plus, AlertTriangle } from 'lucide-react'
-import Link from 'next/link'
-import { getProposalCustomerDisplay } from '@/lib/utils'
-import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
+import { requireAuth } from "@/lib/auth-helpers";
+import { prisma } from "@/lib/db";
+import { MetricCard } from "@/components/dashboard/MetricCard";
+import { OutcomesSummary } from "@/components/dashboard/OutcomesSummary";
+import { RecentProposals } from "@/components/dashboard/RecentProposals";
+import { QuickStats } from "@/components/dashboard/QuickStats";
+import { QuickActions } from "@/components/dashboard/QuickActions";
+import { NavCard } from "@/components/dashboard/NavCard";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { FinanceMetrics } from "@/components/dashboard/FinanceMetrics";
+import { Plus, AlertTriangle, AlertCircle } from "lucide-react";
+import Link from "next/link";
+import { getProposalCustomerDisplay } from "@/lib/utils";
+import { AuthenticatedLayout } from "@/components/layout/AuthenticatedLayout";
 import {
   Breadcrumb,
   BreadcrumbList,
   BreadcrumbItem,
   BreadcrumbPage,
-} from '@/components/ui/breadcrumb'
+} from "@/components/ui/breadcrumb";
 
 async function getDashboardData() {
-  const session = await requireAuth()
+  const session = await requireAuth();
   if (!session.user) {
     return {
       statusCounts: {},
       totalProposals: 0,
       recentProposals: [],
       expiringSoon: [],
-    }
+    };
   }
 
-  const where: any = {}
+  const where: any = {};
 
-  if (session.user.role === 'SUPER_ADMIN') {
+  if (session.user.role === "SUPER_ADMIN") {
   } else {
-    where.companyId = session.user.companyId
+    where.companyId = session.user.companyId;
   }
 
-  if (session.user.role === 'SALES_REP') {
-    where.userId = session.user.id
+  if (session.user.role === "SALES_REP") {
+    where.userId = session.user.id;
   }
 
   const statusCounts = await prisma.proposal.groupBy({
-    by: ['status'],
+    by: ["status"],
     where,
     _count: {
       id: true,
     },
-  })
+  });
 
   const recentProposals = await prisma.proposal.findMany({
     where,
@@ -61,13 +68,13 @@ async function getDashboardData() {
       },
     },
     orderBy: {
-      createdAt: 'desc',
+      createdAt: "desc",
     },
     take: 10,
-  })
+  });
 
-  const sevenDaysFromNow = new Date()
-  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7)
+  const sevenDaysFromNow = new Date();
+  sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
   const expiringSoon = await prisma.proposal.findMany({
     where: {
@@ -77,7 +84,7 @@ async function getDashboardData() {
         gte: new Date(),
       },
       status: {
-        not: 'EXPIRED',
+        not: "EXPIRED",
       },
     },
     include: {
@@ -90,12 +97,12 @@ async function getDashboardData() {
       },
     },
     orderBy: {
-      expiresAt: 'asc',
+      expiresAt: "asc",
     },
     take: 5,
-  })
+  });
 
-  const totalProposals = await prisma.proposal.count({ where })
+  const totalProposals = await prisma.proposal.count({ where });
 
   const statusCountsMap: Record<string, number> = {
     DRAFT: 0,
@@ -104,49 +111,106 @@ async function getDashboardData() {
     ACCEPTED: 0,
     REJECTED: 0,
     EXPIRED: 0,
-  }
+  };
 
   statusCounts.forEach((item) => {
-    statusCountsMap[item.status] = item._count.id
-  })
+    statusCountsMap[item.status] = item._count.id;
+  });
 
   const sentProposals = await prisma.proposal.findMany({
     where: {
       ...where,
-      status: 'SENT',
+      status: "SENT",
     },
     select: {
       createdAt: true,
       totals: true,
     },
     orderBy: {
-      createdAt: 'desc',
+      createdAt: "desc",
     },
-  })
+  });
 
   const allProposalsWithTotals = await prisma.proposal.findMany({
     where,
     select: {
       totals: true,
     },
-  })
+  });
 
   const totalValue = allProposalsWithTotals.reduce((sum, p) => {
-    const totals = p.totals as { total?: number } | null
-    return sum + (totals?.total || 0)
-  }, 0)
-  const avgValue = allProposalsWithTotals.length > 0 ? totalValue / allProposalsWithTotals.length : 0
+    const totals = p.totals as { total?: number } | null;
+    return sum + (totals?.total || 0);
+  }, 0);
+  const avgValue =
+    allProposalsWithTotals.length > 0
+      ? totalValue / allProposalsWithTotals.length
+      : 0;
 
-  const lastSent = sentProposals[0]?.createdAt
+  const lastSent = sentProposals[0]?.createdAt;
   const lastSentDaysAgo = lastSent
-    ? Math.floor((new Date().getTime() - new Date(lastSent).getTime()) / (1000 * 60 * 60 * 24))
-    : null
+    ? Math.floor(
+        (new Date().getTime() - new Date(lastSent).getTime()) /
+          (1000 * 60 * 60 * 24),
+      )
+    : null;
 
-  const rejectedCount = statusCountsMap.REJECTED || 0
-  const acceptedCount = statusCountsMap.ACCEPTED || 0
-  const winRate = acceptedCount + rejectedCount > 0
-    ? Math.round((acceptedCount / (acceptedCount + rejectedCount)) * 100)
-    : 0
+  const rejectedCount = statusCountsMap.REJECTED || 0;
+  const acceptedCount = statusCountsMap.ACCEPTED || 0;
+  const winRate =
+    acceptedCount + rejectedCount > 0
+      ? Math.round((acceptedCount / (acceptedCount + rejectedCount)) * 100)
+      : 0;
+
+  // Finance data
+  const financeWhere: any = {};
+  if (session.user.role !== "SUPER_ADMIN") {
+    financeWhere.proposal = { companyId: session.user.companyId };
+  }
+  if (session.user.role === "SALES_REP") {
+    financeWhere.proposal = {
+      ...financeWhere.proposal,
+      userId: session.user.id,
+    };
+  }
+
+  const financeStatusCounts = await prisma.financeApplication.groupBy({
+    by: ["status"],
+    where: financeWhere,
+    _count: { id: true },
+  });
+
+  const financeMap: Record<string, number> = {};
+  financeStatusCounts.forEach((item) => {
+    financeMap[item.status] = item._count.id;
+  });
+
+  const totalFinance =
+    (financeMap.PENDING || 0) +
+    (financeMap.SUBMITTED || 0) +
+    (financeMap.APPROVED || 0) +
+    (financeMap.CONDITIONAL || 0);
+
+  const conditionalApps = await prisma.financeApplication.findMany({
+    where: { ...financeWhere, status: "CONDITIONAL" },
+    include: {
+      proposal: {
+        select: { id: true, customerData: true },
+      },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 5,
+  });
+
+  // Count contracts pending (approved but not sent)
+  const approvedApps = await prisma.financeApplication.findMany({
+    where: { ...financeWhere, status: "APPROVED" },
+    select: { responseData: true },
+  });
+  const contractsPending = approvedApps.filter((a) => {
+    const rd = a.responseData as any;
+    return !rd?.contractStatus?.sent;
+  }).length;
 
   return {
     statusCounts: statusCountsMap,
@@ -156,12 +220,19 @@ async function getDashboardData() {
     avgValue,
     lastSentDaysAgo,
     winRate,
-  }
+    financeStats: {
+      active: totalFinance,
+      conditional: financeMap.CONDITIONAL || 0,
+      approved: financeMap.APPROVED || 0,
+      contractsPending,
+    },
+    conditionalApps,
+  };
 }
 
 export default async function DashboardPage() {
-  const session = await requireAuth()
-  const data = await getDashboardData()
+  const session = await requireAuth();
+  const data = await getDashboardData();
 
   return (
     <AuthenticatedLayout serverSession={session}>
@@ -177,8 +248,12 @@ export default async function DashboardPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">Welcome back! Here&apos;s your overview.</p>
+            <h1 className="text-2xl font-semibold text-foreground">
+              Dashboard
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Welcome back! Here&apos;s your overview.
+            </p>
           </div>
           <Link href="/builder">
             <Button>
@@ -202,7 +277,11 @@ export default async function DashboardPage() {
             value={data.statusCounts.DRAFT || 0}
             icon="FileText"
             accentColor="gray"
-            subtitle={data.statusCounts.DRAFT > 0 ? `${data.statusCounts.DRAFT} ready to send` : undefined}
+            subtitle={
+              data.statusCounts.DRAFT > 0
+                ? `${data.statusCounts.DRAFT} ready to send`
+                : undefined
+            }
             href="/proposals?status=DRAFT"
           />
           <MetricCard
@@ -210,7 +289,9 @@ export default async function DashboardPage() {
             value={data.statusCounts.SENT || 0}
             icon="Send"
             accentColor="amber"
-            subtitle={data.statusCounts.SENT === 0 ? "Send your first!" : undefined}
+            subtitle={
+              data.statusCounts.SENT === 0 ? "Send your first!" : undefined
+            }
             href="/proposals?status=SENT"
           />
           <MetricCard
@@ -221,6 +302,16 @@ export default async function DashboardPage() {
             href="/proposals?status=VIEWED"
           />
         </div>
+
+        {/* Finance Metrics */}
+        {data.financeStats.active > 0 && (
+          <>
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+              Finance Applications
+            </h2>
+            <FinanceMetrics {...data.financeStats} />
+          </>
+        )}
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -244,16 +335,25 @@ export default async function DashboardPage() {
                     </div>
                     Expiring Soon
                   </CardTitle>
-                  <CardDescription>Proposals expiring within 7 days</CardDescription>
+                  <CardDescription>
+                    Proposals expiring within 7 days
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
                     {data.expiringSoon.map((proposal) => {
-                      const customer = getProposalCustomerDisplay(proposal.customerData)
-                      const expiresAt = proposal.expiresAt ? new Date(proposal.expiresAt) : null
+                      const customer = getProposalCustomerDisplay(
+                        proposal.customerData,
+                      );
+                      const expiresAt = proposal.expiresAt
+                        ? new Date(proposal.expiresAt)
+                        : null;
                       const daysUntilExpiry = expiresAt
-                        ? Math.ceil((expiresAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-                        : null
+                        ? Math.ceil(
+                            (expiresAt.getTime() - new Date().getTime()) /
+                              (1000 * 60 * 60 * 24),
+                          )
+                        : null;
 
                       return (
                         <Link
@@ -263,21 +363,70 @@ export default async function DashboardPage() {
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="font-medium text-foreground truncate">{customer.name}</p>
+                              <p className="font-medium text-foreground truncate">
+                                {customer.name}
+                              </p>
                               <p className="text-sm text-muted-foreground">
                                 {expiresAt
-                                  ? `Expires ${daysUntilExpiry === 0 ? 'today' : `in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? 's' : ''}`}`
-                                  : 'No expiration'}
+                                  ? `Expires ${daysUntilExpiry === 0 ? "today" : `in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? "s" : ""}`}`
+                                  : "No expiration"}
                               </p>
                             </div>
-                            {daysUntilExpiry !== null && daysUntilExpiry <= 3 && (
-                              <span className="px-2 py-0.5 text-xs font-medium bg-error/10 text-error rounded">
-                                Urgent
-                              </span>
-                            )}
+                            {daysUntilExpiry !== null &&
+                              daysUntilExpiry <= 3 && (
+                                <span className="px-2 py-0.5 text-xs font-medium bg-error/10 text-error rounded">
+                                  Urgent
+                                </span>
+                              )}
                           </div>
                         </Link>
-                      )
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {data.conditionalApps && data.conditionalApps.length > 0 && (
+              <Card className="border-amber-200/50 bg-amber-50/30">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <div className="p-1.5 bg-amber-100 rounded-md">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                    </div>
+                    Finance — Needs Attention
+                  </CardTitle>
+                  <CardDescription>
+                    Conditional applications requiring stipulation resolution
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {data.conditionalApps.map((app) => {
+                      const customer = getProposalCustomerDisplay(
+                        app.proposal.customerData,
+                      );
+                      return (
+                        <Link
+                          key={app.id}
+                          href={`/proposals/${app.proposal.id}/view`}
+                          className="block p-3 border border-amber-200/50 rounded-lg hover:border-amber-300 hover:bg-amber-50/50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-medium text-foreground truncate">
+                                {customer.name}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Conditional — action required
+                              </p>
+                            </div>
+                            <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded flex-shrink-0">
+                              Conditional
+                            </span>
+                          </div>
+                        </Link>
+                      );
                     })}
                   </div>
                 </CardContent>
@@ -315,18 +464,27 @@ export default async function DashboardPage() {
                 icon="Users"
                 href="/clients"
               />
-              {(session?.user?.role === 'COMPANY_ADMIN' || session?.user?.role === 'SUPER_ADMIN') && (
-                <NavCard
-                  title="Users"
-                  description="Manage team members"
-                  icon="UserCog"
-                  href="/users"
-                />
+              {(session?.user?.role === "COMPANY_ADMIN" ||
+                session?.user?.role === "SUPER_ADMIN") && (
+                <>
+                  <NavCard
+                    title="Finance Operations"
+                    description="LightReach applications"
+                    icon="DollarSign"
+                    href="/operations/finance"
+                  />
+                  <NavCard
+                    title="Users"
+                    description="Manage team members"
+                    icon="UserCog"
+                    href="/users"
+                  />
+                </>
               )}
             </div>
           </div>
         </div>
       </div>
     </AuthenticatedLayout>
-  )
+  );
 }

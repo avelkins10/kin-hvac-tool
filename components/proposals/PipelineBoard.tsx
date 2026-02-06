@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -9,126 +9,136 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-} from '@dnd-kit/core'
-import { arrayMove, SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable'
-import { PipelineColumn } from './PipelineColumn'
-import { PipelineCard } from './PipelineCard'
-import { toast } from 'sonner'
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { PipelineColumn } from "./PipelineColumn";
+import { PipelineCard } from "./PipelineCard";
+import { toast } from "sonner";
 
 interface Proposal {
-  id: string
-  status: string
-  customerData: any
-  totals: any
-  createdAt: string
+  id: string;
+  status: string;
+  customerData: any;
+  totals: any;
+  createdAt: string;
   user: {
-    id: string
-    email: string
-    name?: string | null
-  }
+    id: string;
+    email: string;
+    name?: string | null;
+  };
+  financeApplications?: {
+    id: string;
+    status: string;
+  }[];
 }
 
 const STATUSES = [
-  { value: 'DRAFT', label: 'Draft', color: 'bg-gray-600' },
-  { value: 'SENT', label: 'Sent', color: 'bg-blue-600' },
-  { value: 'VIEWED', label: 'Viewed', color: 'bg-yellow-600' },
-  { value: 'ACCEPTED', label: 'Accepted', color: 'bg-green-600' },
-  { value: 'REJECTED', label: 'Rejected', color: 'bg-red-600' },
-  { value: 'EXPIRED', label: 'Expired', color: 'bg-gray-400' },
-]
+  { value: "DRAFT", label: "Draft", color: "bg-gray-600" },
+  { value: "SENT", label: "Sent", color: "bg-blue-600" },
+  { value: "VIEWED", label: "Viewed", color: "bg-yellow-600" },
+  { value: "ACCEPTED", label: "Accepted", color: "bg-green-600" },
+  { value: "REJECTED", label: "Rejected", color: "bg-red-600" },
+  { value: "EXPIRED", label: "Expired", color: "bg-gray-400" },
+];
 
 export function PipelineBoard() {
-  const [proposals, setProposals] = useState<Proposal[]>([])
-  const [loading, setLoading] = useState(true)
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
       },
-    })
-  )
+    }),
+  );
 
   useEffect(() => {
-    fetchProposals()
-  }, [])
+    fetchProposals();
+  }, []);
 
   const fetchProposals = async () => {
     try {
-      setLoading(true)
-      const response = await fetch('/api/proposals?limit=100')
+      setLoading(true);
+      const response = await fetch("/api/proposals?limit=100");
       if (response.ok) {
-        const data = await response.json()
-        setProposals(data.proposals || [])
+        const data = await response.json();
+        setProposals(data.proposals || []);
       }
     } catch (error) {
-      console.error('Error fetching proposals:', error)
-      toast.error('Failed to load proposals')
+      console.error("Error fetching proposals:", error);
+      toast.error("Failed to load proposals");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string)
-  }
+    setActiveId(event.active.id as string);
+  };
 
   const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event
-    setActiveId(null)
+    const { active, over } = event;
+    setActiveId(null);
 
     if (!over || active.id === over.id) {
-      return
+      return;
     }
 
-    const proposalId = active.id as string
-    const newStatus = over.id as string
+    const proposalId = active.id as string;
+    const newStatus = over.id as string;
 
     // Find the proposal
-    const proposal = proposals.find((p) => p.id === proposalId)
+    const proposal = proposals.find((p) => p.id === proposalId);
     if (!proposal || proposal.status === newStatus) {
-      return
+      return;
     }
 
     // Optimistically update UI
     const updatedProposals = proposals.map((p) =>
-      p.id === proposalId ? { ...p, status: newStatus } : p
-    )
-    setProposals(updatedProposals)
+      p.id === proposalId ? { ...p, status: newStatus } : p,
+    );
+    setProposals(updatedProposals);
 
     // Update on server
     try {
       const response = await fetch(`/api/proposals/${proposalId}/status`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ status: newStatus }),
-      })
+      });
 
       if (!response.ok) {
         // Revert on error
-        setProposals(proposals)
-        toast.error('Failed to update proposal status')
+        setProposals(proposals);
+        toast.error("Failed to update proposal status");
       } else {
-        toast.success('Proposal status updated')
+        toast.success("Proposal status updated");
       }
     } catch (error) {
       // Revert on error
-      setProposals(proposals)
-      toast.error('Failed to update proposal status')
+      setProposals(proposals);
+      toast.error("Failed to update proposal status");
     }
-  }
+  };
 
   const getProposalsByStatus = (status: string) => {
-    return proposals.filter((p) => p.status === status)
-  }
+    return proposals.filter((p) => p.status === status);
+  };
 
-  const activeProposal = activeId ? proposals.find((p) => p.id === activeId) : null
+  const activeProposal = activeId
+    ? proposals.find((p) => p.id === activeId)
+    : null;
 
   if (loading) {
-    return <div className="p-8">Loading pipeline...</div>
+    return <div className="p-8">Loading pipeline...</div>;
   }
 
   return (
@@ -139,7 +149,10 @@ export function PipelineBoard() {
         onDragEnd={handleDragEnd}
       >
         <div className="flex gap-4 overflow-x-auto pb-4">
-          <SortableContext items={STATUSES.map((s) => s.value)} strategy={horizontalListSortingStrategy}>
+          <SortableContext
+            items={STATUSES.map((s) => s.value)}
+            strategy={horizontalListSortingStrategy}
+          >
             {STATUSES.map((status) => (
               <PipelineColumn
                 key={status.value}
@@ -160,5 +173,5 @@ export function PipelineBoard() {
         </DragOverlay>
       </DndContext>
     </div>
-  )
+  );
 }

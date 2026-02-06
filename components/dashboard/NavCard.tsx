@@ -1,9 +1,17 @@
 import Link from "next/link";
-import { ChevronRight, FileText, Users, UserCog, Workflow } from "lucide-react";
+import {
+  ChevronRight,
+  DollarSign,
+  FileText,
+  Users,
+  UserCog,
+  Workflow,
+} from "lucide-react";
 
-type IconName = "FileText" | "Users" | "UserCog" | "Workflow";
+type IconName = "DollarSign" | "FileText" | "Users" | "UserCog" | "Workflow";
 
 const iconMap = {
+  DollarSign,
   FileText,
   Users,
   UserCog,

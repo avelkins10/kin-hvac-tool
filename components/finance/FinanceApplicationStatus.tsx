@@ -27,6 +27,7 @@ import {
   FinanceStipulations,
   FinanceMilestones,
   FinanceInstallPackageLink,
+  FinancePaymentSchedule,
   SendContractButton,
   type ApplicationData,
   type StatusConfig,
@@ -212,7 +213,8 @@ export function FinanceApplicationStatus({
   const isLightReach = application.lenderId === "lightreach";
   const hasExternalId = !!application.externalApplicationId;
   const isTestMode = application.externalApplicationId?.startsWith("test_");
-  const isApprovedOrConditional = status === "APPROVED" || status === "CONDITIONAL";
+  const isApprovedOrConditional =
+    status === "APPROVED" || status === "CONDITIONAL";
 
   return (
     <Card>
@@ -295,37 +297,52 @@ export function FinanceApplicationStatus({
 
         {/* Contract Status Timeline */}
         {isLightReach && responseData.contractStatus && (
-          <FinanceContractSection contractStatus={responseData.contractStatus} />
+          <FinanceContractSection
+            contractStatus={responseData.contractStatus}
+          />
         )}
 
         {/* Sign contract button */}
-        {isLightReach && hasExternalId && !isTestMode && isApprovedOrConditional && (
-          <div className="rounded-lg border p-4">
-            <Button
-              onClick={handleSignContract}
-              disabled={signingLinkLoading}
-              className="w-full sm:w-auto"
-            >
-              {signingLinkLoading ? (
-                <Spinner className="size-4 mr-2" aria-hidden="true" />
-              ) : (
-                <ExternalLink className="size-4 mr-2" aria-hidden="true" />
-              )}
-              Sign contract
-            </Button>
-            <p className="text-xs text-muted-foreground mt-2">
-              Opens the Palmetto contract signing page in a new tab.
-            </p>
-          </div>
-        )}
+        {isLightReach &&
+          hasExternalId &&
+          !isTestMode &&
+          isApprovedOrConditional && (
+            <div className="rounded-lg border p-4">
+              <Button
+                onClick={handleSignContract}
+                disabled={signingLinkLoading}
+                className="w-full sm:w-auto"
+              >
+                {signingLinkLoading ? (
+                  <Spinner className="size-4 mr-2" aria-hidden="true" />
+                ) : (
+                  <ExternalLink className="size-4 mr-2" aria-hidden="true" />
+                )}
+                Sign contract
+              </Button>
+              <p className="text-xs text-muted-foreground mt-2">
+                Opens the Palmetto contract signing page in a new tab.
+              </p>
+            </div>
+          )}
 
         {/* Stipulations */}
         {isLightReach && isApprovedOrConditional && (
           <FinanceStipulations
             stipulations={stipulations}
             loading={stipulationsLoading}
+            accountId={application.externalApplicationId || undefined}
+            onDocumentUploaded={() => fetchStatus(true)}
           />
         )}
+
+        {/* Payment Schedule */}
+        {isLightReach &&
+          hasExternalId &&
+          !isTestMode &&
+          isApprovedOrConditional && (
+            <FinancePaymentSchedule applicationId={applicationId} />
+          )}
 
         {/* Milestones */}
         <FinanceMilestones
@@ -352,7 +369,9 @@ export function FinanceApplicationStatus({
           !isTestMode &&
           isApprovedOrConditional &&
           !responseData.contractStatus?.sent && (
-            <SendContractButton accountId={application.externalApplicationId!} />
+            <SendContractButton
+              accountId={application.externalApplicationId!}
+            />
           )}
 
         {/* Install Package Link */}
@@ -363,6 +382,8 @@ export function FinanceApplicationStatus({
             <FinanceInstallPackageLink
               proposalId={application.proposalId}
               submittedAt={responseData.installPackage?.submittedAt}
+              reviewFlags={responseData.installPackage?.reviewFlags}
+              installStatus={responseData.installPackage?.status}
             />
           )}
 
