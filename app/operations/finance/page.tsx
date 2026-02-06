@@ -1,8 +1,8 @@
-import { requireAuth } from '@/lib/auth-helpers'
-import { prisma } from '@/lib/db'
-import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
-import { FinanceStatCards } from '@/components/operations/FinanceStatCards'
-import { FinanceOperationsTable } from '@/components/operations/FinanceOperationsTable'
+import { requireAuth } from "@/lib/auth-helpers";
+import { prisma } from "@/lib/db";
+import { AuthenticatedLayout } from "@/components/layout/AuthenticatedLayout";
+import { FinanceStatCards } from "@/components/operations/FinanceStatCards";
+import { FinanceOperationsTable } from "@/components/operations/FinanceOperationsTable";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -10,17 +10,17 @@ import {
   BreadcrumbLink,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
+} from "@/components/ui/breadcrumb";
 
 async function getFinanceData(session: any) {
-  const where: any = {}
+  const where: any = {};
 
-  if (session.user.role !== 'SUPER_ADMIN') {
-    where.proposal = { companyId: session.user.companyId }
+  if (session.user.role !== "SUPER_ADMIN") {
+    where.proposal = { companyId: session.user.companyId };
   }
 
-  if (session.user.role === 'SALES_REP') {
-    where.proposal = { ...where.proposal, userId: session.user.id }
+  if (session.user.role === "SALES_REP") {
+    where.proposal = { ...where.proposal, userId: session.user.id };
   }
 
   const applications = await prisma.financeApplication.findMany({
@@ -42,27 +42,22 @@ async function getFinanceData(session: any) {
         },
       },
     },
-    orderBy: { updatedAt: 'desc' },
-  })
+    orderBy: { updatedAt: "desc" },
+  });
 
-  const statusCounts = await prisma.financeApplication.groupBy({
-    by: ['status'],
-    where,
-    _count: { id: true },
-  })
-
-  const statusMap: Record<string, number> = {}
-  statusCounts.forEach((item) => {
-    statusMap[item.status] = item._count.id
-  })
+  // Compute status counts from the fetched applications (groupBy doesn't support relation where)
+  const statusMap: Record<string, number> = {};
+  for (const app of applications) {
+    statusMap[app.status] = (statusMap[app.status] || 0) + 1;
+  }
 
   // Count contracts sent and install packages submitted from responseData
-  let contractsSent = 0
-  let installSubmitted = 0
+  let contractsSent = 0;
+  let installSubmitted = 0;
   for (const app of applications) {
-    const rd = app.responseData as any
-    if (rd?.contractStatus?.sent) contractsSent++
-    if (rd?.installPackage?.submittedAt) installSubmitted++
+    const rd = app.responseData as any;
+    if (rd?.contractStatus?.sent) contractsSent++;
+    if (rd?.installPackage?.submittedAt) installSubmitted++;
   }
 
   return {
@@ -83,12 +78,12 @@ async function getFinanceData(session: any) {
       contractsSent,
       installSubmitted,
     },
-  }
+  };
 }
 
 export default async function FinanceOperationsPage() {
-  const session = await requireAuth()
-  const data = await getFinanceData(session)
+  const session = await requireAuth();
+  const data = await getFinanceData(session);
 
   return (
     <AuthenticatedLayout serverSession={session}>
@@ -106,7 +101,9 @@ export default async function FinanceOperationsPage() {
         </Breadcrumb>
 
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Finance Operations</h1>
+          <h1 className="text-2xl font-semibold text-foreground">
+            Finance Operations
+          </h1>
           <p className="text-muted-foreground mt-1">
             Manage LightReach finance applications across all proposals.
           </p>
@@ -117,5 +114,5 @@ export default async function FinanceOperationsPage() {
         <FinanceOperationsTable applications={data.applications} />
       </div>
     </AuthenticatedLayout>
-  )
+  );
 }

@@ -174,16 +174,16 @@ async function getDashboardData() {
     };
   }
 
-  const financeStatusCounts = await prisma.financeApplication.groupBy({
-    by: ["status"],
+  // Fetch all finance apps and compute counts (groupBy doesn't support relation where)
+  const allFinanceApps = await prisma.financeApplication.findMany({
     where: financeWhere,
-    _count: { id: true },
+    select: { status: true },
   });
 
   const financeMap: Record<string, number> = {};
-  financeStatusCounts.forEach((item) => {
-    financeMap[item.status] = item._count.id;
-  });
+  for (const app of allFinanceApps) {
+    financeMap[app.status] = (financeMap[app.status] || 0) + 1;
+  }
 
   const totalFinance =
     (financeMap.PENDING || 0) +
