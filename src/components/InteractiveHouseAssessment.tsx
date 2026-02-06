@@ -48,6 +48,7 @@ import {
   Edit,
   X,
   ClipboardList,
+  Lock,
 } from "lucide-react";
 import {
   usePriceBook,
@@ -284,6 +285,31 @@ const hotspots: Hotspot[] = [
   },
 ];
 
+// Guided assessment order
+const ASSESSMENT_ORDER: HotspotType[] = [
+  "customer", // 1. Who is the customer?
+  "home", // 2. Tell us about the home
+  "hvac", // 3. Current HVAC system
+  "electrical", // 4. Electrical capacity
+  "solar", // 5. Solar interest
+  "preferences", // 6. Budget, timeline, priorities
+];
+
+const ASSESSMENT_STEP_INDEX: Record<HotspotType, number> =
+  ASSESSMENT_ORDER.reduce(
+    (acc, id, idx) => ({ ...acc, [id]: idx }),
+    {} as Record<HotspotType, number>,
+  );
+
+const ASSESSMENT_LABELS: Record<HotspotType, string> = {
+  customer: "Customer Info",
+  home: "Home Details",
+  hvac: "HVAC System",
+  electrical: "Electrical Panel",
+  solar: "Solar Interest",
+  preferences: "Preferences",
+};
+
 // Default add-ons
 const defaultAddOns: AddOn[] = [
   {
@@ -403,6 +429,21 @@ function InteractiveHouseAssessmentInner({
   }, []);
   const [completedSections, setCompletedSections] = useState<Set<HotspotType>>(
     new Set(),
+  );
+
+  // Guided assessment flow state
+  const [assessmentStep, setAssessmentStep] = useState(0);
+  const autoAdvanceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Compute hotspot visual state
+  const getHotspotState = useCallback(
+    (id: string): "completed" | "current" | "locked" => {
+      if (completedSections.has(id as HotspotType)) return "completed";
+      if (ASSESSMENT_STEP_INDEX[id as HotspotType] === assessmentStep)
+        return "current";
+      return "locked";
+    },
+    [completedSections, assessmentStep],
   );
 
   // Data state
@@ -769,6 +810,38 @@ function InteractiveHouseAssessmentInner({
     };
   }, [hvacData.nameplatePhotoPath]);
 
+  // Auto-open first uncompleted modal on mount (assessment view only)
+  useEffect(() => {
+    if (showPricing) return;
+    // Compute initial step from any already-completed sections
+    let initialStep = ASSESSMENT_ORDER.length;
+    for (let i = 0; i < ASSESSMENT_ORDER.length; i++) {
+      if (!completedSections.has(ASSESSMENT_ORDER[i])) {
+        initialStep = i;
+        break;
+      }
+    }
+    setAssessmentStep(initialStep);
+
+    // If all done, don't auto-open
+    if (initialStep >= ASSESSMENT_ORDER.length) return;
+
+    const timer = setTimeout(() => {
+      setActiveModal(ASSESSMENT_ORDER[initialStep]);
+    }, 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
+
+  // Cleanup auto-advance timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoAdvanceTimerRef.current) {
+        clearTimeout(autoAdvanceTimerRef.current);
+      }
+    };
+  }, []);
+
   // System design is required for saving proposals and for Comfort Plan (LightReach) applications
   const hasSystemDesignData = (): boolean => {
     const sqft = homeData?.squareFootage ?? 0;
@@ -798,7 +871,7 @@ function InteractiveHouseAssessmentInner({
     return equipmentPrice + addOnsPrice + maintenancePrice - incentivesTotal;
   };
 
-  // Mark section complete
+  // Mark section complete with auto-advance
   const markComplete = (section: HotspotType) => {
     if (section === "home") {
       const sqft = homeData?.squareFootage ?? 0;
@@ -809,8 +882,34 @@ function InteractiveHouseAssessmentInner({
         return;
       }
     }
-    setCompletedSections((prev) => new Set([...prev, section]));
+
+    // Clear any pending auto-advance timer
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+
+    const newCompleted = new Set([...completedSections, section]);
+    setCompletedSections(newCompleted);
     setActiveModal(null);
+
+    // Find next uncompleted step
+    let nextStep = ASSESSMENT_ORDER.length; // default: all done
+    for (let i = 0; i < ASSESSMENT_ORDER.length; i++) {
+      if (!newCompleted.has(ASSESSMENT_ORDER[i])) {
+        nextStep = i;
+        break;
+      }
+    }
+    setAssessmentStep(nextStep);
+
+    // Auto-advance to next uncompleted section after 600ms delay
+    if (nextStep < ASSESSMENT_ORDER.length) {
+      autoAdvanceTimerRef.current = setTimeout(() => {
+        setActiveModal(ASSESSMENT_ORDER[nextStep]);
+        autoAdvanceTimerRef.current = null;
+      }, 600);
+    }
   };
 
   // Reset assessment data
@@ -1147,6 +1246,7 @@ function InteractiveHouseAssessmentInner({
     setShowPricing(false);
     setPricingStep("equipment");
     setCompletedSections(new Set());
+    setAssessmentStep(0);
     setSelectedEquipment(null);
     // Reset add-ons will be handled by useEffect that loads from context
     setSelectedPlan(null);
@@ -1502,9 +1602,12 @@ function InteractiveHouseAssessmentInner({
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="name" className="text-base font-medium">
+                  Full Name
+                </Label>
                 <Input
                   id="name"
+                  className="text-lg h-12"
                   value={customerData.name}
                   onChange={(e) =>
                     setCustomerData({ ...customerData, name: e.target.value })
@@ -1513,9 +1616,12 @@ function InteractiveHouseAssessmentInner({
                 />
               </div>
               <div>
-                <Label htmlFor="phone">Phone</Label>
+                <Label htmlFor="phone" className="text-base font-medium">
+                  Phone
+                </Label>
                 <Input
                   id="phone"
+                  className="text-lg h-12"
                   value={customerData.phone}
                   onChange={(e) =>
                     setCustomerData({ ...customerData, phone: e.target.value })
@@ -1525,9 +1631,12 @@ function InteractiveHouseAssessmentInner({
               </div>
             </div>
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-base font-medium">
+                Email
+              </Label>
               <Input
                 id="email"
+                className="text-lg h-12"
                 type="email"
                 value={customerData.email}
                 onChange={(e) =>
@@ -1537,9 +1646,12 @@ function InteractiveHouseAssessmentInner({
               />
             </div>
             <div>
-              <Label htmlFor="address">Street Address</Label>
+              <Label htmlFor="address" className="text-base font-medium">
+                Street Address
+              </Label>
               <Input
                 id="address"
+                className="text-lg h-12"
                 value={customerData.address}
                 onChange={(e) =>
                   setCustomerData({ ...customerData, address: e.target.value })
@@ -1549,9 +1661,12 @@ function InteractiveHouseAssessmentInner({
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="col-span-2">
-                <Label htmlFor="city">City</Label>
+                <Label htmlFor="city" className="text-base font-medium">
+                  City
+                </Label>
                 <Input
                   id="city"
+                  className="text-lg h-12"
                   value={customerData.city}
                   onChange={(e) =>
                     setCustomerData({ ...customerData, city: e.target.value })
@@ -1560,9 +1675,12 @@ function InteractiveHouseAssessmentInner({
                 />
               </div>
               <div>
-                <Label htmlFor="state">State</Label>
+                <Label htmlFor="state" className="text-base font-medium">
+                  State
+                </Label>
                 <Input
                   id="state"
+                  className="text-lg h-12"
                   value={customerData.state}
                   onChange={(e) =>
                     setCustomerData({ ...customerData, state: e.target.value })
@@ -1571,9 +1689,12 @@ function InteractiveHouseAssessmentInner({
                 />
               </div>
               <div>
-                <Label htmlFor="zip">ZIP</Label>
+                <Label htmlFor="zip" className="text-base font-medium">
+                  ZIP
+                </Label>
                 <Input
                   id="zip"
+                  className="text-lg h-12"
                   value={customerData.zip}
                   onChange={(e) =>
                     setCustomerData({ ...customerData, zip: e.target.value })
@@ -1582,20 +1703,19 @@ function InteractiveHouseAssessmentInner({
                 />
               </div>
             </div>
-            <Button
-              className="w-full bg-blue-500 hover:bg-blue-600"
-              onClick={() => markComplete("customer")}
-            >
-              Save Customer Info
-            </Button>
           </div>
         );
 
       case "home":
         return (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
-              <Label>Square Footage: {homeData.squareFootage} sq ft</Label>
+              <Label className="text-base font-medium">
+                Square Footage:{" "}
+                <span className="text-lg font-bold text-primary">
+                  {homeData.squareFootage.toLocaleString()} sq ft
+                </span>
+              </Label>
               <Slider
                 value={[homeData.squareFootage]}
                 onValueChange={([v]) =>
@@ -1609,7 +1729,10 @@ function InteractiveHouseAssessmentInner({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Year Built: {homeData.yearBuilt}</Label>
+                <Label className="text-base font-medium">
+                  Year Built:{" "}
+                  <span className="font-bold">{homeData.yearBuilt}</span>
+                </Label>
                 <Slider
                   value={[homeData.yearBuilt]}
                   onValueChange={([v]) =>
@@ -1622,7 +1745,9 @@ function InteractiveHouseAssessmentInner({
                 />
               </div>
               <div>
-                <Label>Stories: {homeData.stories}</Label>
+                <Label className="text-base font-medium">
+                  Stories: <span className="font-bold">{homeData.stories}</span>
+                </Label>
                 <Slider
                   value={[homeData.stories]}
                   onValueChange={([v]) =>
@@ -1637,7 +1762,10 @@ function InteractiveHouseAssessmentInner({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Bedrooms: {homeData.bedrooms}</Label>
+                <Label className="text-base font-medium">
+                  Bedrooms:{" "}
+                  <span className="font-bold">{homeData.bedrooms}</span>
+                </Label>
                 <Slider
                   value={[homeData.bedrooms]}
                   onValueChange={([v]) =>
@@ -1650,7 +1778,10 @@ function InteractiveHouseAssessmentInner({
                 />
               </div>
               <div>
-                <Label>Bathrooms: {homeData.bathrooms}</Label>
+                <Label className="text-base font-medium">
+                  Bathrooms:{" "}
+                  <span className="font-bold">{homeData.bathrooms}</span>
+                </Label>
                 <Slider
                   value={[homeData.bathrooms]}
                   onValueChange={([v]) =>
@@ -1664,10 +1795,11 @@ function InteractiveHouseAssessmentInner({
               </div>
             </div>
 
-            <div className="space-y-3 pt-2 border-t">
-              <div className="flex items-center gap-2">
+            <div className="space-y-3 pt-3 border-t">
+              <div className="flex items-center gap-3">
                 <Checkbox
                   id="hasAdditionsOrRemodeling"
+                  className="w-6 h-6"
                   checked={homeData.hasAdditionsOrRemodeling}
                   onCheckedChange={(v) =>
                     setHomeData({
@@ -1676,15 +1808,16 @@ function InteractiveHouseAssessmentInner({
                     })
                   }
                 />
-                <Label htmlFor="hasAdditionsOrRemodeling">
+                <Label htmlFor="hasAdditionsOrRemodeling" className="text-base">
                   Home has additions or remodeled areas
                 </Label>
               </div>
 
               {homeData.hasAdditionsOrRemodeling && (
-                <div className="ml-6 flex items-center gap-2">
+                <div className="ml-8 flex items-center gap-3">
                   <Checkbox
                     id="additionsHaveDuctwork"
+                    className="w-6 h-6"
                     checked={homeData.additionsHaveDuctwork}
                     onCheckedChange={(v) =>
                       setHomeData({
@@ -1693,19 +1826,12 @@ function InteractiveHouseAssessmentInner({
                       })
                     }
                   />
-                  <Label htmlFor="additionsHaveDuctwork" className="text-sm">
+                  <Label htmlFor="additionsHaveDuctwork" className="text-base">
                     These areas have ductwork
                   </Label>
                 </div>
               )}
             </div>
-
-            <Button
-              className="w-full bg-green-500 hover:bg-green-600"
-              onClick={() => markComplete("home")}
-            >
-              Save Home Details
-            </Button>
           </div>
         );
 
@@ -1833,7 +1959,7 @@ function InteractiveHouseAssessmentInner({
         };
 
         return (
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+          <div className="space-y-4">
             {/* CHANGE: Update the nameplate upload section to show AI analysis results */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
@@ -1986,105 +2112,128 @@ function InteractiveHouseAssessmentInner({
               )}
             </div>
 
-            <div>
-              <Label>Current Cooling System</Label>
-              <Select
-                value={hvacData.currentSystem}
-                onValueChange={(v) =>
-                  setHvacData({ ...hvacData, currentSystem: v })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="central_ac">Central AC</SelectItem>
-                  <SelectItem value="heat_pump">Heat Pump</SelectItem>
-                  <SelectItem value="mini_split">Mini Split</SelectItem>
-                  <SelectItem value="window_units">Window Units</SelectItem>
-                  <SelectItem value="none">No AC</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Section: Current Equipment */}
+            <h3 className="text-base font-semibold pt-2 border-t">
+              Current Equipment
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-base font-medium">
+                  Current Cooling System
+                </Label>
+                <Select
+                  value={hvacData.currentSystem}
+                  onValueChange={(v) =>
+                    setHvacData({ ...hvacData, currentSystem: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="central_ac">Central AC</SelectItem>
+                    <SelectItem value="heat_pump">Heat Pump</SelectItem>
+                    <SelectItem value="mini_split">Mini Split</SelectItem>
+                    <SelectItem value="window_units">Window Units</SelectItem>
+                    <SelectItem value="none">No AC</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-base font-medium">
+                  Current Heating System
+                </Label>
+                <Select
+                  value={hvacData.heatingType}
+                  onValueChange={(v) =>
+                    setHvacData({ ...hvacData, heatingType: v })
+                  }
+                >
+                  <SelectTrigger className="text-lg h-12">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gas_furnace">Gas Furnace</SelectItem>
+                    <SelectItem value="electric_furnace">
+                      Electric Furnace
+                    </SelectItem>
+                    <SelectItem value="heat_pump">Heat Pump</SelectItem>
+                    <SelectItem value="boiler">Boiler</SelectItem>
+                    <SelectItem value="space_heaters">Space Heaters</SelectItem>
+                    <SelectItem value="none">No Heating</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div>
-              <Label>Current Heating System</Label>
-              <Select
-                value={hvacData.heatingType}
-                onValueChange={(v) =>
-                  setHvacData({ ...hvacData, heatingType: v })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gas_furnace">Gas Furnace</SelectItem>
-                  <SelectItem value="electric_furnace">
-                    Electric Furnace
-                  </SelectItem>
-                  <SelectItem value="heat_pump">Heat Pump</SelectItem>
-                  <SelectItem value="boiler">Boiler</SelectItem>
-                  <SelectItem value="space_heaters">Space Heaters</SelectItem>
-                  <SelectItem value="none">No Heating</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-base font-medium">System Age</Label>
+                <Select
+                  value={hvacData.systemAge}
+                  onValueChange={(v) =>
+                    setHvacData({ ...hvacData, systemAge: v })
+                  }
+                >
+                  <SelectTrigger className="text-lg h-12">
+                    <SelectValue placeholder="Select age range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0-5">0-5 years</SelectItem>
+                    <SelectItem value="6-10">6-10 years</SelectItem>
+                    <SelectItem value="11-15">11-15 years</SelectItem>
+                    <SelectItem value="16-20">16-20 years</SelectItem>
+                    <SelectItem value="20+">Over 20 years</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-base font-medium">
+                  Last Professional Service
+                </Label>
+                <Select
+                  value={hvacData.lastServiced}
+                  onValueChange={(v) =>
+                    setHvacData({ ...hvacData, lastServiced: v })
+                  }
+                >
+                  <SelectTrigger className="text-lg h-12">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="less_than_year">
+                      Less than 1 year ago
+                    </SelectItem>
+                    <SelectItem value="1-2_years">1-2 years ago</SelectItem>
+                    <SelectItem value="2-5_years">2-5 years ago</SelectItem>
+                    <SelectItem value="over_5_years">
+                      Over 5 years ago
+                    </SelectItem>
+                    <SelectItem value="never">Never</SelectItem>
+                    <SelectItem value="unknown">Unknown</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div>
-              <Label>System Age</Label>
-              <Select
-                value={hvacData.systemAge}
-                onValueChange={(v) =>
-                  setHvacData({ ...hvacData, systemAge: v })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select age range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0-5">0-5 years</SelectItem>
-                  <SelectItem value="6-10">6-10 years</SelectItem>
-                  <SelectItem value="11-15">11-15 years</SelectItem>
-                  <SelectItem value="16-20">16-20 years</SelectItem>
-                  <SelectItem value="20+">Over 20 years</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Section: Ductwork */}
+            <h3 className="text-base font-semibold pt-2 border-t">Ductwork</h3>
 
-            <div>
-              <Label>Last Professional Service</Label>
-              <Select
-                value={hvacData.lastServiced}
-                onValueChange={(v) =>
-                  setHvacData({ ...hvacData, lastServiced: v })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="less_than_year">
-                    Less than 1 year ago
-                  </SelectItem>
-                  <SelectItem value="1-2_years">1-2 years ago</SelectItem>
-                  <SelectItem value="2-5_years">2-5 years ago</SelectItem>
-                  <SelectItem value="over_5_years">Over 5 years ago</SelectItem>
-                  <SelectItem value="never">Never</SelectItem>
-                  <SelectItem value="unknown">Unknown</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Checkbox
                 id="ductwork"
+                className="w-6 h-6"
                 checked={hvacData.hasDuctwork}
                 onCheckedChange={(v) =>
                   setHvacData({ ...hvacData, hasDuctwork: v as boolean })
                 }
               />
-              <Label htmlFor="ductwork">Home has existing ductwork</Label>
+              <Label htmlFor="ductwork" className="text-base">
+                Home has existing ductwork
+              </Label>
             </div>
 
             {hvacData.hasDuctwork && (
@@ -2134,8 +2283,13 @@ function InteractiveHouseAssessmentInner({
               </>
             )}
 
+            {/* Section: Controls & Environment */}
+            <h3 className="text-base font-semibold pt-2 border-t">
+              Controls & Environment
+            </h3>
+
             <div>
-              <Label className="flex items-center gap-2">
+              <Label className="flex items-center gap-2 text-base font-medium">
                 IECC Climate Zone
                 <Info className="w-4 h-4 text-muted-foreground" />
               </Label>
@@ -2282,8 +2436,15 @@ function InteractiveHouseAssessmentInner({
               </Select>
             </div>
 
+            {/* Section: Current Issues */}
+            <h3 className="text-base font-semibold pt-2 border-t">
+              Current Issues & Preferences
+            </h3>
+
             <div>
-              <Label>Current Issues (select all that apply)</Label>
+              <Label className="text-base font-medium">
+                Current Issues (select all that apply)
+              </Label>
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {[
                   { id: "not_cooling", label: "Not cooling properly" },
@@ -2352,19 +2513,12 @@ function InteractiveHouseAssessmentInner({
                 </SelectContent>
               </Select>
             </div>
-
-            <Button
-              className="w-full bg-orange-500 hover:bg-orange-600"
-              onClick={() => markComplete("hvac")}
-            >
-              Save HVAC Info
-            </Button>
           </div>
         );
 
       case "solar":
         return (
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+          <div className="space-y-4">
             {/* CHANGE: Added "already have solar" option */}
             <div className="flex items-center gap-2">
               <Checkbox
@@ -2570,21 +2724,14 @@ function InteractiveHouseAssessmentInner({
                 Have received other solar quotes
               </Label>
             </div>
-
-            <Button
-              className="w-full bg-yellow-500 hover:bg-yellow-600 text-black"
-              onClick={() => markComplete("solar")}
-            >
-              Save Solar Info
-            </Button>
           </div>
         );
 
       case "electrical":
         return (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
-              <Label>Panel Size (Amps)</Label>
+              <Label className="text-base font-medium">Panel Size (Amps)</Label>
               <Select
                 value={electricalData.panelSize.toString()}
                 onValueChange={(v) =>
@@ -2594,7 +2741,7 @@ function InteractiveHouseAssessmentInner({
                   })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="text-lg h-12">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -2606,10 +2753,10 @@ function InteractiveHouseAssessmentInner({
               </Select>
             </div>
 
-            {/* CHANGE: Added open breakers field */}
             <div>
-              <Label>
-                Number of Open Breaker Spaces: {electricalData.openBreakers}
+              <Label className="text-base font-medium">
+                Open Breaker Spaces:{" "}
+                <span className="font-bold">{electricalData.openBreakers}</span>
               </Label>
               <Slider
                 value={[electricalData.openBreakers]}
@@ -2623,9 +2770,10 @@ function InteractiveHouseAssessmentInner({
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Checkbox
                 id="capacity"
+                className="w-6 h-6"
                 checked={electricalData.hasCapacity}
                 onCheckedChange={(v) =>
                   setElectricalData({
@@ -2634,14 +2782,15 @@ function InteractiveHouseAssessmentInner({
                   })
                 }
               />
-              <Label htmlFor="capacity">
+              <Label htmlFor="capacity" className="text-base">
                 Panel has available capacity for HVAC
               </Label>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Checkbox
                 id="upgrade"
+                className="w-6 h-6"
                 checked={electricalData.needsUpgrade}
                 onCheckedChange={(v) =>
                   setElectricalData({
@@ -2650,21 +2799,16 @@ function InteractiveHouseAssessmentInner({
                   })
                 }
               />
-              <Label htmlFor="upgrade">Panel needs upgrade</Label>
+              <Label htmlFor="upgrade" className="text-base">
+                Panel needs upgrade
+              </Label>
             </div>
-
-            <Button
-              className="w-full bg-purple-500 hover:bg-purple-600"
-              onClick={() => markComplete("electrical")}
-            >
-              Save Electrical Info
-            </Button>
           </div>
         );
 
       case "preferences":
         return (
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+          <div className="space-y-4">
             <div>
               <Label>Top Priority</Label>
               <Select
@@ -2931,13 +3075,6 @@ function InteractiveHouseAssessmentInner({
                 Have quotes from other companies
               </Label>
             </div>
-
-            <Button
-              className="w-full bg-pink-500 hover:bg-pink-600"
-              onClick={() => markComplete("preferences")}
-            >
-              Save Preferences
-            </Button>
           </div>
         );
 
@@ -3685,7 +3822,7 @@ function InteractiveHouseAssessmentInner({
 
     return (
       <div
-        className="bg-card/80 backdrop-blur-md rounded-lg p-6 md:p-10 shadow-2xl max-w-5xl mx-auto space-y-8"
+        className="bg-slate-900/90 backdrop-blur-md rounded-lg p-6 md:p-10 shadow-2xl max-w-5xl mx-auto space-y-8"
         id="proposal-content"
         style={{
           backgroundImage: "url(/proposal-background.jpg)",
@@ -3714,7 +3851,7 @@ function InteractiveHouseAssessmentInner({
         </div>
 
         {/* Equipment Details with Edit */}
-        <div className="bg-card/80 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-6 md:p-8 shadow-lg relative group">
+        <div className="bg-slate-800/80 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-6 md:p-8 shadow-lg relative group">
           <Button
             variant="ghost"
             size="sm"
@@ -3779,7 +3916,7 @@ function InteractiveHouseAssessmentInner({
 
         {/* Add-ons */}
         {addOns.some((a) => a.selected) && (
-          <div className="bg-card/80 backdrop-blur-md border-2 border-blue-200 rounded-2xl p-6 md:p-8 shadow-lg">
+          <div className="bg-slate-800/80 backdrop-blur-md border-2 border-blue-400/30 rounded-2xl p-6 md:p-8 shadow-lg">
             <div className="flex items-center gap-3 mb-6">
               <Sparkles className="w-7 h-7 text-blue-600" />
               <h3 className="text-2xl font-bold text-white">Premium Add-Ons</h3>
@@ -3816,7 +3953,7 @@ function InteractiveHouseAssessmentInner({
 
         {/* Maintenance Plan - Show service details instead of cost */}
         {selectedPlan && (
-          <div className="bg-card/80 backdrop-blur-md border-2 border-purple-200 rounded-2xl p-6 md:p-8 shadow-lg">
+          <div className="bg-slate-800/80 backdrop-blur-md border-2 border-purple-400/30 rounded-2xl p-6 md:p-8 shadow-lg">
             <div className="flex items-center gap-3 mb-6">
               <Shield className="w-7 h-7 text-purple-600" />
               <h3 className="text-2xl font-bold text-white">
@@ -3883,7 +4020,7 @@ function InteractiveHouseAssessmentInner({
 
         {/* Incentives */}
         {selectedIncentives.length > 0 && (
-          <div className="bg-card/80 backdrop-blur-md border-2 border-green-300 rounded-2xl p-6 md:p-8 shadow-lg">
+          <div className="bg-slate-800/80 backdrop-blur-md border-2 border-green-400/30 rounded-2xl p-6 md:p-8 shadow-lg">
             <div className="flex items-center gap-3 mb-6">
               <DollarSign className="w-7 h-7 text-green-400" />
               <h3 className="text-2xl font-bold text-green-400">
@@ -3914,7 +4051,7 @@ function InteractiveHouseAssessmentInner({
         )}
 
         {/* Total Investment */}
-        <div className="bg-gradient-to-br from-slate-900/20 to-slate-800/20 backdrop-blur-sm text-white rounded-2xl p-6 md:p-10 shadow-2xl border-2 border-slate-700">
+        <div className="bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur-sm text-white rounded-2xl p-6 md:p-10 shadow-2xl border-2 border-slate-700">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="text-center md:text-left">
               <p className="text-slate-400 text-lg mb-2">Total Investment</p>
@@ -3951,7 +4088,7 @@ function InteractiveHouseAssessmentInner({
         {selectedFinanceApplicationId &&
           paymentMethod === "leasing" &&
           selectedFinancingOption?.provider?.toLowerCase() === "lightreach" && (
-            <div className="bg-card/80 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-6 md:p-8 shadow-lg">
+            <div className="bg-slate-800/80 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-6 md:p-8 shadow-lg">
               <FinanceApplicationStatus
                 applicationId={selectedFinanceApplicationId}
                 autoRefresh
@@ -4357,7 +4494,8 @@ function InteractiveHouseAssessmentInner({
   }
 
   // Determine if all hotspots are completed
-  const allHotspotsCompleted = completedSections.size === hotspots.length;
+  const allHotspotsCompleted =
+    completedSections.size === ASSESSMENT_ORDER.length;
 
   // Get missing sections for completion card
   const getMissingSections = (): string[] => {
@@ -4382,6 +4520,19 @@ function InteractiveHouseAssessmentInner({
 
   // Handle hotspot click
   const handleHotspotClick = (hotspotId: string) => {
+    const state = getHotspotState(hotspotId);
+    if (state === "locked") {
+      const currentLabel =
+        ASSESSMENT_LABELS[ASSESSMENT_ORDER[assessmentStep]] ||
+        "current section";
+      toast.error(`Complete "${currentLabel}" first`);
+      return;
+    }
+    // Clear any pending auto-advance timer
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
     setActiveModal(hotspotId as HotspotType);
   };
 
@@ -4416,32 +4567,44 @@ function InteractiveHouseAssessmentInner({
         />
 
         {/* Hotspots */}
-        {hotspots.map((hotspot) => (
-          <div
-            key={hotspot.id}
-            className="absolute transform -translate-x-1/2 -translate-y-1/2 group"
-            style={{ top: hotspot.top, left: hotspot.left }}
-          >
-            <button
-              onClick={() => handleHotspotClick(hotspot.id)}
-              className={`w-10 h-10 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg ${
-                completedSections.has(hotspot.id)
-                  ? "bg-green-500 scale-100"
-                  : "bg-primary hover:scale-110 animate-pulse"
-              }`}
-              aria-label={hotspot.label}
+        {hotspots.map((hotspot) => {
+          const hState = getHotspotState(hotspot.id);
+          const stepNum = ASSESSMENT_STEP_INDEX[hotspot.id as HotspotType] + 1;
+          return (
+            <div
+              key={hotspot.id}
+              className="absolute transform -translate-x-1/2 -translate-y-1/2 group"
+              style={{ top: hotspot.top, left: hotspot.left }}
             >
-              {completedSections.has(hotspot.id) ? (
-                <Check className="w-4 h-4 md:w-6 md:h-6 text-white" />
-              ) : (
-                hotspot.icon
-              )}
-            </button>
-            <span className="block text-center text-xs md:text-sm font-semibold text-white mt-1 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] pointer-events-none whitespace-nowrap">
-              {hotspot.label}
-            </span>
-          </div>
-        ))}
+              <button
+                onClick={() => handleHotspotClick(hotspot.id)}
+                className={`w-10 h-10 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg ${
+                  hState === "completed"
+                    ? "bg-green-500 ring-2 ring-green-300 scale-100 cursor-pointer"
+                    : hState === "current"
+                      ? "bg-primary ring-4 ring-primary/50 shadow-xl scale-110 animate-pulse cursor-pointer"
+                      : "bg-gray-400/60 scale-90 cursor-not-allowed"
+                }`}
+                aria-label={hotspot.label}
+              >
+                {hState === "completed" ? (
+                  <Check className="w-4 h-4 md:w-6 md:h-6 text-white" />
+                ) : hState === "locked" ? (
+                  <Lock className="w-4 h-4 md:w-5 md:h-5 text-white/60" />
+                ) : (
+                  hotspot.icon
+                )}
+              </button>
+              <span
+                className={`block text-center text-xs md:text-sm font-semibold mt-1 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] pointer-events-none whitespace-nowrap ${
+                  hState === "locked" ? "text-white/60" : "text-white"
+                }`}
+              >
+                {stepNum}. {ASSESSMENT_LABELS[hotspot.id as HotspotType]}
+              </span>
+            </div>
+          );
+        })}
 
         <button
           onClick={handleAdminClick}
@@ -4456,9 +4619,40 @@ function InteractiveHouseAssessmentInner({
           aria-label="Admin access"
         />
 
-        {/* Progress indicator */}
-        <div className="absolute top-4 right-4 bg-black/70 text-white px-4 py-2 rounded-full text-base font-semibold shadow-lg z-10">
-          {completedSections.size}/{hotspots.length} complete
+        {/* Progress indicator - step dots */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+          <div className="bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 flex items-center gap-1.5">
+            {ASSESSMENT_ORDER.map((id, idx) => {
+              const dotState = getHotspotState(id);
+              return (
+                <div key={id} className="flex items-center">
+                  <button
+                    onClick={() => handleHotspotClick(id)}
+                    className={`w-3.5 h-3.5 md:w-4 md:h-4 rounded-full transition-all duration-300 ${
+                      dotState === "completed"
+                        ? "bg-green-400 cursor-pointer"
+                        : dotState === "current"
+                          ? "bg-primary ring-2 ring-primary/50 animate-pulse cursor-pointer"
+                          : "bg-white/30 cursor-not-allowed"
+                    }`}
+                    aria-label={`Step ${idx + 1}: ${ASSESSMENT_LABELS[id]}`}
+                  />
+                  {idx < ASSESSMENT_ORDER.length - 1 && (
+                    <div
+                      className={`w-3 md:w-5 h-0.5 ${
+                        dotState === "completed"
+                          ? "bg-green-400/60"
+                          : "bg-white/20"
+                      }`}
+                    />
+                  )}
+                </div>
+              );
+            })}
+            <span className="text-white/80 text-xs md:text-sm font-medium ml-2 whitespace-nowrap">
+              {completedSections.size}/{ASSESSMENT_ORDER.length}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -4466,7 +4660,7 @@ function InteractiveHouseAssessmentInner({
       {completedSections.size > 0 && (
         <AssessmentCompletionCard
           completedSections={completedSections}
-          totalSections={hotspots.length}
+          totalSections={ASSESSMENT_ORDER.length}
           onContinue={() => {
             if (allHotspotsCompleted) {
               if (!homeData?.squareFootage || homeData.squareFootage <= 0) {
@@ -4507,12 +4701,12 @@ function InteractiveHouseAssessmentInner({
           )}
           {allHotspotsCompleted
             ? "Go to Pricing"
-            : `Complete ${hotspots.length - completedSections.size} more section${hotspots.length - completedSections.size !== 1 ? "s" : ""}`}
+            : `Complete ${ASSESSMENT_ORDER.length - completedSections.size} more section${ASSESSMENT_ORDER.length - completedSections.size !== 1 ? "s" : ""}`}
           <ChevronRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
 
-      {/* Hotspot modals - Mobile optimized. Only mount when open to avoid Radix calling onOpenChange during render (re-render loop). */}
+      {/* Hotspot modals - three-zone layout. Only mount when open to avoid Radix calling onOpenChange during render (re-render loop). */}
       {activeModal !== null && (
         <Dialog
           open={true}
@@ -4520,14 +4714,62 @@ function InteractiveHouseAssessmentInner({
             if (!open) setActiveModal(null);
           }}
         >
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
-            <DialogHeader>
-              <DialogTitle className="text-xl sm:text-2xl">
-                {getModalTitle(activeModal)}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="max-h-[calc(90vh-100px)] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[90vh] w-[95vw] sm:w-full p-0 flex flex-col overflow-hidden">
+            {/* Fixed header */}
+            <div className="px-6 pt-5 pb-3 border-b shrink-0">
+              {/* In-modal step indicator */}
+              <div className="flex items-center gap-1.5 mb-2">
+                {ASSESSMENT_ORDER.map((id) => {
+                  const dState = getHotspotState(id);
+                  return (
+                    <div
+                      key={id}
+                      className={`w-2 h-2 rounded-full ${
+                        id === activeModal
+                          ? "bg-primary scale-125"
+                          : dState === "completed"
+                            ? "bg-green-400"
+                            : "bg-muted"
+                      }`}
+                    />
+                  );
+                })}
+                <span className="text-xs text-muted-foreground ml-1.5">
+                  Section {ASSESSMENT_STEP_INDEX[activeModal] + 1} of{" "}
+                  {ASSESSMENT_ORDER.length}
+                </span>
+              </div>
+              <DialogHeader>
+                <DialogTitle className="text-xl sm:text-2xl">
+                  {getModalTitle(activeModal)}
+                </DialogTitle>
+              </DialogHeader>
+            </div>
+
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
               {renderModalContent()}
+            </div>
+
+            {/* Fixed footer */}
+            <div className="px-6 py-4 border-t shrink-0 bg-card">
+              <Button
+                className="w-full py-6 text-lg font-semibold"
+                size="lg"
+                onClick={() => markComplete(activeModal)}
+              >
+                {completedSections.has(activeModal)
+                  ? "Save Changes"
+                  : assessmentStep >= ASSESSMENT_ORDER.length - 1 &&
+                      !completedSections.has(
+                        ASSESSMENT_ORDER[ASSESSMENT_ORDER.length - 1],
+                      )
+                    ? "Complete Assessment"
+                    : "Save & Continue"}
+                {!completedSections.has(activeModal) && (
+                  <ChevronRight className="w-5 h-5 ml-2" />
+                )}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -4536,38 +4778,67 @@ function InteractiveHouseAssessmentInner({
       {/* Mobile-friendly section list (shown on small screens) */}
       <div className="md:hidden p-4 bg-card/95 backdrop-blur-sm border-t">
         <div className="space-y-2">
-          {hotspots.map((hotspot) => (
-            <button
-              key={hotspot.id}
-              onClick={() => handleHotspotClick(hotspot.id)}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
-                completedSections.has(hotspot.id)
-                  ? "border-green-500 bg-green-50"
-                  : "border-border hover:border-primary"
-              }`}
-            >
-              <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  completedSections.has(hotspot.id)
-                    ? "bg-green-500"
-                    : "bg-primary"
+          {ASSESSMENT_ORDER.map((id, idx) => {
+            const mState = getHotspotState(id);
+            const hotspot = hotspots.find((h) => h.id === id);
+            if (!hotspot) return null;
+            const stepNum = idx + 1;
+            return (
+              <button
+                key={id}
+                onClick={() => handleHotspotClick(id)}
+                disabled={mState === "locked"}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
+                  mState === "completed"
+                    ? "border-green-500 bg-green-50"
+                    : mState === "current"
+                      ? "border-primary bg-primary/5 animate-pulse"
+                      : "border-border opacity-50 cursor-not-allowed"
                 }`}
               >
-                {completedSections.has(hotspot.id) ? (
-                  <Check className="w-5 h-5 text-white" />
-                ) : (
-                  hotspot.icon
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                    mState === "completed"
+                      ? "bg-green-500"
+                      : mState === "current"
+                        ? "bg-primary"
+                        : "bg-gray-400/60"
+                  }`}
+                >
+                  {mState === "completed" ? (
+                    <Check className="w-5 h-5 text-white" />
+                  ) : mState === "locked" ? (
+                    <Lock className="w-4 h-4 text-white/60" />
+                  ) : (
+                    hotspot.icon
+                  )}
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="font-medium">
+                    {stepNum}. {ASSESSMENT_LABELS[id]}
+                  </div>
+                  <div
+                    className={`text-xs ${
+                      mState === "completed"
+                        ? "text-green-600"
+                        : mState === "current"
+                          ? "text-primary font-medium"
+                          : "text-muted-foreground"
+                    }`}
+                  >
+                    {mState === "completed"
+                      ? "Completed - tap to edit"
+                      : mState === "current"
+                        ? "Up next"
+                        : "Locked"}
+                  </div>
+                </div>
+                {mState !== "locked" && (
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
                 )}
-              </div>
-              <div className="flex-1 text-left">
-                <div className="font-medium">{hotspot.label}</div>
-                {completedSections.has(hotspot.id) && (
-                  <div className="text-xs text-green-600">Completed</div>
-                )}
-              </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
       </div>
 
